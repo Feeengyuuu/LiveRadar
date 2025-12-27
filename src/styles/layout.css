@@ -1,0 +1,169 @@
+/* Layout Styles - Zones and Grids */
+
+/* 分区布局 */
+.zone-container {
+    width: 100%;
+    max-width: 2200px;
+    margin: 0 auto 6rem; /* 增加板块之间的间距 */
+    display: none;
+    transition: opacity 0.3s ease;
+    background-color: transparent !important;  /* 强制透明背景，消除任何蓝色 */
+}
+
+.zone-container.active {
+    display: block;
+    animation: fadeIn 0.5s ease;
+    background-color: transparent !important;  /* 强制透明背景 */
+}
+
+.zone-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 1.5rem;
+    padding-left: 0.8rem;
+    border-left: 5px solid transparent;
+    background-color: transparent !important; /* 强制透明背景 */
+}
+
+.zone-title {
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    color: #a3a3a3;
+}
+
+.zone-sub {
+    font-size: 11px;
+    opacity: 0.5;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    margin-left: 8px;
+}
+
+/* 状态滚动通知 */
+.status-ticker {
+    flex: 1;
+    margin-left: 2rem;
+    height: 28px;
+    overflow: hidden;
+    position: relative;
+    display: none;
+    align-items: center;
+    background-color: transparent !important; /* 强制透明背景 */
+}
+
+.status-ticker-item {
+    position: absolute;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    white-space: nowrap;
+    background-color: transparent !important; /* 强制透明背景 */
+}
+
+.status-ticker-item.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.status-ticker-item.exit {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
+.ticker-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.ticker-icon.online {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.ticker-icon.offline {
+    background: rgba(107, 114, 128, 0.2);
+    color: #6b7280;
+}
+
+.ticker-text {
+    color: #9ca3af;
+    background-color: transparent !important; /* 强制透明背景 */
+}
+
+.ticker-name {
+    color: #f3f4f6;
+    font-weight: 700;
+    background-color: transparent !important; /* 强制透明背景 */
+}
+
+/* 【移动端优化】响应式Grid布局 - 原版配置 */
+.monitor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    gap: 1rem;
+    width: 100%;
+    padding: 0 0.5rem;
+}
+
+/* 平板和桌面端 - 原版舒适布局 */
+@media (min-width: 768px) {
+    .monitor-grid {
+        /* 原版尺寸：340px在2109px宽度下显示5列 */
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 1rem; /* 16px */
+        padding: 0;
+    }
+}
+
+/* 区域特定样式 */
+#zone-live .zone-header {
+    border-left-color: var(--live);
+}
+
+#zone-live .zone-title {
+    color: var(--live);
+    text-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+}
+
+#zone-offline .zone-header {
+    border-left-color: #333;
+}
+
+#zone-loop {
+    background: rgba(99, 102, 241, 0.03);
+    border: 2px dashed rgba(99, 102, 241, 0.2);
+    border-radius: 24px;
+    padding: 2.5rem;
+}
+
+#zone-loop .zone-header {
+    border-left-color: var(--loop);
+    padding-left: 0;
+    margin-left: 0.5rem;
+}
+
+#zone-loop .zone-title {
+    color: var(--loop);
+}
+
+#zone-loop .room-card {
+    opacity: 0.85;
+}
+
+#zone-loop .room-card:hover {
+    opacity: 1;
+}

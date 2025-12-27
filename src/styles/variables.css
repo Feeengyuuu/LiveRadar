@@ -1,0 +1,18 @@
+/* CSS Custom Properties */
+:root {
+  /* Platform Colors */
+  --douyu: #ff5d23;
+  --bilibili: #fb7299;
+  --twitch: #9146ff;
+
+  /* Status Colors */
+  --live: #10b981;
+  --loop: #6366f1;
+  --off: #6b7280;
+  --weak: #eab308;
+
+  /* UI Colors */
+  --card-bg: #121212;
+  --bg-dark: #050505;
+  --gold: #ffd700;
+}

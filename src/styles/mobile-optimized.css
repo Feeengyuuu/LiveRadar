@@ -1,0 +1,673 @@
+/* ========================================
+   【iPhone 优化】Mobile-Optimized Layout
+   ======================================== */
+
+/*
+ * Design Concept: Tactical Streaming Command Center
+ * - Floating search bar for quick room access
+ * - Horizontal scrollable control ribbon
+ * - Fluid, one-handed operation
+ * - Satisfying touch interactions
+ */
+
+@media (max-width: 768px) {
+  /* ====================================
+     重置和基础优化
+     ==================================== */
+
+  body {
+    padding: 0 !important;
+    background-color: #050505;
+  }
+
+  /* 移动端也支持下雪特效，更浪漫✨ */
+  /* #snow-canvas 由JS控制，不强制隐藏 */
+
+  /* 加载界面文字缩小50% */
+  #loader-text {
+    font-size: 1rem !important; /* 原来1.575rem的50% */
+  }
+
+  /* ====================================
+     移动端头部重构
+     ==================================== */
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: linear-gradient(180deg, #0a0a0a 0%, #050505 100%);
+    padding: 0 !important;
+    margin-bottom: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  /* 移除原有的flex布局，改为垂直堆叠 */
+  header {
+    display: block !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+
+  /* ====================================
+     顶部品牌栏 - 紧凑设计
+     ==================================== */
+
+  header > div:first-child {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  header h1 {
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.02em;
+    text-align: left !important;
+    margin: 0;
+  }
+
+  header h1 span {
+    display: inline !important;
+    font-size: 10px !important;
+    margin-left: 8px !important;
+    margin-top: 0 !important;
+    opacity: 0.6;
+  }
+
+  /* 雪花切换按钮 */
+  #snow-toggle-btn {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* ====================================
+     搜索栏 - 浮动卡片设计
+     ==================================== */
+
+  header > div:nth-child(2) {
+    padding: 12px 16px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin-bottom: 8px;
+  }
+
+  /* 重新设计搜索容器 */
+  header > div:nth-child(2) {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    align-items: stretch !important;
+  }
+
+  /* 平台选择器 - 压缩设计 */
+  #custom-selector-container {
+    width: auto !important;
+    flex-shrink: 0;
+  }
+
+  #selector-trigger {
+    height: 48px !important;
+    padding: 0 12px !important;
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    font-size: 13px !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  #selector-trigger:active {
+    transform: scale(0.96);
+    background: rgba(255, 255, 255, 0.08) !important;
+  }
+
+  #selected-indicator {
+    width: 6px;
+    height: 6px;
+  }
+
+  /* 输入框 - 直接样式化 */
+  #room-id-input {
+    flex: 1;
+    height: 48px !important;
+    padding: 0 16px !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    font-size: 15px !important;
+    color: white !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  #room-id-input:focus {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: #ff5d23 !important;
+    box-shadow: 0 0 0 3px rgba(255, 93, 35, 0.1) !important;
+    outline: none;
+  }
+
+  #room-id-input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 14px;
+  }
+
+  /* 添加按钮 - 图标样式 */
+  header > div:nth-child(2) > button {
+    width: 48px !important;
+    height: 48px !important;
+    padding: 0 !important;
+    border-radius: 12px !important;
+    background: #ff5d23 !important;
+    color: white !important;
+    font-size: 0 !important; /* 隐藏原文字 */
+    font-weight: 700;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(255, 93, 35, 0.3);
+    position: relative;
+  }
+
+  header > div:nth-child(2) > button:active {
+    transform: scale(0.92);
+    box-shadow: 0 2px 8px rgba(255, 93, 35, 0.4);
+  }
+
+  /* 显示 + 符号 */
+  header > div:nth-child(2) > button::before {
+    content: '+';
+    font-size: 24px !important;
+    font-weight: 400;
+    line-height: 1;
+    color: white;
+  }
+
+  /* ====================================
+     水平滚动控制栏 - 核心创新（带窥视提示）
+     ==================================== */
+
+  header > div:last-child {
+    position: relative;
+    display: flex !important;
+    padding: 12px !important; /* 统一padding */
+    gap: 6px !important; /* 减少按钮间距 */
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: linear-gradient(90deg,
+      rgba(0,0,0,0.4) 0%,
+      transparent 5%,
+      transparent 95%,
+      rgba(0,0,0,0.4) 100%
+    );
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    width: 100%;
+  }
+
+  /* 隐藏滚动条 */
+  header > div:last-child::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 控制按钮统一样式 */
+  header > div:last-child > * {
+    flex-shrink: 0 !important;
+    scroll-snap-align: start;
+    min-width: auto !important;
+    flex: none !important;
+  }
+
+  /* 统计信息 - 紧凑设计 */
+  #refresh-stats {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    height: 36px; /* 减小高度 */
+    padding: 0 10px; /* 减少padding让按钮更窄 */
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px; /* 稍微减小圆角 */
+    font-size: 11px;
+    font-weight: 700;
+    color: #10b981;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  #refresh-stats.hidden {
+    display: none !important;
+  }
+
+  #refresh-stats.active {
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* 功能按钮 - 紧凑设计，让按钮更窄以显示更多 */
+  .auto-refresh-btn,
+  .notify-btn,
+  .keepalive-btn,
+  .region-btn,
+  .import-export-btn {
+    height: 36px !important; /* 减小高度 */
+    min-height: 36px !important;
+    padding: 0 10px !important; /* 减少padding让按钮更窄 */
+    border-radius: 8px !important; /* 稍微减小圆角 */
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 4px; /* 减少图标和文字间距 */
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  /* 激活状态 */
+  .auto-refresh-btn:not(.off),
+  .notify-btn:not(.off),
+  .keepalive-btn:not(.off) {
+    background: linear-gradient(135deg, #ff5d23 0%, #ff8a50 100%) !important;
+    border-color: transparent !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(255, 93, 35, 0.3);
+  }
+
+  /* 按压反馈 */
+  .auto-refresh-btn:active,
+  .notify-btn:active,
+  .keepalive-btn:active,
+  .region-btn:active,
+  .import-export-btn:active {
+    transform: scale(0.94);
+  }
+
+  /* 图标大小 */
+  .auto-refresh-btn svg,
+  .notify-btn svg,
+  .keepalive-btn svg,
+  .region-btn svg,
+  .import-export-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* 全局刷新按钮 - 圆形设计 */
+  #global-refresh-btn {
+    width: 36px !important; /* 减小尺寸 */
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #global-refresh-btn svg {
+    width: 18px; /* 稍微减小图标 */
+    height: 18px;
+  }
+
+  #global-refresh-btn:active {
+    transform: scale(0.9) rotate(45deg);
+  }
+
+  /* ====================================
+     主内容区域优化
+     ==================================== */
+
+  #main-content {
+    padding: 16px;
+    margin-top: 0;
+  }
+
+  /* 区域容器 */
+  .zone-container {
+    margin-bottom: 2rem !important;
+  }
+
+  .zone-header {
+    padding-left: 0 !important;
+    margin-bottom: 12px !important;
+    border-left-width: 3px !important;
+  }
+
+  .zone-title {
+    font-size: 14px !important;
+    font-weight: 900 !important;
+  }
+
+  .zone-sub {
+    font-size: 9px !important;
+  }
+
+  /* 卡片网格 */
+  .monitor-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* 卡片优化 */
+  .room-card {
+    border-radius: 16px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .room-card:active {
+    transform: scale(0.98);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  /* 缩略图容器 */
+  .card-thumbnail-box {
+    border-radius: 0;
+    aspect-ratio: 16 / 9;
+  }
+
+  .card-thumbnail {
+    border-radius: 0;
+  }
+
+  /* 状态芯片 */
+  .status-chip {
+    top: 12px;
+    left: 12px;
+    font-size: 11px !important;
+    padding: 5px 12px !important;
+    border-radius: 8px;
+    font-weight: 700;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* 卡片信息区 */
+  .card-info {
+    padding: 14px !important;
+  }
+
+  .u-avatar {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .skeleton-avatar {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .room-title {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    margin-bottom: 4px;
+  }
+
+  .room-owner {
+    font-size: 13px !important;
+    opacity: 0.7;
+  }
+
+  /* 卡片底栏 */
+  .card-bottom-bar {
+    margin-top: 10px;
+  }
+
+  .viewer-pill {
+    font-size: 12px !important;
+    padding: 4px 10px !important;
+    border-radius: 6px;
+  }
+
+  /* 操作按钮 */
+  .card-actions {
+    opacity: 1 !important;
+    gap: 8px;
+  }
+
+  .action-btn {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 8px;
+  }
+
+  /* ====================================
+     Toast 通知优化
+     ==================================== */
+
+  #toast-container {
+    bottom: env(safe-area-inset-bottom, 16px) !important;
+    left: 16px !important;
+    right: 16px !important;
+    padding: 0;
+  }
+
+  .toast {
+    border-radius: 14px;
+    padding: 14px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  }
+
+  /* ====================================
+     返回顶部按钮
+     ==================================== */
+
+  #back-to-top {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 20px) !important;
+    right: 20px !important;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff5d23 0%, #ff8a50 100%);
+    box-shadow: 0 8px 24px rgba(255, 93, 35, 0.4);
+  }
+
+  #back-to-top:active {
+    transform: scale(0.9);
+  }
+
+  /* ====================================
+     下拉菜单优化
+     ==================================== */
+
+  #selector-menu,
+  #history-dropdown {
+    position: fixed !important;
+    left: 16px !important;
+    right: 16px !important;
+    width: auto !important;
+    max-width: none !important;
+    border-radius: 16px !important;
+    padding: 8px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8);
+  }
+
+  #selector-menu > div,
+  #history-dropdown > div {
+    border-radius: 12px !important;
+    padding: 14px 16px !important;
+    font-size: 15px !important;
+  }
+
+  /* ====================================
+     安全区域适配
+     ==================================== */
+
+  body {
+    padding-top: env(safe-area-inset-top) !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+  }
+
+  /* ====================================
+     性能优化
+     ==================================== */
+
+  /* 使用硬件加速 */
+  header,
+  .room-card,
+  .toast,
+  #back-to-top {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* 触摸滚动优化 */
+  header > div:last-child {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  /* 防止文本选择 */
+  header button,
+  .room-card {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ====================================
+     微交互动画
+     ==================================== */
+
+  @keyframes slideInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  header {
+    animation: slideInDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* 按钮涟漪效果 */
+  .auto-refresh-btn:not(.off)::after,
+  .notify-btn:not(.off)::after,
+  .keepalive-btn:not(.off)::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .auto-refresh-btn:not(.off):active::after,
+  .notify-btn:not(.off):active::after,
+  .keepalive-btn:not(.off):active::after {
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   【超小屏优化】iPhone SE / 小屏设备
+   ======================================== */
+
+@media (max-width: 375px) {
+  header > div:nth-child(2) {
+    padding: 10px 12px !important;
+  }
+
+  #selector-trigger,
+  #room-id-input,
+  header > div:nth-child(2) > button {
+    height: 44px !important;
+  }
+
+  header > div:last-child {
+    padding: 10px !important; /* 统一padding */
+    gap: 5px !important; /* 进一步减少间距 */
+  }
+
+  .auto-refresh-btn,
+  .notify-btn,
+  .keepalive-btn,
+  .region-btn,
+  .import-export-btn {
+    height: 32px !important; /* 超小屏进一步减小 */
+    min-height: 32px !important;
+    font-size: 11px !important;
+    padding: 0 8px !important; /* 更紧凑 */
+  }
+
+  #global-refresh-btn {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  #global-refresh-btn svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  #refresh-stats {
+    height: 32px !important;
+    font-size: 10px !important;
+    padding: 0 8px !important;
+  }
+}
+
+/* ========================================
+   【横屏模式】优化
+   ======================================== */
+
+@media (max-width: 768px) and (orientation: landscape) {
+  header {
+    position: relative;
+  }
+
+  #main-content {
+    padding: 12px;
+  }
+
+  .monitor-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+}

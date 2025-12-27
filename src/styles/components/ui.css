@@ -1,0 +1,224 @@
+/* --- Header样式 --- */
+header {
+    margin-bottom: 12rem; /* 增加header和内容区域的间距 */
+}
+
+/* 确保所有按钮文字保持横向，不换行 */
+button, .btn, [class*="-btn"] {
+    white-space: nowrap;
+}
+
+/* --- 分区布局 --- */
+.zone-container { width: 100%; max-width: 2200px; margin: 0 auto 4rem; display: none; transition: opacity 0.3s ease; background-color: transparent !important; }
+.zone-container.active { display: block; animation: fadeIn 0.5s ease; background-color: transparent !important; }
+
+.zone-header { display: flex; align-items: center; gap: 14px; margin-bottom: 1.5rem; padding-left: 0.8rem; border-left: 5px solid transparent; background-color: transparent !important; }
+.zone-title { font-size: 16px; font-weight: 900; letter-spacing: 0.05em; color: #a3a3a3; }
+.zone-sub { font-size: 11px; opacity: 0.5; font-weight: 400; letter-spacing: 0.1em; margin-left: 8px; }
+
+/* --- 状态滚动通知 --- */
+.status-ticker {
+    flex: 1;
+    margin-left: 2rem;
+    height: 28px;
+    overflow: hidden;
+    position: relative;
+    display: none; /* 默认隐藏，有消息时显示 */
+    align-items: center;
+    background-color: transparent !important; /* 强制透明背景 */
+}
+.status-ticker-item {
+    position: absolute;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    white-space: nowrap;
+}
+.status-ticker-item.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+.status-ticker-item.exit {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+.ticker-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+.ticker-icon.online {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+.ticker-icon.offline {
+    background: rgba(107, 114, 128, 0.2);
+    color: #6b7280;
+}
+.ticker-text {
+    color: #9ca3af;
+}
+.ticker-name {
+    color: #f3f4f6;
+    font-weight: 700;
+}
+
+/* Grid布局已在 layout.css 和 responsive.css 中统一定义 */
+
+#zone-live .zone-header { border-left-color: var(--live); }
+#zone-live .zone-title { color: var(--live); text-shadow: 0 0 12px rgba(16, 185, 129, 0.3); }
+#zone-offline .zone-header { border-left-color: #333; }
+#zone-loop { background: rgba(99, 102, 241, 0.03); border: 2px dashed rgba(99, 102, 241, 0.2); border-radius: 24px; padding: 2.5rem; }
+#zone-loop .zone-header { border-left-color: var(--loop); padding-left: 0; margin-left: 0.5rem; }
+#zone-loop .zone-title { color: var(--loop); }
+#zone-loop .room-card { opacity: 0.85; }
+#zone-loop .room-card:hover { opacity: 1; }
+
+/* 通知按钮 */
+.notify-btn { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.notify-btn.off { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #6b7280; }
+
+/* 自动刷新按钮 */
+.auto-refresh-btn { background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); color: #6366f1; padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.auto-refresh-btn.off { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #6b7280; }
+.auto-refresh-btn:hover { background: rgba(99, 102, 241, 0.2); }
+.auto-refresh-btn.off:hover { background: rgba(255,255,255,0.1); }
+
+/* 防休眠按钮 */
+.keepalive-btn { background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); color: #eab308; padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.keepalive-btn.off { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #6b7280; }
+.keepalive-btn:hover { background: rgba(234, 179, 8, 0.2); }
+.keepalive-btn.off:hover { background: rgba(255,255,255,0.1); }
+
+/* 地区模式按钮 */
+.region-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; font-weight: 800; border-radius: 12px; transition: all 0.2s; cursor: pointer; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: white; border: none; white-space: nowrap; }
+.region-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
+.region-btn.mainland { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+.region-btn.mainland:hover { box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4); }
+.region-btn.overseas { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+.region-btn.overseas:hover { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); }
+
+/* 导入导出按钮 */
+.import-export-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 10px;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: 1px solid rgba(147, 197, 253, 0.3);
+    color: #93c5fd;
+    background: rgba(59, 130, 246, 0.1);
+    white-space: nowrap;
+}
+.import-export-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.import-export-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* 下雪开关按钮 */
+.snow-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    width: 36px;
+    height: 36px;
+    padding: 6px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(147, 197, 253, 0.1);
+    border: 1px solid rgba(147, 197, 253, 0.2);
+    color: #93c5fd;
+}
+.snow-toggle-btn:hover {
+    background: rgba(147, 197, 253, 0.2);
+    transform: scale(1.1) rotate(15deg);
+    box-shadow: 0 0 20px rgba(147, 197, 253, 0.3);
+}
+.snow-toggle-btn.on {
+    background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 100%);
+    color: white;
+    box-shadow: 0 0 15px rgba(96, 165, 250, 0.4);
+}
+.snow-toggle-btn.on:hover {
+    box-shadow: 0 0 25px rgba(96, 165, 250, 0.6);
+}
+.snow-toggle-btn.off {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.1);
+    color: #6b7280;
+}
+.snow-toggle-btn.off:hover {
+    background: rgba(255,255,255,0.1);
+    transform: scale(1.05);
+    box-shadow: none;
+}
+
+/* Dropdown */
+#selector-menu, #history-dropdown { transform-origin: top center; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.dropdown-enter { opacity: 0; transform: scale(0.95) translateY(-10px); pointer-events: none; }
+.dropdown-enter-active { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
+#history-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 8px; background: #161616; border: 1px solid #333; border-radius: 12px; box-shadow: 0 15px 40px rgba(0,0,0,0.8); z-index: 90; overflow: hidden; }
+.history-item { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; color: #9ca3af; font-size: 12px; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.history-item:hover { background-color: #262626; color: #fff; }
+.history-delete { color: #525252; padding: 4px; border-radius: 4px; opacity: 0.5; transition: all 0.2s; }
+.history-item:hover .history-delete { opacity: 1; }
+.history-delete:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+
+/* Toast */
+#toast-container { position: fixed; bottom: 2.5rem; right: 2.5rem; z-index: 9999; }
+.toast { background: #1f1f1f; border: 1px solid #333; padding: 14px 24px; border-radius: 10px; color: #eee; font-size: 14px; font-weight: 600; margin-top: 12px; box-shadow: 0 10px 20px -5px rgba(0,0,0,0.5); animation: slideUp 0.3s ease; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* Loader and Animations */
+@keyframes popIn { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+.animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+/* 逆时针旋转动画 */
+@keyframes spin-reverse { to { transform: rotate(-360deg); } }
+.animate-spin-reverse { animation: spin-reverse 1s linear infinite; }
+
+.loader-ring { display: inline-block; width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.1); border-radius: 50%; border-top-color: var(--douyu); animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 新增：刷新状态指示器 */
+.refresh-stats {
+    font-size: 11px;
+    color: #6b7280;
+    padding: 4px 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    font-family: ui-monospace, monospace;
+}
+.refresh-stats.active { color: #10b981; }
+
+/* Back to Top Button */
+#back-to-top {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+#back-to-top.hidden-btn {
+    opacity: 0;
+    transform: translateY(1rem);
+    pointer-events: none;
+}

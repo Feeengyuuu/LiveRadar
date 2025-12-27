@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="referrer" content="no-referrer" />
+    <title>直播监控室 - LiveRadar v3.1.1</title>
+
+    <!-- Favicon -->
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23ef4444'/%3E%3C/svg%3E"
+    />
+
+    <!-- CryptoJS from CDN (required for Bilibili signing) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+    <!-- Critical CSS - 防止FOUC，确保加载器优先显示 -->
+    <style>
+      /* 页面加载时隐藏主内容，只显示加载器 */
+      body {
+        background-color: #050505;
+        margin: 0;
+      }
+      /* 使用class控制可见性和滚动，便于JavaScript移除 */
+      body.loading {
+        overflow: hidden;
+      }
+      body.loading > *:not(#initial-loader):not(#snow-canvas):not(script) {
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+      /* 加载器立即居中显示 */
+      #initial-loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #050505;
+      }
+      /* 加载器旋转环 - 内联以确保立即显示 */
+      .loader-ring {
+        display: inline-block;
+        width: 48px;
+        height: 48px;
+        margin-bottom: 2rem;
+        border: 4px solid rgba(255,255,255,0.1);
+        border-radius: 50%;
+        border-top-color: #ff5d23;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      /* 加载器文字样式 */
+      #loader-text {
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 1.575rem;
+        font-weight: bold;
+        letter-spacing: 0.025em;
+        color: #9ca3af;
+      }
+    </style>
+  </head>
+
+  <body class="loading p-6 md:p-10" onclick="window.closeDropdown?.(event); window.hideHistory?.(event)">
+    <!-- Snow Canvas -->
+    <canvas id="snow-canvas"></canvas>
+
+    <!-- Initial Loader -->
+    <div id="initial-loader">
+      <div class="loader-ring"></div>
+      <div id="loader-text">加载中...</div>
+    </div>
+
+    <!-- Header -->
+    <header
+      class="max-w-[2200px] mx-auto flex flex-col md:flex-row items-center gap-6 mb-12 bg-[#0a0a0a] p-6 rounded-3xl border border-[#1f1f1f] shadow-2xl relative z-50"
+    >
+      <div class="flex items-center gap-5 px-4 border-r border-[#1f1f1f] pr-8">
+        <div
+          id="secret-audio-button"
+          class="w-3 h-3 bg-red-600 rounded-full animate-pulse cursor-pointer"
+          title="播放测试音效"
+        ></div>
+        <h1 class="text-2xl font-black italic tracking-tighter text-gray-100">
+          直播监控室
+          <span class="text-orange-500 text-sm not-italic font-mono ml-2">LiveRadar v3.1.1</span>
+        </h1>
+        <button
+          id="snow-toggle-btn"
+          onclick="window.toggleSnow?.()"
+          class="snow-toggle-btn off"
+          title="切换下雪特效"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93M12 6l-3 3M12 6l3 3M6 12l3-3M6 12l3 3M12 18l-3-3M12 18l3-3M18 12l-3-3M18 12l-3 3"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Platform Selector & Input -->
+      <div
+        class="flex flex-1 w-full md:w-auto items-center gap-3 bg-[#111] p-2 rounded-2xl border border-[#1f1f1f] relative"
+      >
+        <div class="relative w-40" id="custom-selector-container">
+          <button
+            onclick="window.toggleDropdown?.(event)"
+            id="selector-trigger"
+            class="w-full flex items-center justify-between bg-transparent text-sm font-bold px-4 py-3 rounded-xl text-gray-400 hover:text-white border-r border-[#262626] cursor-pointer transition-colors focus:outline-none"
+          >
+            <div class="flex items-center gap-2">
+              <div
+                id="selected-indicator"
+                class="w-2.5 h-2.5 rounded-full bg-[#ff5d23] shadow-[0_0_6px_#ff5d23]"
+              ></div>
+              <span id="current-platform-label" class="text-[#ff5d23]">斗鱼</span>
+            </div>
+            <svg class="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+              ></path>
+            </svg>
+          </button>
+          <input type="hidden" id="platform-select" value="douyu" />
+          <div
+            id="selector-menu"
+            class="dropdown-enter absolute top-full left-0 mt-3 w-full bg-[#161616]/95 backdrop-blur-xl border border-[#333] rounded-2xl shadow-[0_15px_30px_-5px_rgba(0,0,0,0.8)] overflow-hidden z-[100]"
+          >
+            <div
+              onclick="window.selectPlatform?.('douyu', '#ff5d23', '斗鱼')"
+              class="cursor-pointer px-5 py-3 hover:bg-[#262626] transition-colors border-b border-white/5 flex items-center justify-between group"
+            >
+              <span
+                class="text-[#ff5d23] font-bold text-sm group-hover:drop-shadow-[0_0_6px_#ff5d23]"
+                >斗鱼</span
+              >
+            </div>
+            <div
+              onclick="window.selectPlatform?.('bilibili', '#fb7299', 'B站')"
+              class="cursor-pointer px-5 py-3 hover:bg-[#262626] transition-colors border-b border-white/5 flex items-center justify-between group"
+            >
+              <span
+                class="text-[#fb7299] font-bold text-sm group-hover:drop-shadow-[0_0_6px_#fb7299]"
+                >B站</span
+              >
+            </div>
+            <div
+              onclick="window.selectPlatform?.('twitch', '#9146ff', 'Twitch')"
+              class="cursor-pointer px-5 py-3 hover:bg-[#262626] transition-colors flex items-center justify-between group"
+            >
+              <span
+                class="text-[#9146ff] font-bold text-sm group-hover:drop-shadow-[0_0_6px_#9146ff]"
+                >Twitch</span
+              >
+            </div>
+          </div>
+        </div>
+        <input
+          type="text"
+          id="room-id-input"
+          onfocus="window.showHistory?.()"
+          oninput="window.handleInput?.(event)"
+          onkeydown="if(event.key === 'Enter') window.handleAddInput?.()"
+          placeholder="输入房间号..."
+          class="bg-transparent text-sm flex-1 outline-none text-gray-200 placeholder:text-gray-700 font-medium px-4 py-3 h-full"
+        />
+        <div id="history-dropdown" class="dropdown-enter w-full"></div>
+        <button
+          onclick="window.handleAddInput?.()"
+          class="bg-gray-100 text-black hover:bg-orange-500 hover:text-white text-sm font-bold px-6 py-3 rounded-xl transition-all active:scale-95"
+        >
+          添加
+        </button>
+      </div>
+
+      <!-- Control Buttons -->
+      <div class="flex items-center gap-4 px-4">
+        <span id="refresh-stats" class="refresh-stats hidden">--</span>
+        <button id="auto-refresh-btn" onclick="window.toggleAutoRefresh?.()" class="auto-refresh-btn off">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <span id="auto-refresh-label">自动: 关</span>
+        </button>
+        <button id="notify-btn" onclick="window.toggleNotifications?.()" class="notify-btn off">
+          <span>推送: 关</span>
+        </button>
+        <button id="keepalive-btn" onclick="window.toggleKeepAlive?.()" class="keepalive-btn off">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M13 10V3L4 14h7v7l9-11h-7z"
+            />
+          </svg>
+          <span id="keepalive-label">防休眠: 关</span>
+        </button>
+        <button
+          id="region-btn"
+          onclick="window.toggleRegionMode?.()"
+          class="region-btn"
+          title="切换地区模式"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <span id="region-label">地区: 自动</span>
+        </button>
+        <button onclick="window.exportRooms?.()" class="import-export-btn" title="导出主播列表">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+            />
+          </svg>
+          <span>导出</span>
+        </button>
+        <button
+          onclick="document.getElementById('import-file-input')?.click()"
+          class="import-export-btn"
+          title="导入主播列表"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+            />
+          </svg>
+          <span>导入</span>
+        </button>
+        <input
+          type="file"
+          id="import-file-input"
+          accept=".json,.liveradar"
+          style="display: none"
+          onchange="window.importRooms?.(event)"
+        />
+        <button
+          onclick="window.refreshAll?.()"
+          id="global-refresh-btn"
+          class="p-3 text-gray-600 hover:text-white transition-colors rounded-full hover:bg-[#1f1f1f]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2.5"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- File Protocol Warning -->
+    <div id="file-protocol-warning" class="hidden max-w-[2200px] mx-auto"></div>
+
+    <!-- Main Content -->
+    <div id="main-content" class="w-full relative z-10">
+      <section id="zone-live" class="zone-container">
+        <div class="zone-header">
+          <div class="zone-title">正在直播</div>
+          <div class="zone-sub">LIVE NOW</div>
+          <div class="status-ticker" id="status-ticker"></div>
+        </div>
+        <div class="monitor-grid" id="grid-live"></div>
+      </section>
+
+      <section id="zone-offline" class="zone-container">
+        <div class="zone-header">
+          <div class="zone-title">离线房间</div>
+          <div class="zone-sub">OFFLINE</div>
+        </div>
+        <div class="monitor-grid" id="grid-offline"></div>
+      </section>
+
+      <section id="zone-loop" class="zone-container">
+        <div class="zone-header">
+          <div class="zone-title">轮播录像</div>
+          <div class="zone-sub">REPLAY</div>
+        </div>
+        <div class="monitor-grid" id="grid-loop"></div>
+      </section>
+
+      <div id="empty-state" class="hidden py-40 text-center opacity-30">
+        <p class="text-base font-bold text-gray-500 uppercase tracking-widest">暂无信号源</p>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Keep-Alive Audio -->
+    <audio id="bg-keepalive" loop style="display: none">
+      <source
+        src="data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAADhAC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7v////////////////////////////////////////////////////////////////////////////////////////////////MQXQwAAAAAtgAAAAAAAANEAAAAAOGluZwAAAAPAAAAAgAAA4QAu7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7v////////////////////////////////////////////////////////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uQxAAADwAABpAAAACAAADSAAAAETEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ=="
+        type="audio/mp3"
+      />
+    </audio>
+
+    <!-- Back to Top Button -->
+    <button
+      id="back-to-top"
+      class="hidden-btn fixed bottom-8 right-8 z-[99] w-12 h-12 rounded-full bg-orange-500/80 text-white flex items-center justify-center shadow-lg backdrop-blur-sm hover:bg-orange-500"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="3"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+      </svg>
+    </button>
+
+    <!-- Card Template -->
+    <template id="card-template">
+      <a target="_blank" rel="noopener noreferrer" class="room-card group">
+        <div class="card-thumbnail-box">
+          <div class="thumb-loader">
+            <div
+              class="w-8 h-8 border-2 border-white/20 border-t-orange-500 rounded-full animate-spin"
+            ></div>
+          </div>
+          <img class="card-thumbnail" src="" alt="" loading="lazy" />
+        </div>
+        <span class="status-chip chip-off"><span class="status-text">加载中</span></span>
+        <div class="card-info">
+          <img class="u-avatar hidden" src="" alt="" />
+          <div class="w-14 h-14 rounded-full bg-[#262626] flex-shrink-0 skeleton-avatar"></div>
+          <div class="meta-text">
+            <span class="room-title">正在连接...</span>
+            <span class="room-owner owner-name">---</span>
+            <div class="card-bottom-bar">
+              <div class="viewer-pill">
+                <span class="viewer-icon">🔥</span><span class="viewer-num">--</span>
+              </div>
+              <span class="live-duration hidden">⏱ --:--</span>
+              <div class="card-actions">
+                <button
+                  class="action-btn fav-btn"
+                  onclick="event.preventDefault(); event.stopPropagation(); window.toggleFavorite?.(this.dataset.id, this.dataset.platform)"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <path
+                      d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.01 4.38.38-3.32 2.88 1 4.28L12 15.4z"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    />
+                  </svg>
+                </button>
+                <button
+                  class="action-btn delete-btn"
+                  onclick="event.preventDefault(); event.stopPropagation(); window.removeRoom?.(this.dataset.id, this.dataset.platform)"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <path
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </a>
+    </template>
+
+    <!-- Footer -->
+    <footer class="w-full text-center py-8 mt-12 border-t border-[#1f1f1f] relative z-10">
+      <p class="text-[10px] text-gray-600 font-mono tracking-widest uppercase mb-2">
+        DISCLAIMER: EDUCATIONAL PURPOSE ONLY.
+      </p>
+      <div class="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
+        <span>Idea by <span class="text-gray-200">Fengyu Xu</span></span>
+        <span class="w-1 h-1 rounded-full bg-gray-700"></span>
+        <span
+          >Built by <span class="text-blue-400">Gemini</span> &
+          <span class="text-purple-400">Claude</span></span
+        >
+      </div>
+    </footer>
+
+    <!-- Vite Entry Point -->
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

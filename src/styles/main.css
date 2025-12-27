@@ -1,0 +1,17 @@
+/* Import custom CSS FIRST (before Tailwind) */
+@import './variables.css';
+@import './base.css';
+@import './layout.css';
+@import './components/card.css';
+@import './components/ui.css';
+@import './components/warning-banner.css';
+@import './components/secret-button.css'; /* Secret audio button */
+@import './effects/snow.css';
+@import './utilities.css';
+@import './responsive.css';
+@import './mobile-optimized.css'; /* iPhone-optimized layout */
+
+/* Import Tailwind directives AFTER custom imports */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

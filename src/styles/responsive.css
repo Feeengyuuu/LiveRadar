@@ -1,0 +1,405 @@
+/* ========================================
+   【移动端优化】Mobile-First Enhancements
+   ======================================== */
+
+/* iOS安全区域适配 */
+@media (max-width: 768px) {
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+
+    /* 优化移动端字体大小 */
+    body { padding: 1rem !important; }
+    .zone-title { font-size: 14px; }
+    .zone-sub { font-size: 10px; }
+    .room-title { font-size: 14px; }
+    .room-owner { font-size: 12px; }
+
+    /* 优化触摸目标大小(最小44x44px) */
+    .action-btn { width: 44px; height: 44px; }
+    button, .notify-btn, .auto-refresh-btn {
+        min-height: 44px;
+        padding: 10px 14px;
+    }
+
+    /* 优化卡片间距 */
+    .zone-container { margin-bottom: 2rem; }
+    .card-info { padding: 12px; }
+
+    /* Toast移动端位置 */
+    #toast-container {
+        bottom: 1rem;
+        right: 1rem;
+        left: 1rem;
+    }
+    .toast {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* 移除hover效果，优化触摸体验 */
+    .room-card:hover {
+        transform: none;
+        box-shadow: 0 5px 8px -1px rgba(0,0,0,0.3);
+    }
+    .room-card:active {
+        transform: scale(0.98);
+    }
+}
+
+/* iPhone SE等小屏设备 */
+@media (max-width: 375px) {
+    .monitor-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+    .zone-header { gap: 8px; }
+}
+
+/* ========================================
+   【移动端】头部工具栏优化
+   ======================================== */
+@media (max-width: 768px) {
+    header {
+        padding: 1rem !important;
+        gap: 1rem !important;
+        margin-bottom: 1.5rem !important;
+        flex-direction: column !important;
+    }
+
+    header > div:first-child {
+        border-right: none !important;
+        padding: 0 !important;
+        width: 100%;
+        justify-content: center;
+    }
+
+    header h1 {
+        font-size: 1.25rem !important; /* 20px */
+        text-align: center;
+    }
+
+    header h1 span {
+        display: block;
+        font-size: 0.75rem !important; /* 12px */
+        margin-top: 0.25rem;
+        margin-left: 0 !important;
+    }
+
+    /* 输入区域 */
+    header > div:nth-child(2) {
+        flex-direction: column;
+        gap: 0.5rem !important;
+        padding: 0.75rem !important;
+    }
+
+    #custom-selector-container {
+        width: 100% !important;
+    }
+
+    #room-id-input {
+        width: 100%;
+        padding: 0.75rem !important;
+    }
+
+    header button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* 工具按钮区 */
+    header > div:last-child {
+        width: 100%;
+        padding: 0 !important;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+
+    .auto-refresh-btn,
+    .notify-btn,
+    .keepalive-btn {
+        flex: 1;
+        min-width: 120px;
+    }
+
+    #global-refresh-btn {
+        flex: 0 0 auto;
+    }
+}
+
+/* ========================================
+   【移动端】卡片和交互优化
+   ======================================== */
+@media (max-width: 768px) {
+    /* 优化卡片内边距 */
+    .u-avatar {
+        width: 48px !important;
+        height: 48px !important;
+    }
+
+    .viewer-pill {
+        font-size: 11px !important;
+        padding: 3px 8px !important;
+    }
+
+    /* 优化状态芯片 */
+    .status-chip {
+        font-size: 11px !important;
+        padding: 4px 10px !important;
+    }
+
+    /* 优化卡片按钮 */
+    .card-actions {
+        opacity: 1 !important; /* 移动端始终显示 */
+    }
+
+    /* 优化下拉菜单 */
+    #selector-menu {
+        position: fixed !important;
+        left: 0.5rem !important;
+        right: 0.5rem !important;
+        width: auto !important;
+        max-width: none !important;
+    }
+
+    #history-dropdown {
+        position: fixed !important;
+        left: 0.5rem !important;
+        right: 0.5rem !important;
+        top: auto !important;
+        bottom: 5rem !important;
+    }
+
+    /* 优化区域标题 */
+    .zone-header {
+        padding-left: 0.5rem !important;
+    }
+
+    /* 触摸滚动优化 */
+    body {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
+    }
+
+    /* 防止iOS双击缩放 */
+    * {
+        touch-action: manipulation;
+    }
+}
+
+/* ========================================
+   【平板端】优化 - 舒适布局
+   ======================================== */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .monitor-grid {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1rem;
+    }
+
+    header {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    header h1 {
+        font-size: 1.5rem;
+    }
+}
+
+/* ========================================
+   【桌面端】优化 - 原版舒适布局（5列）
+   ======================================== */
+@media (min-width: 1025px) {
+    .monitor-grid {
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 1rem;
+    }
+
+    header {
+        flex-direction: row;
+        gap: 1.5rem;
+    }
+
+    header h1 {
+        font-size: 2rem;
+    }
+
+    /* 桌面端允许雪花特效（由JS控制开关，移除!important让JS可以控制） */
+    #snow-canvas {
+        /* display由JS控制，不强制设置 */
+    }
+}
+
+/* ========================================
+   【大屏优化】4K及以上分辨率 - 舒适布局
+   ======================================== */
+@media (min-width: 2560px) {
+    .monitor-grid {
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .room-title {
+        font-size: 18px;
+    }
+
+    .room-owner {
+        font-size: 14px;
+    }
+
+    header h1 {
+        font-size: 2.5rem;
+    }
+}
+
+/* ========================================
+   【纵向屏幕优化】竖屏优先
+   ======================================== */
+@media (orientation: portrait) {
+    .monitor-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    header {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+
+/* ========================================
+   【横向屏幕优化】横屏优先
+   ======================================== */
+@media (orientation: landscape) {
+    body {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+
+    header {
+        margin-bottom: 1rem !important;
+    }
+
+    .zone-container {
+        margin-bottom: 2rem;
+    }
+}
+
+/* ========================================
+   【低光环境优化】深色模式偏好
+   ======================================== */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #050505;
+        color: #e5e7eb;
+    }
+
+    /* 进一步降低对比度缓解眼睛疲劳 */
+    @media (prefers-reduced-motion: reduce) {
+        * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+}
+
+/* ========================================
+   【减少动画】无障碍支持
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    #snow-canvas {
+        display: none !important;
+    }
+}
+
+/* ========================================
+   【高对比度】无障碍支持
+   ======================================== */
+@media (prefers-contrast: more) {
+    body {
+        color: #ffffff;
+    }
+
+    .room-title {
+        font-weight: 900;
+    }
+
+    .zone-title {
+        text-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+    }
+}
+
+/* ========================================
+   【触摸设备优化】指针设备检测
+   ======================================== */
+@media (hover: none) and (pointer: coarse) {
+    /* 移动设备 */
+    button:hover,
+    .action-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .room-card:hover {
+        transform: none;
+    }
+
+    .card-actions {
+        opacity: 1 !important;
+    }
+}
+
+@media (hover: hover) and (pointer: fine) {
+    /* 鼠标设备 */
+    button:hover,
+    .action-btn:hover {
+        background: white;
+        color: black;
+    }
+
+    .room-card:hover {
+        transform: translateY(-8px) scale(1.02);
+    }
+
+    .card-actions {
+        opacity: 0;
+    }
+
+    .room-card:hover .card-actions {
+        opacity: 1;
+    }
+}
+
+/* ========================================
+   【网络条件优化】低带宽
+   ======================================== */
+@media (prefers-reduced-data: reduce) {
+    /* 禁用雪花特效 */
+    #snow-canvas {
+        display: none !important;
+    }
+
+    /* 禁用渐变 */
+    * {
+        background-image: none !important;
+    }
+
+    /* 禁用阴影 */
+    body {
+        box-shadow: none !important;
+    }
+
+    .room-card {
+        box-shadow: none !important;
+        border: 1px solid #333;
+    }
+}
