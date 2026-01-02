@@ -18,6 +18,56 @@ import { APP_CONFIG } from '../config/constants.js';
 import { getDOMCache } from '../utils/dom-cache.js';
 import { getRooms, getRoomDataCache, subscribe } from './state.js';
 
+// ====================================================================
+// Debounce Utility
+// ====================================================================
+
+/**
+ * 防抖函数 - 优化renderAll调用频率
+ * 在短时间内多次调用时，只执行最后一次
+ * @param {Function} func - 需要防抖的函数
+ * @param {number} wait - 等待时间（毫秒）
+ * @returns {Function} 防抖后的函数
+ */
+function debounce(func, wait = 16) {
+    let timeout;
+    let lastCallTime = 0;
+
+    const debounced = function(...args) {
+        const now = Date.now();
+        const timeSinceLastCall = now - lastCallTime;
+
+        // 清除之前的定时器
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+
+        // 如果距离上次调用超过wait时间，立即执行
+        // 这样可以保证第一次调用和长时间没有调用后的首次调用能立即执行
+        if (timeSinceLastCall > wait * 2) {
+            lastCallTime = now;
+            func.apply(this, args);
+        } else {
+            // 否则延迟执行
+            timeout = setTimeout(() => {
+                lastCallTime = Date.now();
+                func.apply(this, args);
+            }, wait);
+        }
+    };
+
+    // 添加立即执行方法，用于需要强制刷新的场景
+    debounced.immediate = function(...args) {
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+        lastCallTime = Date.now();
+        func.apply(this, args);
+    };
+
+    return debounced;
+}
+
 /**
  * Initialize renderer with state subscriptions
  * Automatically re-renders when rooms state changes
@@ -26,7 +76,7 @@ export function initRenderer(deps = {}) {
     // Subscribe to rooms changes for automatic re-rendering
     subscribe('rooms', (newRooms, oldRooms) => {
         console.log('[Renderer] Rooms changed, auto-rendering...');
-        renderAll();
+        debouncedRenderAll();
     });
 
     console.log('[Renderer] Initialized with state subscriptions');
@@ -61,8 +111,11 @@ function formatDuration(startTime) {
 /**
  * Render all room cards with incremental updates
  * 优化：使用DOM缓存消除重复查询
+ *
+ * NOTE: 这是原始的renderAll函数，直接调用会立即渲染
+ * 建议使用 debouncedRenderAll 以获得更好的性能
  */
-export function renderAll() {
+function renderAllImmediate() {
     const rooms = getRooms();
     const roomDataCache = getRoomDataCache();
     const cache = getDOMCache();
@@ -518,6 +571,25 @@ export function updateCard(card, roomInfo, data, cardState) {
         avt.classList.add('hidden');
         if (avatarSkeleton) avatarSkeleton.classList.remove('hidden');
     }
+}
+
+// ====================================================================
+// Debounced Render Function
+// ====================================================================
+
+/**
+ * 防抖版本的renderAll - 优化渲染频率
+ * 在短时间内多次调用时，只执行最后一次
+ * 默认16ms延迟（约60fps）
+ */
+export const debouncedRenderAll = debounce(renderAllImmediate, 16);
+
+/**
+ * 立即渲染所有房间卡片（不防抖）
+ * 用于需要强制刷新的场景（如手动刷新、初始化等）
+ */
+export function renderAll() {
+    debouncedRenderAll.immediate();
 }
 
 // ====================================================================

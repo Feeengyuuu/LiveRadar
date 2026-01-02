@@ -575,6 +575,8 @@
         ];
         let index = 0;
         let direction = 1;
+        let animationTimer = null;
+
         const tick = () => {
           favicon.href = frames[index];
           if (index === frames.length - 1) direction = -1;
@@ -582,8 +584,39 @@
           index += direction;
         };
 
-        tick();
-        setInterval(tick, 260);
+        // 启动动画
+        const startAnimation = () => {
+          if (!animationTimer) {
+            tick(); // 立即执行一次
+            animationTimer = setInterval(tick, 260);
+            console.log('[Favicon] Animation started');
+          }
+        };
+
+        // 停止动画
+        const stopAnimation = () => {
+          if (animationTimer) {
+            clearInterval(animationTimer);
+            animationTimer = null;
+            console.log('[Favicon] Animation paused');
+          }
+        };
+
+        // 监听页面可见性变化
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            // 页面不可见时暂停动画
+            stopAnimation();
+          } else {
+            // 页面可见时恢复动画
+            startAnimation();
+          }
+        });
+
+        // 初始化：如果页面可见，启动动画
+        if (!document.hidden) {
+          startAnimation();
+        }
       })();
     </script>
     <script type="module" src="/src/main.js"></script>

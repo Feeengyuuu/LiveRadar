@@ -155,104 +155,113 @@ export function initMusicPlayer() {
 // 事件绑定
 // ====================================================================
 
-function bindEvents() {
-    // 播放/暂停
-    elements.playBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // 阻止冒泡到player
+// 存储事件处理函数的引用，以便移除
+const eventHandlers = {
+    playBtnClick: (e) => {
+        e.stopPropagation();
         togglePlay();
-    });
-
-    // 上一曲
-    elements.prevBtn.addEventListener('click', (e) => {
+    },
+    prevBtnClick: (e) => {
         e.stopPropagation();
         playPrevTrack();
-    });
-
-    // 下一曲
-    elements.nextBtn.addEventListener('click', (e) => {
+    },
+    nextBtnClick: (e) => {
         e.stopPropagation();
         playNextTrack();
-    });
-
-    // 进度条拖动
-    elements.progressBar.addEventListener('mousedown', (e) => {
+    },
+    progressBarMouseDown: (e) => {
         e.stopPropagation();
         startDraggingProgress(e);
-    });
-    elements.progressBar.addEventListener('click', (e) => {
+    },
+    progressBarClick: (e) => {
         e.stopPropagation();
         seekProgress(e);
-    });
-
-    // 音量拖动
-    elements.volumeSlider.addEventListener('mousedown', (e) => {
+    },
+    progressBarTouchStart: (e) => {
+        e.stopPropagation();
+        startDraggingProgress(e);
+    },
+    volumeSliderMouseDown: (e) => {
         e.stopPropagation();
         startDraggingVolume(e);
-    });
-    elements.volumeSlider.addEventListener('click', (e) => {
+    },
+    volumeSliderClick: (e) => {
         e.stopPropagation();
         adjustVolume(e);
-    });
+    },
+    volumeSliderTouchStart: (e) => {
+        e.stopPropagation();
+        startDraggingVolume(e);
+    },
+    toggleBtnClick: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        console.log('[MusicPlayer] Toggle button clicked, current state:', isMinimized);
+        toggleMinimize();
+    },
+    playerClick: (e) => {
+        if (isMinimized && !elements.toggleBtn.contains(e.target)) {
+            console.log('[MusicPlayer] Player clicked while minimized');
+            toggleMinimize();
+        } else if (!isMinimized) {
+            e.stopPropagation();
+        }
+    },
+    coverClick: (e) => {
+        if (isMinimized) {
+            e.stopPropagation();
+            console.log('[MusicPlayer] Cover clicked while minimized');
+            toggleMinimize();
+        }
+    },
+    outsideClick: (e) => {
+        if (!isMinimized && elements.player && !elements.player.contains(e.target)) {
+            console.log('[MusicPlayer] Clicked outside, minimizing...');
+            toggleMinimize();
+        }
+    }
+};
+
+function bindEvents() {
+    // 播放/暂停
+    elements.playBtn.addEventListener('click', eventHandlers.playBtnClick);
+
+    // 上一曲
+    elements.prevBtn.addEventListener('click', eventHandlers.prevBtnClick);
+
+    // 下一曲
+    elements.nextBtn.addEventListener('click', eventHandlers.nextBtnClick);
+
+    // 进度条拖动
+    elements.progressBar.addEventListener('mousedown', eventHandlers.progressBarMouseDown);
+    elements.progressBar.addEventListener('click', eventHandlers.progressBarClick);
+
+    // 音量拖动
+    elements.volumeSlider.addEventListener('mousedown', eventHandlers.volumeSliderMouseDown);
+    elements.volumeSlider.addEventListener('click', eventHandlers.volumeSliderClick);
 
     // 全局鼠标事件（用于拖动）
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
     // 触摸事件支持
-    elements.progressBar.addEventListener('touchstart', (e) => {
-        e.stopPropagation();
-        startDraggingProgress(e);
-    });
-    elements.volumeSlider.addEventListener('touchstart', (e) => {
-        e.stopPropagation();
-        startDraggingVolume(e);
-    });
+    elements.progressBar.addEventListener('touchstart', eventHandlers.progressBarTouchStart);
+    elements.volumeSlider.addEventListener('touchstart', eventHandlers.volumeSliderTouchStart);
     document.addEventListener('touchmove', handleTouchMove);
     document.addEventListener('touchend', handleMouseUp);
 
     // 最小化/展开
-    elements.toggleBtn.addEventListener('click', (e) => {
-        e.preventDefault(); // 阻止默认行为
-        e.stopPropagation(); // 阻止事件冒泡
-        e.stopImmediatePropagation(); // 阻止同一元素上的其他监听器
-        console.log('[MusicPlayer] Toggle button clicked, current state:', isMinimized);
-        toggleMinimize();
-    });
+    elements.toggleBtn.addEventListener('click', eventHandlers.toggleBtnClick);
 
-    // 缩小状态下点击整个播放器展开
-    elements.player.addEventListener('click', (e) => {
-        // 只有在最小化状态下，并且不是点击toggle按钮时才展开
-        if (isMinimized && !elements.toggleBtn.contains(e.target)) {
-            console.log('[MusicPlayer] Player clicked while minimized');
-            toggleMinimize();
-        }
-    });
+    // 播放器点击事件（包含缩小状态展开和阻止冒泡）
+    elements.player.addEventListener('click', eventHandlers.playerClick);
 
     // 缩小状态下点击封面也可以展开
-    elements.cover.addEventListener('click', (e) => {
-        if (isMinimized) {
-            e.stopPropagation();
-            console.log('[MusicPlayer] Cover clicked while minimized');
-            toggleMinimize();
-        }
-    });
-
-    // 阻止播放器内部点击事件冒泡（避免触发外部点击折叠）
-    elements.player.addEventListener('click', (e) => {
-        // 如果是展开状态，阻止事件冒泡
-        if (!isMinimized) {
-            e.stopPropagation();
-        }
-    });
+    elements.cover.addEventListener('click', eventHandlers.coverClick);
 
     // 点击外部区域自动折叠
-    document.addEventListener('click', (e) => {
-        // 只在展开状态下处理外部点击
-        if (!isMinimized && elements.player && !elements.player.contains(e.target)) {
-            console.log('[MusicPlayer] Clicked outside, minimizing...');
-            toggleMinimize();
-        }
-    });
+    document.addEventListener('click', eventHandlers.outsideClick);
 
     // 音频事件
     audio.addEventListener('timeupdate', updateProgress);
@@ -675,6 +684,93 @@ if (typeof window !== 'undefined') {
 }
 
 // ====================================================================
+// 清理和销毁
+// ====================================================================
+
+/**
+ * 清理音乐播放器资源，移除所有事件监听器
+ * 用于防止内存泄漏
+ */
+export function destroyMusicPlayer() {
+    // 停止音频播放
+    if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+
+        // 移除音频事件监听器
+        audio.removeEventListener('timeupdate', updateProgress);
+        audio.removeEventListener('loadedmetadata', onMetadataLoaded);
+        audio.removeEventListener('ended', onAudioEnded);
+        audio.removeEventListener('play', onPlay);
+        audio.removeEventListener('pause', onPause);
+
+        audio = null;
+    }
+
+    // 移除DOM事件监听器
+    if (elements.playBtn) {
+        elements.playBtn.removeEventListener('click', eventHandlers.playBtnClick);
+    }
+    if (elements.prevBtn) {
+        elements.prevBtn.removeEventListener('click', eventHandlers.prevBtnClick);
+    }
+    if (elements.nextBtn) {
+        elements.nextBtn.removeEventListener('click', eventHandlers.nextBtnClick);
+    }
+
+    // 移除进度条事件
+    if (elements.progressBar) {
+        elements.progressBar.removeEventListener('mousedown', eventHandlers.progressBarMouseDown);
+        elements.progressBar.removeEventListener('click', eventHandlers.progressBarClick);
+        elements.progressBar.removeEventListener('touchstart', eventHandlers.progressBarTouchStart);
+    }
+
+    // 移除音量控制事件
+    if (elements.volumeSlider) {
+        elements.volumeSlider.removeEventListener('mousedown', eventHandlers.volumeSliderMouseDown);
+        elements.volumeSlider.removeEventListener('click', eventHandlers.volumeSliderClick);
+        elements.volumeSlider.removeEventListener('touchstart', eventHandlers.volumeSliderTouchStart);
+    }
+
+    // 移除全局事件监听器
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+    document.removeEventListener('touchmove', handleTouchMove);
+    document.removeEventListener('touchend', handleMouseUp);
+
+    // 移除播放器相关事件
+    if (elements.toggleBtn) {
+        elements.toggleBtn.removeEventListener('click', eventHandlers.toggleBtnClick);
+    }
+    if (elements.player) {
+        elements.player.removeEventListener('click', eventHandlers.playerClick);
+    }
+    if (elements.cover) {
+        elements.cover.removeEventListener('click', eventHandlers.coverClick);
+    }
+
+    // 移除外部点击事件
+    document.removeEventListener('click', eventHandlers.outsideClick);
+
+    // 清空播放列表事件监听器
+    if (elements.playlistContainer) {
+        const items = elements.playlistContainer.querySelectorAll('.playlist-item');
+        items.forEach(item => {
+            item.removeEventListener('click', switchTrack);
+        });
+    }
+
+    // 重置状态
+    isPlaying = false;
+    isDraggingProgress = false;
+    isDraggingVolume = false;
+    hasEverPlayed = false;
+    isAnimating = false;
+
+    console.log('[MusicPlayer] Resources cleaned up and destroyed');
+}
+
+// ====================================================================
 // 导出
 // ====================================================================
 
@@ -682,4 +778,5 @@ export default {
     init: initMusicPlayer,
     togglePlay,
     toggleMinimize,
+    destroy: destroyMusicPlayer,
 };
