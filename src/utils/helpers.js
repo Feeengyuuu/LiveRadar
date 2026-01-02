@@ -53,13 +53,47 @@ export function getRandomItem(arr) {
 
 /**
  * Show toast notification
+ * Limited to maximum 5 toasts to prevent infinite stacking
  */
-export function showToast(message, duration = 3000) {
+export function showToast(message, typeOrDuration = 3000, durationOverride) {
   const container = document.getElementById('toast-container');
   if (!container) return;
 
+  const DEFAULT_DURATION = 3000;
+  let type = 'info';
+  let duration = DEFAULT_DURATION;
+
+  if (typeof typeOrDuration === 'number') {
+    duration = typeOrDuration;
+  } else if (typeof typeOrDuration === 'string') {
+    type = typeOrDuration;
+    if (typeof durationOverride === 'number') duration = durationOverride;
+  } else if (typeOrDuration && typeof typeOrDuration === 'object') {
+    if (typeof typeOrDuration.type === 'string') type = typeOrDuration.type;
+    if (typeof typeOrDuration.duration === 'number') duration = typeOrDuration.duration;
+  }
+
+  if (!Number.isFinite(duration) || duration <= 0) {
+    duration = DEFAULT_DURATION;
+  }
+
+  const normalizedType = String(type).toLowerCase();
+  const typeMap = { warn: 'warning' };
+  const finalType = typeMap[normalizedType] || normalizedType;
+  const allowedTypes = new Set(['info', 'success', 'error', 'warning']);
+  const toastType = allowedTypes.has(finalType) ? finalType : 'info';
+
+  // Limit maximum number of toasts to 5
+  const MAX_TOASTS = 5;
+  const existingToasts = container.querySelectorAll('.toast');
+  if (existingToasts.length >= MAX_TOASTS) {
+    // Remove oldest toast (first child)
+    existingToasts[0].remove();
+  }
+
   const toast = document.createElement('div');
   toast.className = 'toast';
+  toast.classList.add(`toast--${toastType}`);
   toast.textContent = message;
   container.appendChild(toast);
 

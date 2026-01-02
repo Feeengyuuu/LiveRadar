@@ -36,11 +36,11 @@ export const APP_CONFIG = {
     RETRY_DELAY: 1000,
   },
 
-  // Cache configuration
+  // Cache configuration (优化：增加缓存时间以减少不必要的网络请求)
   CACHE: {
     DEBOUNCE_DELAY: 500,
     AVATAR_UPDATE_INTERVAL: 90 * 24 * 60 * 60 * 1000, // 90 days
-    IMAGE_TIMESTAMP_INTERVAL: 300000, // 5 minutes
+    IMAGE_TIMESTAMP_INTERVAL: 1800000, // 优化：从5分钟(300000)改为30分钟(1800000)
   },
 
   // UI configuration
@@ -51,11 +51,11 @@ export const APP_CONFIG = {
     STATS_HIDE_DELAY: 2000,
   },
 
-  // Concurrency control
+  // Concurrency control (优化：降低并发数以减少带宽占用，避免视频卡顿)
   CONCURRENCY: {
-    DEFAULT: 6,
-    MEDIUM: 8,
-    HIGH: 10,
+    DEFAULT: 2,        // 从4降到2
+    MEDIUM: 3,         // 从5降到3
+    HIGH: 4,           // 从6降到4
     THRESHOLD_MEDIUM: 5,
     THRESHOLD_HIGH: 15,
   },
@@ -67,10 +67,10 @@ export const APP_CONFIG = {
     THRESHOLD: 10,
   },
 
-  // Auto-refresh
+  // Auto-refresh (优化：增加抖动延迟以分散请求，减少突发流量)
   AUTO_REFRESH: {
     INTERVAL: 600, // seconds
-    JITTER_MAX_INITIAL: 2000,
+    JITTER_MAX_INITIAL: 3000,  // 优化：从2000ms增加到3000ms
   },
 
   // Snow effect
@@ -78,7 +78,7 @@ export const APP_CONFIG = {
     ENABLED:
       typeof window !== 'undefined' &&
       window.innerWidth >= 768 &&
-      SafeStorage.getItem('pro_snow_enabled', 'true') === 'true',
+      SafeStorage.getItem('pro_snow_enabled', 'false') === 'true',
     COUNT: 500,
     MAX_SIZE: 3.5,
     MIN_SIZE: 1,

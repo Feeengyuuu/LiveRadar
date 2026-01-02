@@ -17,6 +17,7 @@ import { APP_CONFIG } from '../config/constants.js';
 import { PROXIES } from '../config/proxies.js';
 import { Signer } from '../config/signer.js';
 import { SafeStorage } from '../utils/safe-storage.js';
+import { executeWithProxyControl } from '../utils/proxy-pool-manager.js';
 
 // ====================================================================
 // State Management
@@ -202,44 +203,66 @@ export async function fetchWithProxy(targetUrl, isBinary = false, timeout = APP_
         }
     }
 
-    console.log('[Proxy Strategy] Using smart proxy pool to fetch data...');
+    console.log('[Proxy Strategy] Using smart proxy pool with concurrency control...');
 
     const smartProxies = getSmartProxyOrder(targetUrl);
 
     for (const proxy of smartProxies) {
-        const startTime = Date.now(); // Record request start time
-
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeout);
+            // Execute with proxy pool concurrency control
+            const result = await executeWithProxyControl(
+                async (assignedProxyName) => {
+                    const startTime = Date.now(); // Record request start time
 
-            const res = await fetch(proxy.url(finalUrl), {
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
+                    // Find the assigned proxy config
+                    const assignedProxy = PROXIES.find(p => p.name === assignedProxyName);
+                    if (!assignedProxy) throw new Error(`Proxy ${assignedProxyName} not found`);
 
-            const responseTime = Date.now() - startTime; // Calculate response time
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-            if (!res.ok) {
-                recordProxyResult(proxy.name, false, responseTime);
-                continue;
+                    try {
+                        const res = await fetch(assignedProxy.url(finalUrl), {
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+
+                        const responseTime = Date.now() - startTime; // Calculate response time
+
+                        if (!res.ok) {
+                            recordProxyResult(assignedProxy.name, false, responseTime);
+                            throw new Error(`HTTP ${res.status}`);
+                        }
+
+                        if (isBinary) {
+                            recordProxyResult(assignedProxy.name, true, responseTime);
+                            return await res.blob();
+                        }
+
+                        const raw = await res.json();
+                        const data = assignedProxy.wrap ? (typeof raw.contents === 'string' ? JSON.parse(raw.contents) : raw.contents) : raw;
+                        if (data) {
+                            recordProxyResult(assignedProxy.name, true, responseTime);
+                            return data;
+                        }
+                        recordProxyResult(assignedProxy.name, false, responseTime);
+                        throw new Error('Empty data');
+                    } catch (err) {
+                        clearTimeout(timeoutId);
+                        throw err;
+                    }
+                },
+                proxy.name,
+                targetUrl
+            );
+
+            // If we got a result, return it
+            if (result) {
+                return result;
             }
-
-            if (isBinary) {
-                recordProxyResult(proxy.name, true, responseTime);
-                return await res.blob();
-            }
-
-            const raw = await res.json();
-            const data = proxy.wrap ? (typeof raw.contents === 'string' ? JSON.parse(raw.contents) : raw.contents) : raw;
-            if (data) {
-                recordProxyResult(proxy.name, true, responseTime);
-                return data;
-            }
-            recordProxyResult(proxy.name, false, responseTime);
         } catch (e) {
-            const responseTime = Date.now() - startTime;
-            recordProxyResult(proxy.name, false, responseTime);
+            // Error already handled inside executeWithProxyControl
+            console.warn(`[Proxy] ${proxy.name} failed:`, e.message);
             continue;
         }
     }

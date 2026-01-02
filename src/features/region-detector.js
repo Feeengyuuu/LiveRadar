@@ -26,7 +26,7 @@ export async function detectRegion() {
         },
         {
             name: 'ip-api.com',
-            url: 'http://ip-api.com/json/?fields=countryCode',
+            url: 'https://ip-api.com/json/?fields=countryCode',
             parse: (data) => data.countryCode === 'CN'
         },
         {

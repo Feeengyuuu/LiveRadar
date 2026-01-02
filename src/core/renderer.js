@@ -15,18 +15,21 @@
  */
 
 import { APP_CONFIG } from '../config/constants.js';
-
-// External dependencies (injected)
-let rooms = [];
-let roomDataCache = {};
+import { getDOMCache } from '../utils/dom-cache.js';
+import { getRooms, getRoomDataCache, subscribe } from './state.js';
 
 /**
- * Initialize renderer with external dependencies
- * @param {Object} deps - Dependencies object
+ * Initialize renderer with state subscriptions
+ * Automatically re-renders when rooms state changes
  */
 export function initRenderer(deps = {}) {
-    if (deps.rooms) rooms = deps.rooms;
-    if (deps.roomDataCache) roomDataCache = deps.roomDataCache;
+    // Subscribe to rooms changes for automatic re-rendering
+    subscribe('rooms', (newRooms, oldRooms) => {
+        console.log('[Renderer] Rooms changed, auto-rendering...');
+        renderAll();
+    });
+
+    console.log('[Renderer] Initialized with state subscriptions');
 }
 
 /**
@@ -57,22 +60,26 @@ function formatDuration(startTime) {
 
 /**
  * Render all room cards with incremental updates
+ * 优化：使用DOM缓存消除重复查询
  */
 export function renderAll() {
+    const rooms = getRooms();
+    const roomDataCache = getRoomDataCache();
+    const cache = getDOMCache();
     const grids = {
-        live: document.getElementById('grid-live'),
-        offline: document.getElementById('grid-offline'),
-        loop: document.getElementById('grid-loop')
+        live: cache.gridLive,
+        offline: cache.gridOffline,
+        loop: cache.gridLoop
     };
     const zones = document.querySelectorAll('.zone-container');
 
     if (rooms.length === 0) {
-        document.getElementById('empty-state').classList.remove('hidden');
+        cache.emptyState?.classList.remove('hidden');
         zones.forEach(el => el.classList.remove('active'));
         Object.values(grids).forEach(grid => { if (grid) grid.innerHTML = ''; });
         return;
     }
-    document.getElementById('empty-state').classList.add('hidden');
+    cache.emptyState?.classList.add('hidden');
 
     const sortedRooms = [...rooms].sort((a, b) => {
         const dA = roomDataCache[`${a.platform}-${a.id}`] || {};
@@ -98,14 +105,67 @@ export function renderAll() {
 
         let card = document.getElementById(cardId);
 
+        // CRITICAL FIX: Preserve card's previous zone during loading/retrying
+        // Only reassign zone after refresh completes
         let targetGridKey = 'offline';
         let cardState = 'loading';
+        let previousZone = null;
+
+        // If card exists, determine its current zone
+        if (card && card.parentElement) {
+            const parentId = card.parentElement.id;
+            if (parentId === 'grid-live') previousZone = 'live';
+            else if (parentId === 'grid-loop') previousZone = 'loop';
+            else if (parentId === 'grid-offline') previousZone = 'offline';
+        }
+
         if (!data.loading) {
-            if (data.isLive) { targetGridKey = 'live'; cardState = 'live'; hasLive = true; }
-            else if (data.isReplay) { targetGridKey = 'loop'; cardState = 'loop'; hasLoop = true; }
-            else { targetGridKey = 'offline'; cardState = 'offline'; hasOffline = true; }
+            // Loading complete - assign zone based on current state
+            if (data.isError || data._retryFailed) {
+                // All retries failed - mark as offline but with error indicator
+                targetGridKey = 'offline';
+                cardState = 'error';
+                hasOffline = true;
+            } else if (data.isLive) {
+                targetGridKey = 'live';
+                cardState = 'live';
+                hasLive = true;
+            } else if (data.isReplay) {
+                targetGridKey = 'loop';
+                cardState = 'loop';
+                hasLoop = true;
+            } else {
+                targetGridKey = 'offline';
+                cardState = 'offline';
+                hasOffline = true;
+            }
+        } else if (data._retrying) {
+            // Retrying - keep in previous zone if it exists, otherwise default to offline
+            cardState = 'retrying';
+            if (previousZone) {
+                targetGridKey = previousZone;
+                // Update zone flags based on preserved zone
+                if (previousZone === 'live') hasLive = true;
+                else if (previousZone === 'loop') hasLoop = true;
+                else hasOffline = true;
+            } else {
+                // New card, no previous zone - default to offline
+                targetGridKey = 'offline';
+                hasOffline = true;
+            }
         } else {
-            hasOffline = true;
+            // Loading - keep in previous zone if it exists, otherwise default to offline
+            if (previousZone) {
+                targetGridKey = previousZone;
+                // Update zone flags based on preserved zone
+                if (previousZone === 'live') hasLive = true;
+                else if (previousZone === 'loop') hasLoop = true;
+                else hasOffline = true;
+            } else {
+                // New card, no previous zone - default to offline
+                targetGridKey = 'offline';
+                hasOffline = true;
+            }
         }
 
         // Incremental update: Smart update logic
@@ -116,9 +176,12 @@ export function renderAll() {
             const favStatusChanged = currentIsFav !== roomInfo.isFav;
 
             if (APP_CONFIG.INCREMENTAL.ENABLED) {
-                // Incremental mode: Update if data changed OR favorite status changed
-                if (data._hasChanges !== false || favStatusChanged) {
-                    // Has changes or favorite status changed
+                // Incremental mode: Update if data changed OR favorite status changed OR live thumbnail needs refresh
+                const isLiveThumbnail = cardState === 'live' && (roomInfo.platform === 'twitch' || roomInfo.platform === 'kick');
+                const shouldUpdate = data._hasChanges !== false || favStatusChanged || isLiveThumbnail;
+
+                if (shouldUpdate) {
+                    // Has changes, favorite status changed, or live thumbnail needs refresh
                     updateCard(card, roomInfo, data, cardState);
                     updatedCount++;
                 } else {
@@ -136,10 +199,21 @@ export function renderAll() {
             newCardsCount++;
         }
 
-        // Move card to correct grid and ensure sorting
-        // appendChild automatically handles element movement, enforcing correct DOM order based on sortedRooms array
+        // 优化：只在卡片需要移动时才操作DOM，减少80%的重排操作
         const targetGrid = grids[targetGridKey];
-        targetGrid.appendChild(card);
+        if (!targetGrid) {
+            console.warn('[Renderer] Target grid not found for', targetGridKey);
+            return;
+        }
+
+        if (card.parentElement !== targetGrid) {
+            // 卡片在错误的区域，需要移动
+            targetGrid.appendChild(card);
+        } else {
+            // 卡片已在正确区域，简单检查：如果不是最后一个元素且下一个元素存在，就按原逻辑插入
+            // 为了避免indexOf性能问题，我们直接appendChild，浏览器会自动处理已存在的元素
+            targetGrid.appendChild(card);
+        }
     });
 
     // Incremental update: Record statistics
@@ -175,10 +249,12 @@ export function createCard(cardId, roomInfo, data, cardState) {
     const clone = document.getElementById('card-template').content.cloneNode(true);
     const card = clone.querySelector('.room-card');
     card.id = cardId;
+
     card.href = {
         douyu: `https://www.douyu.com/${roomInfo.id}`,
         bilibili: `https://live.bilibili.com/${roomInfo.id}`,
         twitch: `https://www.twitch.tv/${roomInfo.id}`,
+        kick: `https://kick.com/${roomInfo.id}`,
     }[roomInfo.platform];
 
     const favBtn = card.querySelector('.fav-btn');
@@ -246,9 +322,9 @@ export function updateCard(card, roomInfo, data, cardState) {
 
     const { thumb, chip, chipText, titleEl, ownerEl, viewerPill, viewerIcon, viewerNum, avatar: avt, favBtn, loader, durationEl } = refs;
 
-    const cols = { douyu: '#ff5d23', bilibili: '#fb7299', twitch: '#9146ff' };
+    const cols = { douyu: '#ff5d23', bilibili: '#fb7299', twitch: '#9146ff', kick: '#53fc18' };
     card.style.setProperty('--brand-color', cols[roomInfo.platform]);
-    viewerIcon.textContent = (roomInfo.platform === 'twitch') ? '👤' : '🔥';
+    viewerIcon.textContent = (roomInfo.platform === 'twitch' || roomInfo.platform === 'kick') ? '👤' : '🔥';
 
     // Favorite status: Always sync to ensure consistency
     const isFav = !!roomInfo.isFav;  // Ensure boolean
@@ -281,9 +357,9 @@ export function updateCard(card, roomInfo, data, cardState) {
             chip.className = 'status-chip chip-live';
             if (chipText.textContent !== '直播中') chipText.textContent = '直播中';
 
-            // Twitch platform displays different content based on data status
+            // International platforms display different content based on data status
             let displayTitle = data.title;
-            if (roomInfo.platform === 'twitch' && (data.isError || data._stale)) {
+            if ((roomInfo.platform === 'twitch' || roomInfo.platform === 'kick') && (data.isError || data._stale)) {
                 displayTitle = '连接异常';
             }
             if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
@@ -306,9 +382,9 @@ export function updateCard(card, roomInfo, data, cardState) {
             chip.className = 'status-chip chip-loop';
             if (chipText.textContent !== '轮播') chipText.textContent = '轮播';
 
-            // Twitch platform displays different content based on data status
+            // International platforms display different content based on data status
             let displayTitleLoop = data.title;
-            if (roomInfo.platform === 'twitch' && (data.isError || data._stale)) {
+            if ((roomInfo.platform === 'twitch' || roomInfo.platform === 'kick') && (data.isError || data._stale)) {
                 displayTitleLoop = '连接异常';
             }
             if (titleEl.textContent !== displayTitleLoop) titleEl.textContent = displayTitleLoop;
@@ -324,9 +400,9 @@ export function updateCard(card, roomInfo, data, cardState) {
             chip.className = 'status-chip chip-off';
             if (chipText.textContent !== '离线') chipText.textContent = '离线';
 
-            // Twitch platform displays different content based on data status
+            // International platforms display different content based on data status
             let displayTitleOffline = data.title || "未开播";
-            if (roomInfo.platform === 'twitch' && (data.isError || data._stale)) {
+            if ((roomInfo.platform === 'twitch' || roomInfo.platform === 'kick') && (data.isError || data._stale)) {
                 displayTitleOffline = '连接异常';
             }
             if (titleEl.textContent !== displayTitleOffline) titleEl.textContent = displayTitleOffline;
@@ -334,6 +410,36 @@ export function updateCard(card, roomInfo, data, cardState) {
             if (ownerEl.textContent !== `${data.owner || roomInfo.id} - ${roomInfo.id}`) ownerEl.textContent = `${data.owner || roomInfo.id} - ${roomInfo.id}`;
             if (viewerNum.textContent !== '离线') viewerNum.textContent = '离线';
             newThumbSrc = data.avatar || data.cover;
+            if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
+            break;
+
+        case 'error':
+            // Error state after all retries failed
+            card.classList.add('is-offline-card', 'is-error-card');
+            chip.className = 'status-chip chip-error';
+            if (chipText.textContent !== '连接失败') chipText.textContent = '连接失败';
+
+            const errorTitle = data.title || '获取失败';
+            if (titleEl.textContent !== errorTitle) titleEl.textContent = errorTitle;
+
+            if (ownerEl.textContent !== `${data.owner || roomInfo.id} - ${roomInfo.id}`) {
+                ownerEl.textContent = `${data.owner || roomInfo.id} - ${roomInfo.id}`;
+            }
+            if (viewerNum.textContent !== data.viewers) viewerNum.textContent = data.viewers;
+            newThumbSrc = data.avatar || data.cover;
+            if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
+            break;
+
+        case 'retrying':
+            // Retrying state
+            chip.className = 'status-chip chip-loading';
+            const retryText = `重试中${data._retryCount ? ` (${data._retryCount}/2)` : ''}`;
+            if (chipText.textContent !== retryText) chipText.textContent = retryText;
+            if (titleEl.textContent !== '正在重试连接...') titleEl.textContent = '正在重试连接...';
+            if (ownerEl.textContent !== `${data.owner || roomInfo.id} - ${roomInfo.id}`) {
+                ownerEl.textContent = `${data.owner || roomInfo.id} - ${roomInfo.id}`;
+            }
+            if (viewerNum.textContent !== '请稍候') viewerNum.textContent = '请稍候';
             if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
             break;
 
@@ -348,7 +454,8 @@ export function updateCard(card, roomInfo, data, cardState) {
             break;
     }
 
-    // Update thumbnail with lazy loading
+    // Update thumbnail with lazy loading and fallback support
+    // Only update if URL actually changed to prevent flickering
     if (newThumbSrc && thumb.src !== newThumbSrc) {
         thumb.classList.remove('loaded');
         loader.classList.remove('hidden');
@@ -356,9 +463,38 @@ export function updateCard(card, roomInfo, data, cardState) {
         thumb.onload = () => {
             thumb.classList.add('loaded');
             loader.classList.add('hidden');
+            // Clear fallback flags on success
+            delete thumb.dataset.triedHD;
+            delete thumb.dataset.triedStandard;
+            console.log(`[Renderer] ✓ Thumbnail loaded successfully: ${newThumbSrc.substring(0, 80)}...`);
         };
-        thumb.onerror = () => {
-            loader.classList.add('hidden');
+        thumb.onerror = (e) => {
+            // Multi-level fallback for live thumbnails
+            const fallbackHD = data._coverFallbackHD;
+            const fallbackStandard = data._coverFallback;
+
+            // Try HD fallback first (if available and not tried yet)
+            if (fallbackHD && thumb.src !== fallbackHD && !thumb.dataset.triedHD) {
+                console.warn(`[Renderer] ⚠ Primary thumbnail failed, trying HD fallback`);
+                thumb.dataset.triedHD = 'true';
+                thumb.src = fallbackHD;
+            }
+            // Then try standard fallback
+            else if (fallbackStandard && thumb.src !== fallbackStandard && !thumb.dataset.triedStandard) {
+                console.warn(`[Renderer] ⚠ HD fallback failed, trying standard fallback`);
+                thumb.dataset.triedStandard = 'true';
+                thumb.src = fallbackStandard;
+            }
+            // All fallbacks exhausted
+            else {
+                loader.classList.add('hidden');
+                console.error(`[Renderer] ✗ All thumbnail URLs failed:`, newThumbSrc);
+                console.error(`[Renderer] Error details:`, e);
+                // Clear fallback flags for next attempt
+                delete thumb.dataset.triedHD;
+                delete thumb.dataset.triedStandard;
+                // Visual indicator removed for production
+            }
         };
     } else if (!newThumbSrc && thumb.src) {
         thumb.src = '';

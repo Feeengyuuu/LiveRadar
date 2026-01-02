@@ -9,6 +9,13 @@ import { getRooms, addRoom as addRoomToState, removeRoom as removeRoomFromState 
 // State
 let searchHistory = SafeStorage.getJSON('pro_search_history', []);
 let historyEventsBound = false;
+let historyPositionBound = false;
+const HISTORY_DROPDOWN_RIGHT_GAP = 8;
+
+// Device detection
+const isMobile = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
 
 /**
  * Toggle platform selector dropdown
@@ -77,7 +84,8 @@ export function updatePlaceholder() {
     const placeholders = {
         twitch: "输入 ID (如 xqc)...",
         douyu: "输入房间号...",
-        bilibili: "输入房间号..."
+        bilibili: "输入房间号...",
+        kick: "输入 ID (如 xqc)..."
     };
     input.placeholder = placeholders[platform] || "输入 ID...";
 }
@@ -86,6 +94,9 @@ export function updatePlaceholder() {
  * Show search history dropdown
  */
 export function showHistory() {
+    // 在移动端禁用历史记录功能
+    if (isMobile()) return;
+
     const input = document.getElementById('room-id-input');
     renderHistory(input ? input.value : '');
     const menu = document.getElementById('history-dropdown');
@@ -118,6 +129,9 @@ export function hideHistory(e) {
  * @param {Event} e - Input event
  */
 export function handleInput(e) {
+    // 在移动端禁用历史记录功能
+    if (isMobile()) return;
+
     const value = e && e.target ? e.target.value : '';
     renderHistory(value);
 
@@ -142,7 +156,6 @@ export function handleAddInput() {
     const platform = platformSelect.value;
 
     if (!value) return;
-
     saveSearchHistory(value);
     window.addRoom?.(value, platform);
     input.value = '';
@@ -273,15 +286,60 @@ function bindHistoryEvents() {
     historyEventsBound = true;
 }
 
+function updateHistoryDropdownPosition() {
+    const historyEl = document.getElementById('history-dropdown');
+    if (!historyEl) return;
+
+    const container = historyEl.offsetParent;
+    if (!container) return;
+
+    const input = document.getElementById('room-id-input');
+    if (!input) return;
+
+    // 找到添加按钮
+    let addButton = historyEl.nextElementSibling;
+    if (!addButton || addButton.tagName !== 'BUTTON') {
+        addButton = historyEl.parentElement?.querySelector('button[onclick*="handleAddInput"]');
+    }
+    if (!addButton) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const inputRect = input.getBoundingClientRect();
+    const buttonRect = addButton.getBoundingClientRect();
+
+    // 计算输入框左边缘相对于容器的偏移
+    const leftOffset = Math.max(0, Math.round(inputRect.left - containerRect.left));
+
+    // 计算添加按钮左边缘相对于容器的偏移（留一点间距）
+    const rightOffset = Math.max(
+        0,
+        Math.round(containerRect.right - buttonRect.left + HISTORY_DROPDOWN_RIGHT_GAP)
+    );
+
+    historyEl.style.left = `${leftOffset}px`;
+    historyEl.style.right = `${rightOffset}px`;
+}
+
+function bindHistoryPosition() {
+    if (historyPositionBound) return;
+    window.addEventListener('resize', updateHistoryDropdownPosition);
+    historyPositionBound = true;
+}
+
 /**
  * Render search history dropdown
  * @param {string} query - Search query to filter history
  */
 export function renderHistory(query = '') {
+    // 在移动端禁用历史记录功能
+    if (isMobile()) return;
+
     const historyEl = document.getElementById('history-dropdown');
     if (!historyEl) return;
 
     bindHistoryEvents();
+    bindHistoryPosition();
+    updateHistoryDropdownPosition();
     historyEl.textContent = '';
 
     const q = query.trim().toLowerCase();

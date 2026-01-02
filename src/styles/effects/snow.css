@@ -9,6 +9,15 @@
     pointer-events: none; /* 关键：让鼠标穿透雪花，不影响点击 */
     opacity: 0.6; /* 整体透明度，让雪花不那么抢眼 */
     display: none; /* 默认隐藏，由JS控制显示 */
+
+    /* GPU加速优化 - 提升渲染性能 */
+    will-change: transform;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    perspective: 1000px;
+    -webkit-perspective: 1000px;
 }
 
 /* 移动端也启用雪花特效（浪漫优先✨） */

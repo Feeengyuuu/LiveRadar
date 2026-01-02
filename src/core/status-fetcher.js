@@ -15,25 +15,21 @@
  */
 
 import { APP_CONFIG } from '../config/constants.js';
-import { sniffDouyu, sniffBilibili, sniffTwitch } from '../api/platform-sniffers.js';
+import { sniffDouyu, sniffBilibili, sniffTwitch, sniffKick } from '../api/platform-sniffers.js';
 import { fetchQuick } from '../api/proxy-manager.js';
 import { DataDiffer } from '../utils/data-differ.js';
+import { getRoomDataCache, updateRoomCache } from './state.js';
+import { formatHeat } from '../utils/helpers.js';
 
-// External dependencies (injected)
-let roomDataCache = {};
-let debouncedSaveCache = null;
+// External dependencies (only notification check needs injection)
 let checkAndNotify = null;
-let formatHeat = null;
 
 /**
  * Initialize status fetcher with external dependencies
  * @param {Object} deps - Dependencies object
  */
 export function initStatusFetcher(deps) {
-    if (deps.roomDataCache) roomDataCache = deps.roomDataCache;
-    if (deps.debouncedSaveCache) debouncedSaveCache = deps.debouncedSaveCache;
     if (deps.checkAndNotify) checkAndNotify = deps.checkAndNotify;
-    if (deps.formatHeat) formatHeat = deps.formatHeat;
 }
 
 /**
@@ -46,6 +42,7 @@ export async function fetchRoomStatus(room, jitter = 0) {
     if (jitter > 0) await new Promise(r => setTimeout(r, jitter));
 
     const cacheKey = `${room.platform}-${room.id}`;
+    const roomDataCache = getRoomDataCache();
     const prevData = roomDataCache[cacheKey];
     const now = Date.now();
     const needAvatarUpdate = !prevData?.avatar || !prevData?.lastAvatarUpdate || (now - prevData.lastAvatarUpdate > APP_CONFIG.CACHE.AVATAR_UPDATE_INTERVAL);
@@ -59,6 +56,8 @@ export async function fetchRoomStatus(room, jitter = 0) {
             result = await sniffBilibili(room.id, needAvatarUpdate, prevData);
         } else if (room.platform === 'twitch') {
             result = await sniffTwitch(room.id, needAvatarUpdate, prevData);
+        } else if (room.platform === 'kick') {
+            result = await sniffKick(room.id, needAvatarUpdate, prevData);
         }
     } catch (error) {
         console.error(`[fetchStatus] ${room.platform}-${room.id} fetch failed:`, error.message);
@@ -79,7 +78,7 @@ export async function fetchRoomStatus(room, jitter = 0) {
             // Priority: Display heat value, add "人" suffix for Twitch
             if (heatValue > 0) {
                 viewers = "在线 " + (formatHeat ? formatHeat(heatValue) : heatValue);
-                if (room.platform === 'twitch') viewers += "人";
+                if (room.platform === 'twitch' || room.platform === 'kick') viewers += "人";
             } else {
                 // Display online status when no heat data
                 viewers = "在线";
@@ -98,8 +97,10 @@ export async function fetchRoomStatus(room, jitter = 0) {
         if (room.platform === 'douyu' && !result.avatar && !result.isError) {
             fetchQuick(`https://open.douyucdn.cn/api/RoomApi/room/${room.id}`)
                 .then(o => {
-                    if (o?.data?.avatar && roomDataCache[cacheKey]) {
-                        roomDataCache[cacheKey].avatar = o.data.avatar;
+                    const cache = getRoomDataCache();
+                    if (o?.data?.avatar && cache[cacheKey]) {
+                        cache[cacheKey].avatar = o.data.avatar;
+                        updateRoomCache(cacheKey, cache[cacheKey], true);
                         if (window.renderAll) window.renderAll();
                     }
                 });
@@ -143,19 +144,14 @@ export async function fetchRoomStatus(room, jitter = 0) {
             console.log(`[Incremental Update] ${room.platform}-${room.id}: ${summary}`);
         }
 
-        roomDataCache[cacheKey] = updateData;
+        // Update cache with debounced write (handled by state.js)
+        updateRoomCache(cacheKey, updateData, false);
     } else {
         // Update failed but have previous data
-        if (prevData) {
-            roomDataCache[cacheKey] = { ...prevData, isError: false, loading: false, _stale: true };
-        } else {
-            roomDataCache[cacheKey] = { loading: false, isError: true };
-        }
-    }
-
-    // Use debounced save to reduce localStorage write frequency
-    if (debouncedSaveCache) {
-        debouncedSaveCache();
+        const errorData = prevData
+            ? { ...prevData, isError: false, loading: false, _stale: true }
+            : { loading: false, isError: true };
+        updateRoomCache(cacheKey, errorData, false);
     }
 }
 

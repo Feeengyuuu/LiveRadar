@@ -40,6 +40,7 @@ export function toggleNotifications() {
     // Toggle state
     if (notificationsEnabled) {
         notificationsEnabled = false;
+        window.notificationsEnabled = false; // Sync global state
         SafeStorage.setItem('pro_notify_enabled', false);
         updateNotifyBtn();
         window.showToast?.("推送通知已关闭");
@@ -47,6 +48,7 @@ export function toggleNotifications() {
         Notification.requestPermission().then(permission => {
             if (permission === "granted") {
                 notificationsEnabled = true;
+                window.notificationsEnabled = true; // Sync global state
                 SafeStorage.setItem('pro_notify_enabled', true);
                 updateNotifyBtn();
 
@@ -102,8 +104,9 @@ export function checkNotifications(room, data) {
     sessionStorage.setItem(cacheKey, data.isLive ? 'true' : 'false');
 
     if (shouldNotify) {
-        // Play notification sound
-        if (window.playNotificationSound && !iOSDevice) {
+        // Play notification sound ONLY for favorite streamers
+        // 只有收藏的主播上线时才播放音效
+        if (room.isFav && window.playNotificationSound && !iOSDevice) {
             window.playNotificationSound();
         }
 

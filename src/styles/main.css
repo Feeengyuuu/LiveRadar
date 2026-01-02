@@ -1,5 +1,6 @@
 /* Import custom CSS FIRST (before Tailwind) */
 @import './variables.css';
+@import './animations.css';  /* Centralized animations - loaded before components */
 @import './base.css';
 @import './layout.css';
 @import './components/card.css';

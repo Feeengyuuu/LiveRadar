@@ -19,28 +19,15 @@
 
 import { APP_CONFIG } from '../config/constants.js';
 import { fetchWithProxy, fetchQuick } from './proxy-manager.js';
-
-// Global state - will be injected from outside
-let imgTimestamp = Math.floor(Date.now() / APP_CONFIG.CACHE.IMAGE_TIMESTAMP_INTERVAL);
-let roomDataCache = {};
-let debouncedSaveCache = null;
+import { ErrorHandler } from '../utils/error-handler.js';
 
 /**
- * Initialize sniffer module with external dependencies
- * @param {Object} deps - Dependencies object
+ * Initialize sniffer module (no longer needs dependencies)
+ * Kept for backward compatibility
  */
 export function initSniffers(deps) {
-    if (deps.imgTimestamp !== undefined) imgTimestamp = deps.imgTimestamp;
-    if (deps.roomDataCache) roomDataCache = deps.roomDataCache;
-    if (deps.debouncedSaveCache) debouncedSaveCache = deps.debouncedSaveCache;
-}
-
-/**
- * Update image timestamp (called externally on refresh)
- * @param {number} timestamp - New timestamp value
- */
-export function updateImgTimestamp(timestamp) {
-    imgTimestamp = timestamp;
+    // No longer needs dependency injection
+    console.log('[Sniffers] Initialized (no dependencies required)');
 }
 
 // ====================================================================
@@ -83,7 +70,8 @@ export async function getDouyuStatus(id, fetchAvatar, prevData) {
         res.heatValue = parseInt(bizAll.online || roomInfo.online || 0);
 
         const baseCover = bizAll.room_pic || roomInfo.room_pic;
-        res.cover = res.isLive && baseCover ? `${baseCover}?t=${imgTimestamp}` : baseCover || res.cover;
+        // 优化：直播中使用实时时间戳（每次刷新都更新），离线不添加时间戳（长缓存）
+        res.cover = res.isLive && baseCover ? `${baseCover}?t=${Date.now()}` : baseCover || res.cover;
         res.avatar = bizAll.owner_avatar || roomInfo.avatar || res.avatar;
 
         // Get live start time
@@ -104,7 +92,8 @@ export async function getDouyuStatus(id, fetchAvatar, prevData) {
         res.title = d.room_name || res.title;
         res.owner = d.nickname || res.owner;
         res.heatValue = parseInt(d.online || 0);
-        res.cover = res.isLive && d.room_pic ? `${d.room_pic}?t=${imgTimestamp}` : d.room_pic || res.cover;
+        // 优化：直播中使用实时时间戳（每次刷新都更新），离线不添加时间戳（长缓存）
+        res.cover = res.isLive && d.room_pic ? `${d.room_pic}?t=${Date.now()}` : d.room_pic || res.cover;
         res.avatar = d.owner_avatar || res.avatar;
 
         // Get live start time
@@ -115,8 +104,8 @@ export async function getDouyuStatus(id, fetchAvatar, prevData) {
         return res;
     }
 
-    res.isError = true;
-    return res;
+    // Return null on failure to maintain consistency with other platforms
+    return null;
 }
 
 // ====================================================================
@@ -135,7 +124,7 @@ export async function getBilibiliStatus(id, fetchAvatar, prevData) {
     let res = {
         isLive: false,
         isReplay: false,
-        title: prevData?.title || "信号波动",
+        title: prevData?.title || "",
         owner: prevData?.owner || id,
         cover: prevData?.cover || "",
         avatar: prevData?.avatar || "",
@@ -144,45 +133,70 @@ export async function getBilibiliStatus(id, fetchAvatar, prevData) {
         startTime: null
     };
 
-    // Parallel requests: Room info + User initialization info
-    const [infoRes, initRes] = await Promise.allSettled([
-        fetchWithProxy(`https://api.live.bilibili.com/room/v1/Room/get_info?room_id=${id}`, false, 8000),
-        fetchWithProxy(`https://api.live.bilibili.com/room/v1/Room/room_init?id=${id}`, false, 6000)
-    ]);
+    // Step 1: Use room_init to determine live status first
+    const init = await fetchWithProxy(`https://api.live.bilibili.com/room/v1/Room/room_init?id=${id}`, false, 6000);
+    console.log(`[Bilibili] room=${id}, init=${init?.code}`);
 
-    const info = infoRes.status === 'fulfilled' ? infoRes.value : null;
-    const init = initRes.status === 'fulfilled' ? initRes.value : null;
+    if (!init) {
+        console.error(`[Bilibili] ✗ Network error for room ${id} - will retry`);
+        return null;
+    }
 
-    console.log(`[Bilibili] room=${id}, info=${info?.code}, init=${init?.code}`);
+    if (init.code !== 0) {
+        console.warn(`[Bilibili] ⚠ API error code ${init.code} for room ${id}, message: ${init.message || 'N/A'} - treating as offline`);
+        res.isError = false;
+        res.isLive = false;
+        res.isReplay = false;
+        res.title = prevData?.title || "房间信息异常";
+        return res;
+    }
 
-    // Try to get UID from both sources
-    let uid = null;
-    if (init?.data?.uid) uid = init.data.uid;
-    else if (info?.data?.uid) uid = info.data.uid;
+    const liveStatus = init?.data?.live_status;
+    res.isLive = liveStatus === 1;
+    res.isReplay = liveStatus === 2;
 
-    if (info?.code === 0) {
-        const d = info.data;
-        res.isLive = d.live_status === 1;
-        res.isReplay = d.live_status === 2;
-        res.heatValue = d.online || 0;
+    // Try to get UID from init first
+    let uid = init?.data?.uid || null;
 
-        // Get live start time
-        if (d.live_time && res.isLive) {
-            // Bilibili returns "2024-01-01 12:00:00" format
-            const liveTime = new Date(d.live_time.replace(' ', 'T') + '+08:00');
-            if (!isNaN(liveTime.getTime())) {
-                res.startTime = liveTime.getTime();
-            }
+    // Offline or replay: reuse cached info but allow basic profile fetch below
+    if (!res.isLive) {
+        if (prevData) {
+            if (!res.title) res.title = prevData.title;
+            if (!res.owner) res.owner = prevData.owner;
+            if (!res.cover) res.cover = prevData.cover;
+            if (!res.avatar) res.avatar = prevData.avatar;
         }
+        if (!res.title || res.title === "信号波动") {
+            res.title = (prevData?.title && prevData.title !== "信号波动") ? prevData.title : "";
+        }
+    }
 
-        if (res.isLive || res.isReplay) {
+    if (res.isLive) {
+        // Step 2: Only fetch detailed info when live
+        const info = await fetchWithProxy(`https://api.live.bilibili.com/room/v1/Room/get_info?room_id=${id}`, false, 8000);
+        if (info?.code === 0) {
+            const d = info.data;
+            res.heatValue = d.online || 0;
+
+            // Get live start time
+            if (d.live_time) {
+                // Bilibili returns "2024-01-01 12:00:00" format
+                const liveTime = new Date(d.live_time.replace(' ', 'T') + '+08:00');
+                if (!isNaN(liveTime.getTime())) {
+                    res.startTime = liveTime.getTime();
+                }
+            }
+
             res.title = d.title;
             res.cover = d.keyframe || d.user_cover;
-            if (res.isLive) res.cover += `?t=${imgTimestamp}`;
+            // 优化：直播中使用实时时间戳（每次刷新都更新）
+            if (res.cover) res.cover += `?t=${Date.now()}`;
+        } else if (info) {
+            console.warn(`[Bilibili] ⚠ get_info error code ${info.code} for room ${id}, message: ${info.message || 'N/A'} - using cached data`);
         } else {
-            res.title = prevData?.title || d.title;
-            res.cover = prevData?.cover || d.user_cover;
+            console.warn(`[Bilibili] ⚠ get_info failed for room ${id} - using cached data`);
         }
+        if (!res.title) res.title = prevData?.title || "信号波动";
     }
 
     // Get user avatar and name
@@ -223,7 +237,6 @@ export async function getBilibiliStatus(id, fetchAvatar, prevData) {
         res.owner = prevData.owner;
     }
 
-    if (!info || info.code !== 0) return null;
     return res;
 }
 
@@ -256,6 +269,8 @@ function parseUptimeToMs(uptime) {
     return totalMs;
 }
 
+const TWITCH_OFFLINE_TITLE_REFRESH_MS = 30 * 60 * 1000;
+
 /**
  * Async fetch Twitch avatar and update cache
  * @param {string} id - Channel ID
@@ -271,7 +286,9 @@ async function fetchTwitchAvatarAsync(id) {
                 if (window.renderAll) window.renderAll();
             }
         }
-    } catch(e) {}
+    } catch(e) {
+        ErrorHandler.silent(e, 'Twitch Avatar');
+    }
 }
 
 /**
@@ -298,6 +315,7 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
     };
 
     try {
+        const now = Date.now();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), APP_CONFIG.NETWORK.PROXY_TIMEOUT_TWITCH);
 
@@ -307,10 +325,9 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
         const isOffline = uptime.toLowerCase().includes("offline") || uptime.toLowerCase().includes("not found") || uptime.toLowerCase().includes("error");
         res.isLive = !isOffline;
 
-        // Fetch title regardless of online/offline status (if connection works)
-        const titlePromise = fetch(`https://decapi.me/twitch/title/${id}`).then(r => r.text()).catch(() => "");
-
         if (res.isLive) {
+            // Fetch title and viewers only when live
+            const titlePromise = fetch(`https://decapi.me/twitch/title/${id}`).then(r => r.text()).catch(() => "");
             // Parse uptime to calculate stream start time
             // uptime format: "2 hours, 30 minutes, 15 seconds" or "30 minutes, 15 seconds"
             const uptimeMs = parseUptimeToMs(uptime);
@@ -323,17 +340,35 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
                 titlePromise,
                 fetch(`https://decapi.me/twitch/viewers/${id}`).then(r => r.text()).catch(() => "0")
             ]);
-            res.title = t || ""; // Use actual fetched title, empty if none
+            res.title = t || prevData?.title || ""; // Use actual fetched title, empty if none
+            res.lastTitleUpdate = now;
 
             // Validate viewers data validity, exclude 404 errors
             const cleanV = v.replace(/,/g, '').trim();
             if (cleanV && !isNaN(parseInt(cleanV)) && parseInt(cleanV) >= 0 && !/error|not found|404/i.test(v)) {
                 res.heatValue = parseInt(cleanV);
             }
-            res.cover = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${id}-640x360.jpg?t=${imgTimestamp}`;
+            // 优化：直播中使用实时时间戳（每次刷新都更新）
+            res.cover = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${id}-640x360.jpg?t=${Date.now()}`;
         } else {
-            // Also fetch title when offline
-            res.title = await titlePromise || "";
+            // Offline: reuse cached title and refresh at low frequency
+            const cachedTitle = prevData?.title || "";
+            const lastTitleUpdate = prevData?.lastTitleUpdate || 0;
+            const shouldRefreshTitle = !cachedTitle || (now - lastTitleUpdate > TWITCH_OFFLINE_TITLE_REFRESH_MS);
+
+            if (shouldRefreshTitle) {
+                try {
+                    const t = await fetch(`https://decapi.me/twitch/title/${id}`).then(r => r.text());
+                    res.title = t || cachedTitle;
+                    res.lastTitleUpdate = now;
+                } catch (e) {
+                    res.title = cachedTitle;
+                    res.lastTitleUpdate = lastTitleUpdate;
+                }
+            } else {
+                res.title = cachedTitle;
+                res.lastTitleUpdate = lastTitleUpdate;
+            }
         }
 
         // Async avatar fetch
@@ -348,6 +383,105 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
 }
 
 // ====================================================================
+// Kick Sniffer
+// ====================================================================
+
+/**
+ * Fetch Kick channel status
+ * Uses Kick API v2 for live stream data
+ * @param {string} id - Channel username
+ * @param {boolean} fetchAvatar - Whether to fetch avatar
+ * @param {Object} prevData - Previous cached data
+ * @returns {Promise<Object|null>} Channel status object or null on failure
+ */
+export async function getKickStatus(id, fetchAvatar, prevData) {
+    let res = {
+        isLive: false,
+        isReplay: false,
+        title: "",
+        owner: prevData?.owner || id,
+        cover: prevData?.cover || "",
+        avatar: prevData?.avatar || "",
+        heatValue: 0,
+        isError: false,
+        startTime: null
+    };
+
+    try {
+        // Kick API v2 - try direct connection first (public API since March 2025)
+        const apiUrl = `https://kick.com/api/v2/channels/${id}`;
+        let data = null;
+
+        // Try direct fetch first
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+            const response = await fetch(apiUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                data = await response.json();
+                console.log(`[Kick] ✓ Direct connection successful for ${id}`);
+            }
+        } catch (directError) {
+            console.log(`[Kick] Direct connection failed for ${id}, trying proxy...`, directError.message);
+            // Fallback to proxy
+            data = await fetchWithProxy(apiUrl, false, 8000);
+        }
+
+        if (!data || !data.user) {
+            return null;
+        }
+
+        const livestream = data.livestream;
+        const user = data.user;
+
+        // Check if channel is live
+        res.isLive = livestream?.is_live === true;
+        res.owner = user.username || id;
+        res.avatar = user.profile_pic || res.avatar;
+
+        if (res.isLive && livestream) {
+            // Live stream data
+            res.title = livestream.session_title || "";
+            res.heatValue = livestream.viewer_count || 0;
+
+            // Get live start time
+            if (livestream.created_at) {
+                res.startTime = new Date(livestream.created_at).getTime();
+            }
+
+            // Get thumbnail URL with cache busting
+            // Try multiple thumbnail sources
+            const thumbnailUrl = livestream.thumbnail?.url ||
+                                 livestream.thumbnail?.src ||
+                                 livestream.thumbnail;
+
+            if (thumbnailUrl) {
+                // 优化：直播中使用实时时间戳（每次刷新都更新）
+                res.cover = typeof thumbnailUrl === 'string'
+                    ? `${thumbnailUrl}?t=${Date.now()}`
+                    : res.cover;
+                console.log(`[Kick] Thumbnail URL for ${id}:`, res.cover);
+            } else {
+                console.warn(`[Kick] No thumbnail found for ${id}, using profile pic`);
+                res.cover = user.profile_pic || res.cover;
+            }
+        } else {
+            // Offline - use cached title or profile picture
+            res.title = prevData?.title || "";
+            res.cover = user.profile_pic || res.cover;
+        }
+
+        return res;
+    } catch(e) {
+        console.error(`[Kick] Error fetching ${id}:`, e.message);
+        return null;
+    }
+}
+
+// ====================================================================
 // Exports
 // ====================================================================
 
@@ -356,8 +490,10 @@ export {
     getDouyuStatus as sniffDouyu,
     getBilibiliStatus as sniffBilibili,
     getTwitchStatus as sniffTwitch,
+    getKickStatus as sniffKick,
     // Aliases for main.js compatibility
     getDouyuStatus as sniffDouyuRoom,
     getBilibiliStatus as sniffBilibiliRoom,
-    getTwitchStatus as sniffTwitchStream
+    getTwitchStatus as sniffTwitchStream,
+    getKickStatus as sniffKickChannel
 };

@@ -208,6 +208,31 @@
     header h1 {
         font-size: 1.5rem;
     }
+
+    /* 工具按钮区 - 允许换行 */
+    header > div:last-child {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .auto-refresh-btn,
+    .notify-btn,
+    .keepalive-btn {
+        flex: 0 1 auto;
+        min-width: 110px;
+    }
+
+    /* 卡片底栏 - 缩小字体和间距 */
+    .viewer-pill {
+        font-size: 11px !important;
+        padding: 3px 8px !important;
+        gap: 4px;
+    }
+
+    .live-duration {
+        font-size: 11px !important;
+        padding: 3px 7px !important;
+    }
 }
 
 /* ========================================
@@ -231,6 +256,132 @@
     /* 桌面端允许雪花特效（由JS控制开关，移除!important让JS可以控制） */
     #snow-canvas {
         /* display由JS控制，不强制设置 */
+    }
+}
+
+/* ========================================
+   【中等桌面】优化 - 窗口宽度 1025px-1440px
+   ======================================== */
+@media (min-width: 1025px) and (max-width: 1440px) {
+    /* 工具按钮区 - 允许换行防止溢出 */
+    header > div:last-child {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .auto-refresh-btn,
+    .notify-btn,
+    .keepalive-btn {
+        flex: 0 1 auto;
+        min-width: 100px;
+        padding: 0.5rem 0.875rem;
+        font-size: 0.875rem;
+    }
+
+    /* 卡片底栏 - 轻微缩小 */
+    .viewer-pill {
+        font-size: 11.5px !important;
+        padding: 3.5px 9px !important;
+    }
+
+    .live-duration {
+        font-size: 11.5px !important;
+        padding: 3.5px 7.5px !important;
+    }
+}
+
+/* ========================================
+   【中窄桌面】按钮下沉到搜索栏下方
+   ======================================== */
+@media (min-width: 768px) and (max-width: 1200px) {
+    header {
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    header > div:first-child {
+        order: 1;
+        flex: 0 0 auto;
+    }
+
+    header > div:nth-child(2) {
+        order: 2;
+        flex: 1 1 520px;
+        min-width: 360px;
+    }
+
+    header > div:last-child {
+        order: 3;
+        width: 100%;
+        padding: 0;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+}
+
+/* ========================================
+   【窄卡片】优化 - 当卡片宽度 < 320px
+   ======================================== */
+@media (min-width: 768px) {
+    /* 使用容器查询的备选方案：通过视口宽度估算卡片宽度 */
+    @media (max-width: 1200px) {
+        .viewer-pill {
+            font-size: 10.5px !important;
+            padding: 3px 7px !important;
+            gap: 3px;
+        }
+
+        .viewer-pill .viewer-icon {
+            font-size: 11px;
+        }
+
+        .live-duration {
+            font-size: 10.5px !important;
+            padding: 3px 6px !important;
+        }
+    }
+
+    /* 极窄卡片 - 底栏元素堆叠 */
+    @media (max-width: 900px) {
+        .card-bottom-bar {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+            height: auto;
+        }
+
+        .viewer-pill,
+        .live-duration {
+            font-size: 11px !important;
+        }
+    }
+}
+
+/* ========================================
+   【窄窗口桌面】优化 - 防止按钮溢出隐藏
+   ======================================== */
+@media (min-width: 768px) and (max-width: 1024px) {
+    /* 当按钮换行后仍然溢出，启用横向滚动 */
+    header > div:last-child {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    }
+
+    header > div:last-child::-webkit-scrollbar {
+        height: 4px;
+    }
+
+    header > div:last-child::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    header > div:last-child::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
     }
 }
 
@@ -260,11 +411,6 @@
    【纵向屏幕优化】竖屏优先
    ======================================== */
 @media (orientation: portrait) {
-    .monitor-grid {
-        grid-template-columns: 1fr;
-        gap: 0.75rem;
-    }
-
     header {
         flex-direction: column;
         gap: 0.5rem;

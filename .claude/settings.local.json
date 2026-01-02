@@ -8,7 +8,36 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "Bash(grep:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(npm run build:*)",
+      "WebFetch(domain:developers.google.com)",
+      "Bash(npx stylelint:*)",
+      "Bash(if [ -f \"package.json\" ])",
+      "Bash(then cat package.json)",
+      "Bash(else echo \"No package.json found\")",
+      "Bash(fi:*)",
+      "Bash(wc:*)",
+      "Bash(for file in src/**/*.js)",
+      "Bash(done)",
+      "Bash(du -sh:*)",
+      "Bash(node -c:*)",
+      "Bash(timeout 5 npm run dev:*)",
+      "Bash(git checkout:*)",
+      "Bash(find:*)",
+      "Bash(git add:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx eslint --fix ."
+          }
+        ]
+      }
     ]
   }
 }

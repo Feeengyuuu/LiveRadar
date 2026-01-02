@@ -5,7 +5,7 @@
  *
  * Handles complete application initialization sequence:
  * - File protocol warning check
- * - Region detection and Twitch availability
+ * - Region detection (handled during bootstrap)
  * - UI state initialization
  * - Cache cleanup and data migration
  * - Audio system setup
@@ -20,6 +20,7 @@ import { APP_CONFIG } from '../config/constants.js';
 import { SafeStorage } from '../utils/safe-storage.js';
 import { ResourceManager } from '../utils/resource-manager.js';
 import { checkFileProtocol } from './file-protocol-warning.js';
+import { getDOMCache } from '../utils/dom-cache.js';
 
 // External dependencies (injected)
 let rooms = [];
@@ -45,75 +46,32 @@ export function initAppDependencies(deps) {
 }
 
 // ====================================================================
-// Region Detection
-// ====================================================================
-
-/**
- * Detect user region (Mainland China vs Overseas)
- * @returns {Promise<boolean>} True if mainland China, false otherwise
- */
-async function detectUserRegion() {
-    if (!APP_CONFIG.REGION.AUTO_DETECT) {
-        console.log('[Region Detection] Auto-detect disabled');
-        return false;
-    }
-
-    console.log('[Region Detection] Starting IP geolocation detection...');
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), APP_CONFIG.REGION.DETECTION_TIMEOUT);
-
-        const response = await fetch('https://ipapi.co/json/', {
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            console.warn('[Region Detection] API request failed:', response.status);
-            return false;
-        }
-
-        const data = await response.json();
-        console.log('[Region Detection] API response:', data);
-
-        // Check if country code is CN (China)
-        const isMainland = data.country_code === 'CN';
-        APP_CONFIG.REGION.IS_MAINLAND_CHINA = isMainland;
-
-        console.log(`[Region Detection] Result: ${isMainland ? 'Mainland China' : 'Overseas'}`);
-        return isMainland;
-    } catch (error) {
-        console.warn('[Region Detection] Detection failed:', error.message);
-        return false;
-    }
-}
-
-// ====================================================================
 // UI Initialization Functions
 // ====================================================================
 
 /**
  * Update platform input placeholder
+ * 优化：使用DOM缓存
  */
 function updatePlaceholder() {
-    const p = document.getElementById('platform-select')?.value;
-    const i = document.getElementById('room-id-input');
-    if (!i) return;
+    const cache = getDOMCache();
+    const p = cache.platformSelect?.value;
+    if (!cache.roomIdInput) return;
 
     const placeholders = {
         twitch: "输入 ID (如 xqc)...",
         douyu: "输入房间号...",
         bilibili: "输入房间号..."
     };
-    i.placeholder = placeholders[p] || "输入 ID...";
+    cache.roomIdInput.placeholder = placeholders[p] || "输入 ID...";
 }
 
 /**
  * Update notification button state
+ * 优化：使用DOM缓存
  */
 function updateNotifyBtn() {
-    const btn = document.getElementById('notify-btn');
+    const btn = getDOMCache().notifyBtn;
     if (!btn) return;
 
     if (notificationsEnabled) {
@@ -127,60 +85,63 @@ function updateNotifyBtn() {
 
 /**
  * Update snow effect button state
+ * 优化：使用DOM缓存
  */
 function updateSnowBtn() {
-    const btn = document.getElementById('snow-toggle-btn');
-    const canvas = document.getElementById('snow-canvas');
-    if (!btn) return;
+    const cache = getDOMCache();
+    if (!cache.snowToggleBtn) return;
 
-    const snowEnabled = SafeStorage.getItem('snow_effect_enabled') === 'true';
+    const snowEnabled = SafeStorage.getItem('pro_snow_enabled', 'false') === 'true';
 
     if (snowEnabled) {
-        btn.classList.add('active');
-        btn.innerHTML = '❄️ <span class="ml-1">雪花: 开</span>';
-        if (canvas) canvas.style.display = 'block';
+        cache.snowToggleBtn.classList.add('active');
+        cache.snowToggleBtn.innerHTML = '❄️ <span class="ml-1">雪花: 开</span>';
+        if (cache.snowCanvas) cache.snowCanvas.style.display = 'block';
     } else {
-        btn.classList.remove('active');
-        btn.innerHTML = '❄️ <span class="ml-1">雪花: 关</span>';
-        if (canvas) canvas.style.display = 'none';
+        cache.snowToggleBtn.classList.remove('active');
+        cache.snowToggleBtn.innerHTML = '❄️ <span class="ml-1">雪花: 关</span>';
+        if (cache.snowCanvas) cache.snowCanvas.style.display = 'none';
     }
 }
 
 /**
  * Update region button state
+ * 优化：使用DOM缓存
  */
 function updateRegionButtonState() {
-    const btn = document.getElementById('region-btn');
-    const label = document.getElementById('region-label');
-    if (!btn || !label) return;
+    const cache = getDOMCache();
+    if (!cache.regionBtn || !cache.regionLabel) return;
 
     const manualMode = SafeStorage.getItem('manual_region_mode');
     const isMainland = APP_CONFIG.REGION.IS_MAINLAND_CHINA;
 
     if (manualMode === 'mainland') {
-        label.textContent = '🇨🇳 国内';
-        btn.title = '当前: 国内模式 (手动)';
+        cache.regionLabel.textContent = '🇨🇳 国内';
+        cache.regionBtn.title = '当前: 国内模式 (手动)';
     } else if (manualMode === 'overseas') {
-        label.textContent = '🌍 海外';
-        btn.title = '当前: 海外模式 (手动)';
+        cache.regionLabel.textContent = '🌍 海外';
+        cache.regionBtn.title = '当前: 海外模式 (手动)';
     } else {
         // Auto mode
         if (isMainland) {
-            label.textContent = '🇨🇳 国内';
-            btn.title = '当前: 国内模式 (自动检测)';
+            cache.regionLabel.textContent = '🇨🇳 国内';
+            cache.regionBtn.title = '当前: 国内模式 (自动检测)';
         } else {
-            label.textContent = '🌍 海外';
-            btn.title = '当前: 海外模式 (自动检测)';
+            cache.regionLabel.textContent = '🌍 海外';
+            cache.regionBtn.title = '当前: 海外模式 (自动检测)';
         }
     }
 }
 
 // ====================================================================
-// Audio Initialization
+// Audio Initialization - DEPRECATED
+// NOTE: These functions are deprecated and kept only for backward compatibility.
+// Audio initialization is now handled by initAudioManager() in audio-manager.js
 // ====================================================================
 
 /**
  * Unlock all audio contexts (iOS compatibility)
+ * @deprecated Use unlockAllAudio from audio-manager.js instead
  */
 function unlockAllAudio() {
     if (window.audioContextUnlocked) return;
@@ -211,14 +172,8 @@ function unlockAllAudio() {
     Promise.all(promises).then(() => {
         window.audioContextUnlocked = true;
         console.log('[Audio] All audio contexts unlocked');
-
-        // Show toast notification (only once)
-        if (!window.hasShownAudioUnlockToast) {
-            window.hasShownAudioUnlockToast = true;
-            if (window.showToast) {
-                window.showToast('🔊 音频已激活', 'info');
-            }
-        }
+        // Audio unlocked silently - no toast notification
+        // Only play sound when user explicitly enables notifications
     }).catch(err => {
         console.warn('[Audio] Audio unlock failed:', err);
     });
@@ -227,6 +182,7 @@ function unlockAllAudio() {
 /**
  * Play notification sound
  * @param {boolean} isTest - Whether this is a test playback
+ * @deprecated Kept for backward compatibility
  */
 function playNotificationSound(isTest = false) {
     // Allow secret button to bypass notification switch
@@ -250,33 +206,23 @@ function playNotificationSound(isTest = false) {
 
 /**
  * Initialize audio system
+ * @deprecated This function is deprecated. Use initAudioManager() from audio-manager.js instead
  */
 function initAudio() {
-    // Update keep-alive button if exists
-    if (window.updateKeepAliveBtn) window.updateKeepAliveBtn();
-
-    // Add global one-time event listeners to unlock all audio
-    document.addEventListener('click', unlockAllAudio, { once: true });
-    document.addEventListener('touchstart', unlockAllAudio, { once: true });
-
-    console.log('[Audio] Audio system initialized, waiting for user interaction to unlock');
+    console.warn('[Init] initAudio() is deprecated - initialization now handled by initAudioManager()');
 }
 
 // ====================================================================
-// Auto-Refresh Initialization
+// Auto-Refresh Initialization - DEPRECATED
+// NOTE: This function is deprecated. Use initAutoRefresh() from auto-refresh.js instead
 // ====================================================================
 
 /**
  * Initialize auto-refresh system
+ * @deprecated Use initAutoRefresh() from auto-refresh.js instead
  */
 function initAutoRefresh() {
-    const autoRefreshEnabled = SafeStorage.getItem('pro_auto_refresh') === 'true';
-    if (autoRefreshEnabled && window.startAutoRefreshTimer) {
-        window.startAutoRefreshTimer();
-    }
-    if (window.updateAutoRefreshBtn) {
-        window.updateAutoRefreshBtn();
-    }
+    console.warn('[Init] initAutoRefresh() is deprecated - initialization now handled by auto-refresh.js');
 }
 
 // ====================================================================
@@ -438,14 +384,7 @@ export function init() {
     // File Protocol detection: Check if using file:// protocol and show warning
     checkFileProtocol();
 
-    // Region detection: Priority detect user region (async, non-blocking)
-    detectUserRegion().then(isMainland => {
-        if (isMainland) {
-            console.log('[Init] Mainland China user, Twitch features disabled');
-        }
-    }).catch(err => {
-        console.warn('[Init] Region detection failed:', err.message);
-    });
+    // Region detection is handled by initRegionDetection during bootstrap
 
     // Update UI states
     if (window.updatePlaceholder) window.updatePlaceholder();
@@ -494,14 +433,8 @@ export function init() {
     // Start initial refresh (silent if no cache)
     if (window.refreshAll) window.refreshAll(!hasCache);
 
-    // Initialize auto-refresh
-    initAutoRefresh();
-
-    // Initialize region button state
-    updateRegionButtonState();
-
-    // Initialize global audio manager
-    initAudio();
+    // Note: initAutoRefresh(), initAudioManager(), and initRegionDetection()
+    // are now called in main.js before init() to ensure proper initialization
 
     // Network status monitoring
     initNetworkMonitor();
@@ -519,7 +452,6 @@ export function init() {
 export default init;
 
 export {
-    detectUserRegion,
     updatePlaceholder,
     updateNotifyBtn,
     updateSnowBtn,

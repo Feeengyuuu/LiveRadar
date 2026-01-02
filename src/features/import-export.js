@@ -72,7 +72,7 @@ export function importRooms(event) {
             // Validate each room data
             const validRooms = importData.rooms.filter(room => {
                 return room.id && room.platform &&
-                       ['douyu', 'bilibili', 'twitch'].includes(room.platform);
+                       ['douyu', 'bilibili', 'twitch', 'kick'].includes(room.platform);
             });
 
             if (validRooms.length === 0) {

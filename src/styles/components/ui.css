@@ -179,7 +179,7 @@ button, .btn, [class*="-btn"] {
 #selector-menu, #history-dropdown { transform-origin: top center; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
 .dropdown-enter { opacity: 0; transform: scale(0.95) translateY(-10px); pointer-events: none; }
 .dropdown-enter-active { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
-#history-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 8px; background: #161616; border: 1px solid #333; border-radius: 12px; box-shadow: 0 15px 40px rgba(0,0,0,0.8); z-index: 90; overflow: hidden; }
+#history-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 8px; background: rgba(22, 22, 22, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; box-shadow: 0 15px 40px rgba(0,0,0,0.8); z-index: 90; overflow: hidden; }
 .history-item { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; color: #9ca3af; font-size: 12px; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.03); }
 .history-item:hover { background-color: #262626; color: #fff; }
 .history-delete { color: #525252; padding: 4px; border-radius: 4px; opacity: 0.5; transition: all 0.2s; }
@@ -189,18 +189,15 @@ button, .btn, [class*="-btn"] {
 /* Toast */
 #toast-container { position: fixed; bottom: 2.5rem; right: 2.5rem; z-index: 9999; }
 .toast { background: #1f1f1f; border: 1px solid #333; padding: 14px 24px; border-radius: 10px; color: #eee; font-size: 14px; font-weight: 600; margin-top: 12px; box-shadow: 0 10px 20px -5px rgba(0,0,0,0.5); animation: slideUp 0.3s ease; }
-@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.toast--info { border-color: #3b82f6; background: #162033; }
+.toast--success { border-color: #22c55e; background: #14251b; }
+.toast--error { border-color: #ef4444; background: #2b1414; }
+.toast--warning { border-color: #f59e0b; background: #2a1b0a; }
 
-/* Loader and Animations */
-@keyframes popIn { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+/* Loader and Animations - keyframes moved to animations.css */
 .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-
-/* 逆时针旋转动画 */
-@keyframes spin-reverse { to { transform: rotate(-360deg); } }
 .animate-spin-reverse { animation: spin-reverse 1s linear infinite; }
-
 .loader-ring { display: inline-block; width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.1); border-radius: 50%; border-top-color: var(--douyu); animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
 
 /* 新增：刷新状态指示器 */
 .refresh-stats {
@@ -210,8 +207,37 @@ button, .btn, [class*="-btn"] {
     background: rgba(255,255,255,0.03);
     border-radius: 8px;
     font-family: ui-monospace, monospace;
+    transition: all 0.3s ease;
 }
-.refresh-stats.active { color: #10b981; }
+.refresh-stats.active {
+    color: #10b981;
+    opacity: 1;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+    animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+@keyframes pulse-subtle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(0.98); }
+}
+
+/* 全局刷新按钮 - 浅蓝色统一风格 */
+#global-refresh-btn {
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+    color: white !important;
+    /* PC端无需设置order，保持默认顺序 */
+}
+#global-refresh-btn:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4) !important;
+}
+#global-refresh-btn:active {
+    transform: scale(0.9) rotate(45deg);
+}
 
 /* Back to Top Button */
 #back-to-top {

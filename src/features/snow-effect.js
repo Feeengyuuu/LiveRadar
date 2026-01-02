@@ -4,13 +4,14 @@
  */
 
 import { SafeStorage } from '../utils/safe-storage.js';
+import { ResourceManager } from '../utils/resource-manager.js';
 
 // ========================================
 // Configuration (aligned with original file)
 // ========================================
 const CONFIG = {
     ENABLED: SafeStorage.getItem('pro_snow_enabled', 'false') === 'true',  // 默认关闭，所有设备都支持
-    COUNT: window.innerWidth < 768 ? 200 : 500,  // 移动端减少雪花数量优化性能
+    COUNT: window.innerWidth < 768 ? 80 : 150,  // 优化：移动端80个，桌面端150个（从500降低）
     MAX_SIZE: 3.5,                  // Maximum size (pixels)
     MIN_SIZE: 1,                    // Minimum size (pixels)
     MAX_SPEED: 1.2,                 // Maximum fall speed
@@ -33,6 +34,7 @@ let snowflakes = [];
 let cardPositionsCache = [];
 let lastPositionUpdate = 0;
 let animationId = null;
+let domObserver = null;  // MutationObserver for DOM changes
 
 // Performance monitoring
 let frameCount = 0;
@@ -106,8 +108,12 @@ class Snowflake {
         this.y = initial ? Math.random() * height : -10 - Math.random() * 50;
         this.size = Math.random() * (CONFIG.MAX_SIZE - CONFIG.MIN_SIZE) + CONFIG.MIN_SIZE;
         this.baseSize = this.size;
-        this.speed = Math.random() * (CONFIG.MAX_SPEED - CONFIG.MIN_SPEED) + CONFIG.MIN_SPEED;
-        this.baseSpeed = this.speed;
+
+        // 确保速度重置为基础速度
+        const newSpeed = Math.random() * (CONFIG.MAX_SPEED - CONFIG.MIN_SPEED) + CONFIG.MIN_SPEED;
+        this.speed = newSpeed;
+        this.baseSpeed = newSpeed;
+
         this.opacity = Math.random() * 0.5 + 0.2;
         this.drift = Math.random() * 2 - 1;
         this.driftCycle = Math.random() * Math.PI * 2;
@@ -174,8 +180,13 @@ class Snowflake {
         // Update rotation
         this.rotation += this.rotationSpeed;
 
-        // Collision detection with cards
-        for (const cardData of cardPositionsCache) {
+        // 优化：空间分区碰撞检测 - 只检查Y轴附近的卡片（±150px范围内）
+        const nearbyCards = cardPositionsCache.filter(
+            cardData => Math.abs(cardData.rect.top - this.y) < 150
+        );
+
+        // Collision detection with nearby cards only
+        for (const cardData of nearbyCards) {
             // Skip hovered cards
             if (cardData.isHovered) continue;
 
@@ -256,7 +267,7 @@ class Snowflake {
         ctx.fillStyle = 'white';
 
         if (this.isAccumulated) {
-            // Accumulated snow: ellipse (flattened)
+            // Accumulated snow: ellipse (flattened) - 移除光晕效果以提升性能
             ctx.beginPath();
             ctx.ellipse(
                 this.x, this.y,
@@ -265,18 +276,10 @@ class Snowflake {
                 0, 0, Math.PI * 2
             );
             ctx.fill();
-
-            // Subtle glow effect
-            ctx.globalAlpha = this.opacity * 0.3;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size * 1.5, 0, Math.PI * 2);
-            ctx.fill();
         } else {
-            // Falling snow: circle with rotation
-            ctx.translate(this.x, this.y);
-            ctx.rotate(this.rotation);
+            // Falling snow: simple circle (移除rotation以减少transform操作)
             ctx.beginPath();
-            ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -324,6 +327,11 @@ function checkPerformance() {
 function loop() {
     if (!snowEnabled) {
         ctx.clearRect(0, 0, width, height);
+        // 确保动画停止
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
         return;
     }
 
@@ -345,6 +353,7 @@ function loop() {
     // Performance check
     checkPerformance();
 
+    // 只在没有运行的情况下才请求下一帧
     animationId = requestAnimationFrame(loop);
 }
 
@@ -369,12 +378,11 @@ export function initSnow() {
 
     // Setup canvas
     resize();
-    window.addEventListener('resize', resize);
+    ResourceManager.addEventListener(window, 'resize', resize);
 
     // Scroll handler: force update card positions
-    window.addEventListener('scroll', () => {
-        updateCardPositions(true);
-    }, { passive: true });
+    const scrollHandler = () => updateCardPositions(true);
+    ResourceManager.addEventListener(window, 'scroll', scrollHandler, { passive: true });
 
     // Create snowflakes
     snowflakes = [];
@@ -386,7 +394,7 @@ export function initSnow() {
     updateCardPositions(true);
 
     // Watch for DOM changes (new/removed cards)
-    const domObserver = new MutationObserver(() => {
+    domObserver = new MutationObserver(() => {
         updateCardPositions(true);
     });
 
@@ -400,11 +408,18 @@ export function initSnow() {
 
     // Start animation if enabled
     if (snowEnabled) {
+        // 确保之前的动画已停止
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
         loop();
     }
 
     // Update button state
     updateSnowBtn();
+
+    console.log('[Snow] Initialization complete, enabled:', snowEnabled);
 }
 
 /**
@@ -433,21 +448,60 @@ export function toggleSnow() {
     SafeStorage.setItem('pro_snow_enabled', snowEnabled);
     updateSnowBtn();
 
+    // 先停止现有的动画循环
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+
     if (snowEnabled) {
         if (canvas && ctx) {
-            loop();
+            // 确保只启动一个循环
+            if (!animationId) {
+                loop();
+            }
         }
         window.showToast?.("❄️ 下雪特效已开启");
     } else {
-        if (animationId) {
-            cancelAnimationFrame(animationId);
-            animationId = null;
-        }
         if (ctx && canvas) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
         window.showToast?.("下雪特效已关闭");
     }
+}
+
+/**
+ * Destroy snow effect and clean up resources
+ * Prevents memory leaks by removing event listeners and observers
+ */
+export function destroySnow() {
+    // Disable snow
+    snowEnabled = false;
+
+    // Stop animation
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+
+    // Clear snowflakes
+    snowflakes = [];
+
+    // Disconnect MutationObserver
+    if (domObserver) {
+        domObserver.disconnect();
+        domObserver = null;
+    }
+
+    // Clear canvas
+    if (ctx && canvas) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // ResourceManager will automatically clean up event listeners
+    // when ResourceManager.cleanup() is called
+
+    console.log('[Snow] Effect destroyed and resources cleaned up');
 }
 
 window.updateSnowBtn = updateSnowBtn;

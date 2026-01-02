@@ -8,6 +8,19 @@
  * - Horizontal scrollable control ribbon
  * - Fluid, one-handed operation
  * - Satisfying touch interactions
+ *
+ * About !important Usage:
+ * This file contains extensive use of !important declarations (200+).
+ * This is intentional and necessary because:
+ * 1. HTML uses Tailwind utility classes that have high specificity
+ * 2. Mobile layout requires complete override of desktop styles
+ * 3. @media queries need to enforce mobile-specific behavior
+ * 4. Without !important, Tailwind's inline utilities would take precedence
+ *
+ * Examples of necessary !important:
+ * - padding/margin overrides for Tailwind spacing classes (p-6, m-4, etc.)
+ * - display/flex overrides for layout classes (flex, block, etc.)
+ * - font-size overrides for text utilities (text-2xl, text-sm, etc.)
  */
 
 @media (max-width: 768px) {
@@ -16,7 +29,7 @@
      ==================================== */
 
   body {
-    padding: 0 !important;
+    padding: 0; /* No !important needed - base.css already sets this */
     background-color: #050505;
   }
 
@@ -60,10 +73,11 @@
   header > div:first-child {
     display: flex !important;
     align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px !important;
+    justify-content: flex-start;
+    padding: 12px 16px 6px 16px !important; /* 底部padding减半：12px→6px */
     border-right: none !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    gap: 10px;
   }
 
   header h1 {
@@ -72,14 +86,26 @@
     letter-spacing: -0.02em;
     text-align: left !important;
     margin: 0;
+    line-height: 1.1;
+    gap: 2px;
+    padding: 2px 0;
   }
 
   header h1 span {
-    display: inline !important;
-    font-size: 10px !important;
-    margin-left: 8px !important;
+    display: block !important;
+    margin-left: 0 !important;
     margin-top: 0 !important;
     opacity: 0.6;
+  }
+
+  header h1 span:first-child {
+    font-size: 20px !important;
+    line-height: 1.05;
+    opacity: 1;
+  }
+
+  header h1 span:last-child {
+    font-size: 10px !important;
   }
 
   /* 雪花切换按钮 */
@@ -87,6 +113,7 @@
     width: 36px;
     height: 36px;
     padding: 8px;
+    margin-left: auto;
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -97,11 +124,11 @@
      ==================================== */
 
   header > div:nth-child(2) {
-    padding: 12px 16px !important;
+    padding: 6px 16px !important; /* 上下padding减半：12px→6px */
     background: transparent !important;
     border: none !important;
     border-radius: 0 !important;
-    margin-bottom: 8px;
+    margin-bottom: 4px; /* 底部间距减半：8px→4px */
   }
 
   /* 重新设计搜索容器 */
@@ -139,9 +166,9 @@
     height: 6px;
   }
 
-  /* 输入框 - 直接样式化 */
+  /* 输入框 - 动态填满可用空间 */
   #room-id-input {
-    flex: 1;
+    flex: 1 !important; /* 自动扩展填满空间 */
     height: 48px !important;
     padding: 0 16px !important;
     background: rgba(255, 255, 255, 0.05) !important;
@@ -204,8 +231,8 @@
   header > div:last-child {
     position: relative;
     display: flex !important;
-    padding: 12px !important; /* 统一padding */
-    gap: 6px !important; /* 减少按钮间距 */
+    padding: 3px 12px 8px 12px !important; /* 顶部padding上移3px */
+    gap: 5px !important;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
@@ -238,23 +265,25 @@
     flex: none !important;
   }
 
-  /* 统计信息 - 紧凑设计 */
+  /* 统计信息 - 固定宽度 */
   #refresh-stats {
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    height: 36px; /* 减小高度 */
-    padding: 0 10px; /* 减少padding让按钮更窄 */
+    height: 36px !important;
+    min-height: 36px !important;
+    min-width: 70px !important;
+    padding: 0 10px !important;
     background: rgba(16, 185, 129, 0.1);
     border: 1px solid rgba(16, 185, 129, 0.3);
-    border-radius: 8px; /* 稍微减小圆角 */
-    font-size: 11px;
+    border-radius: 10px !important;
+    font-size: 10px !important;
     font-weight: 700;
     color: #10b981;
     font-family: 'Courier New', monospace;
-    letter-spacing: 0.02em;
     white-space: nowrap;
     text-align: center;
+    flex-shrink: 0;
   }
 
   #refresh-stats.hidden {
@@ -265,23 +294,19 @@
     animation: pulse 2s ease-in-out infinite;
   }
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-  }
-
-  /* 功能按钮 - 紧凑设计，让按钮更窄以显示更多 */
+  /* 功能按钮 - 窄按钮，只显示图标 */
   .auto-refresh-btn,
   .notify-btn,
   .keepalive-btn,
   .region-btn,
   .import-export-btn {
-    height: 36px !important; /* 减小高度 */
-    min-height: 36px !important;
-    padding: 0 10px !important; /* 减少padding让按钮更窄 */
-    border-radius: 8px !important; /* 稍微减小圆角 */
-    font-size: 12px !important;
-    font-weight: 600 !important;
+    width: 36px !important; /* 固定窄宽度 */
+    height: 36px !important;
+    min-width: 36px !important;
+    max-width: 36px !important;
+    padding: 0 !important;
+    border-radius: 10px !important; /* 圆角方形 */
+    font-size: 0 !important; /* 隐藏文字 */
     background: rgba(255, 255, 255, 0.05) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     color: rgba(255, 255, 255, 0.6) !important;
@@ -289,12 +314,19 @@
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    gap: 4px; /* 减少图标和文字间距 */
-    white-space: nowrap;
-    text-align: center;
+    flex-shrink: 0 !important;
   }
 
-  /* 激活状态 */
+  /* 隐藏按钮内的文字span */
+  .auto-refresh-btn span,
+  .notify-btn span,
+  .keepalive-btn span,
+  .region-btn span,
+  .import-export-btn span {
+    display: none !important;
+  }
+
+  /* 激活状态 - 统一橙色 */
   .auto-refresh-btn:not(.off),
   .notify-btn:not(.off),
   .keepalive-btn:not(.off) {
@@ -302,6 +334,21 @@
     border-color: transparent !important;
     color: white !important;
     box-shadow: 0 4px 12px rgba(255, 93, 35, 0.3);
+  }
+
+  /* 地区按钮 - 保持原有颜色方案 */
+  .region-btn.mainland {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+    border-color: transparent !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  }
+
+  .region-btn.overseas {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    border-color: transparent !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
   }
 
   /* 按压反馈 */
@@ -323,26 +370,36 @@
     height: 16px;
   }
 
-  /* 全局刷新按钮 - 圆形设计 */
+  /* 全局刷新按钮 - 浅蓝色，更显眼 */
   #global-refresh-btn {
-    width: 36px !important; /* 减小尺寸 */
+    width: 36px !important;
     height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    max-width: 36px !important;
+    max-height: 36px !important;
     padding: 0 !important;
     border-radius: 50% !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important; /* 浅蓝色渐变 */
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+    color: white !important;
     display: flex !important;
     align-items: center;
     justify-content: center;
+    order: -1;
+    flex-shrink: 0;
   }
 
   #global-refresh-btn svg {
-    width: 18px; /* 稍微减小图标 */
-    height: 18px;
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0;
   }
 
   #global-refresh-btn:active {
     transform: scale(0.9) rotate(45deg);
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
   }
 
   /* ====================================
@@ -350,119 +407,203 @@
      ==================================== */
 
   #main-content {
-    padding: 16px;
+    padding: 8px; /* 极致紧凑间距 */
     margin-top: 0;
   }
 
-  /* 区域容器 */
+  /* 区域容器 - 极致紧凑间距 */
   .zone-container {
-    margin-bottom: 2rem !important;
+    margin-bottom: 1rem !important;
   }
 
   .zone-header {
     padding-left: 0 !important;
-    margin-bottom: 12px !important;
-    border-left-width: 3px !important;
+    padding-bottom: 6px !important; /* 增加底部间距 */
+    margin-bottom: 6px !important;
+    border-left-width: 2px !important;
   }
 
   .zone-title {
-    font-size: 14px !important;
+    font-size: 11px !important;
     font-weight: 900 !important;
   }
 
   .zone-sub {
-    font-size: 9px !important;
+    font-size: 8px !important;
   }
 
-  /* 卡片网格 */
+  /* 滚动播报 - 匹配区域标题字体大小 */
+  .status-ticker {
+    height: 20px !important; /* 缩小高度 */
+    margin-left: 1rem !important; /* 减少左边距 */
+  }
+
+  .status-ticker-item {
+    font-size: 10px !important; /* 匹配zone-title的大小 */
+    gap: 4px !important; /* 缩小间距 */
+  }
+
+  .ticker-icon {
+    width: 14px !important;
+    height: 14px !important;
+    font-size: 8px !important;
+  }
+
+  /* 卡片网格 - 双列布局，极致紧凑 */
   .monitor-grid {
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
   }
 
-  /* 卡片优化 */
+  /* 卡片优化 - 极致紧凑，1/4尺寸 */
   .room-card {
-    border-radius: 16px;
+    border-radius: 6px;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: rgba(18, 18, 18, 0.45);
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.25) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 16px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.32s cubic-bezier(0.22, 0.61, 0.36, 1), border-color 0.32s ease, background-color 0.32s ease, filter 0.32s ease;
   }
 
   .room-card:active {
-    transform: scale(0.98);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    transform: scale(0.985);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.45);
+    border-color: rgba(255, 255, 255, 0.18);
+    filter: brightness(1.02);
   }
 
-  /* 缩略图容器 */
+  /* 缩略图容器 - 缩小高度 */
   .card-thumbnail-box {
     border-radius: 0;
     aspect-ratio: 16 / 9;
+    max-height: 80px;
   }
 
   .card-thumbnail {
     border-radius: 0;
   }
 
-  /* 状态芯片 */
+  /* 状态芯片 - 极小尺寸 */
   .status-chip {
-    top: 12px;
-    left: 12px;
-    font-size: 11px !important;
-    padding: 5px 12px !important;
-    border-radius: 8px;
+    top: 3px;
+    left: 2px; /* 往左靠一点，在小卡片上更好看 */
+    font-size: 8px !important;
+    padding: 2px 5px !important;
+    border-radius: 3px;
     font-weight: 700;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
 
-  /* 卡片信息区 */
+  /* 卡片信息区 - 极致紧凑 */
   .card-info {
-    padding: 14px !important;
+    padding: 8px 4px 4px 4px !important; /* 缩小顶部padding为更大的标题腾空间 */
   }
 
   .u-avatar {
-    width: 44px !important;
-    height: 44px !important;
+    width: 18px !important;
+    height: 18px !important;
   }
 
   .skeleton-avatar {
-    width: 44px !important;
-    height: 44px !important;
+    width: 18px !important;
+    height: 18px !important;
   }
 
   .room-title {
-    font-size: 15px !important;
+    font-size: 11px !important; /* 放大一个字号，提升可读性 */
     font-weight: 700 !important;
-    margin-bottom: 4px;
+    margin-bottom: 1px;
+    line-height: 1.2;
+    /* 最多显示2行 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .room-owner {
-    font-size: 13px !important;
+    font-size: 9px !important;
     opacity: 0.7;
+    /* 单行显示，超出隐藏 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  /* 卡片底栏 */
+  /* 卡片底栏 - 极致紧凑，优化布局 */
   .card-bottom-bar {
-    margin-top: 10px;
+    margin-top: 0 !important; /* 往上移3px：从3px改为0 */
+    margin-left: -32px; /* 左对齐头像：-(avatar宽度18px + gap14px) */
+    height: auto !important; /* 移除固定高度 */
+    gap: 2px !important; /* 添加间距 */
+    flex-wrap: nowrap !important; /* 不换行 */
+    flex-direction: row !important; /* 强制水平布局 */
   }
 
+  /* 在iPhone界面隐藏人气热度标识 */
   .viewer-pill {
-    font-size: 12px !important;
-    padding: 4px 10px !important;
-    border-radius: 6px;
+    display: none !important;
   }
 
-  /* 操作按钮 */
+  /* 直播时长 - 对齐标题左侧，极致紧凑样式 */
+  .live-duration {
+    font-size: 8px !important;
+    padding: 2px 4px !important;
+    border-radius: 3px !important;
+    white-space: nowrap;
+    max-width: 60px; /* 限制最大宽度，防止过长 */
+    overflow: hidden; /* 超出隐藏 */
+    text-overflow: ellipsis; /* 显示省略号 */
+    flex-shrink: 1; /* 允许收缩 */
+    margin-left: 32px; /* 抵消card-bottom-bar的负margin，对齐标题 */
+  }
+
+  .is-live-card .live-duration {
+    background: rgba(16, 185, 129, 0.1) !important;
+    color: #10b981 !important;
+  }
+
+  /* 操作按钮 - 适中尺寸，方便点击 */
   .card-actions {
     opacity: 1 !important;
-    gap: 8px;
+    gap: 2px !important;
+    flex-shrink: 0; /* 按钮不收缩 */
+    margin-left: auto; /* 推到最右边 */
   }
 
   .action-btn {
-    width: 36px !important;
-    height: 36px !important;
-    border-radius: 8px;
+    width: 24px !important; /* 稍微大一点，方便点击 */
+    height: 24px !important;
+    min-width: 24px !important; /* 确保不会被压缩 */
+    min-height: 24px !important;
+    max-width: 24px !important; /* 确保不会扩展 */
+    max-height: 24px !important;
+    padding: 0 !important; /* 移除所有内边距 */
+    border-radius: 50% !important; /* 完全圆形 */
+    background: rgba(0,0,0,0.5) !important; /* 半透明背景 */
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    flex-shrink: 0 !important; /* 不收缩 */
+    flex-grow: 0 !important; /* 不扩展 */
+    aspect-ratio: 1 !important; /* 强制1:1比例 */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .action-btn svg {
+    width: 12px !important;
+    height: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* 收藏按钮激活状态 */
+  .fav-btn.active {
+    background: rgba(255, 215, 0, 0.2) !important;
+    border-color: var(--gold) !important;
   }
 
   /* ====================================
@@ -508,21 +649,30 @@
      下拉菜单优化
      ==================================== */
 
-  #selector-menu,
+  /* 在移动端隐藏历史记录下拉框 */
   #history-dropdown {
+    display: none !important;
+  }
+
+  #selector-menu {
     position: fixed !important;
     left: 16px !important;
-    right: 16px !important;
-    width: auto !important;
-    max-width: none !important;
-    border-radius: 16px !important;
-    padding: 8px;
+    top: auto !important;
+    width: 120px !important; /* 固定窄宽度，符合按钮宽度 */
+    border-radius: 12px !important;
+    padding: 4px !important; /* 减少内边距 */
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8);
+    margin-top: 4px !important;
   }
 
-  #selector-menu > div,
+  #selector-menu > div {
+    border-radius: 8px !important;
+    padding: 10px 12px !important; /* 紧凑内边距 */
+    font-size: 14px !important;
+  }
+
   #history-dropdown > div {
     border-radius: 12px !important;
     padding: 14px 16px !important;
@@ -630,15 +780,27 @@
   .keepalive-btn,
   .region-btn,
   .import-export-btn {
-    height: 32px !important; /* 超小屏进一步减小 */
-    min-height: 32px !important;
-    font-size: 11px !important;
-    padding: 0 8px !important; /* 更紧凑 */
+    width: 32px !important; /* 超小屏稍微缩小 */
+    height: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+    border-radius: 8px !important;
   }
 
   #global-refresh-btn {
     width: 32px !important;
     height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important; /* 浅蓝色 */
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+    color: white !important;
+    order: -1;
+    flex-shrink: 0;
   }
 
   #global-refresh-btn svg {
@@ -646,10 +808,17 @@
     height: 16px !important;
   }
 
+  #global-refresh-btn:active {
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
+  }
+
   #refresh-stats {
     height: 32px !important;
-    font-size: 10px !important;
+    min-width: fit-content !important;
     padding: 0 8px !important;
+    font-size: 9px !important;
+    border-radius: 8px !important;
+    order: 999 !important; /* 保持在最右边 */
   }
 }
 
@@ -663,11 +832,11 @@
   }
 
   #main-content {
-    padding: 12px;
+    padding: 8px;
   }
 
   .monitor-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px !important;
+    grid-template-columns: repeat(3, 1fr) !important; /* 横屏显示3列 */
+    gap: 6px !important;
   }
 }

@@ -12,6 +12,12 @@ export default defineConfig({
         drop_console: true, // Remove console.log in production
         drop_debugger: true,
       },
+      format: {
+        comments: false,
+        // 确保正确处理 Unicode 字符（包括中文）
+        ascii_only: false,
+        ecma: 2020,
+      },
     },
     rollupOptions: {
       output: {

@@ -1,0 +1,114 @@
+/**
+ * ====================================================================
+ * Animation Definitions - Centralized Animation Management
+ * ====================================================================
+ *
+ * All @keyframes animations in one place to avoid duplication.
+ * Component-specific animations remain in their respective files.
+ *
+ * Usage:
+ * - Import this file before component styles in main.css
+ * - Use animation classes (.animate-*) for quick application
+ * - Custom animations can still reference these keyframes
+ */
+
+/* ===== Breathing Effects ===== */
+
+/* Golden breathing effect for favorite cards */
+@keyframes goldenBreath {
+    0% { box-shadow: 0 0 5px rgba(255, 215, 0, 0.2); }
+    50% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.5); }
+    100% { box-shadow: 0 0 5px rgba(255, 215, 0, 0.2); }
+}
+
+/* Pulse effect for loading/status indicators */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* ===== Entry/Exit Animations ===== */
+
+/* Pop-in effect for cards and modals */
+@keyframes popIn {
+    0% { opacity: 0; transform: scale(0.9); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* Slide up from bottom */
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Slide down from top */
+@keyframes slideDown {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Fade in with slight upward movement */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Simple fade out */
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* ===== Rotation Animations ===== */
+
+/* Clockwise rotation */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Counter-clockwise rotation */
+@keyframes spin-reverse {
+    to { transform: rotate(-360deg); }
+}
+
+/* ===== Loading Animations ===== */
+
+/* Shimmer effect for skeleton loaders */
+@keyframes shimmer {
+    0% { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+}
+
+/* ===== Utility Animation Classes ===== */
+
+.animate-pop-in {
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+.animate-spin-reverse {
+    animation: spin-reverse 1s linear infinite;
+}
+
+.animate-pulse {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease;
+}
+
+.animate-fade-out {
+    animation: fadeOut 0.3s ease;
+}
+
+.animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+}
+
+.animate-slide-down {
+    animation: slideDown 0.4s ease-out;
+}

@@ -1,18 +1,99 @@
-/* CSS Custom Properties */
+/* ====================================================================
+   CSS Custom Properties - Design System Variables
+   ====================================================================
+   Centralized design tokens for consistent styling across the app
+   ==================================================================== */
+
 :root {
-  /* Platform Colors */
+  /* ===== Platform Brand Colors ===== */
   --douyu: #ff5d23;
   --bilibili: #fb7299;
   --twitch: #9146ff;
+  --kick: #53fc18;
 
-  /* Status Colors */
-  --live: #10b981;
-  --loop: #6366f1;
-  --off: #6b7280;
-  --weak: #eab308;
+  /* ===== Status Colors ===== */
+  --live: #10b981;        /* Green - Live streaming */
+  --loop: #6366f1;        /* Indigo - Replay/Loop */
+  --off: #6b7280;         /* Gray - Offline */
+  --weak: #eab308;        /* Yellow - Weak signal */
+  --error: #ef4444;       /* Red - Error state */
 
-  /* UI Colors */
+  /* ===== UI Background Colors ===== */
   --card-bg: #121212;
   --bg-dark: #050505;
+  --bg-darker: #000000;
+  --bg-elevated: #1f1f1f;
+  --bg-overlay: rgba(0, 0, 0, 0.8);
   --gold: #ffd700;
+
+  /* Brand gradient */
+  --brand-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+  /* ===== Text Colors ===== */
+  --text-primary: #f3f4f6;     /* Near white */
+  --text-secondary: #9ca3af;   /* Light gray */
+  --text-muted: #6b7280;       /* Muted gray */
+  --text-inverse: #000000;     /* Black (for light backgrounds) */
+
+  /* ===== Border Colors ===== */
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-normal: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --border-accent: rgba(255, 255, 255, 0.3);
+
+  /* ===== Spacing System (8px base) ===== */
+  --space-xs: 0.25rem;    /* 4px */
+  --space-sm: 0.5rem;     /* 8px */
+  --space-md: 1rem;       /* 16px */
+  --space-lg: 1.5rem;     /* 24px */
+  --space-xl: 2rem;       /* 32px */
+  --space-2xl: 3rem;      /* 48px */
+  --space-3xl: 4rem;      /* 64px */
+
+  /* ===== Border Radius System ===== */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  --radius-full: 9999px;  /* Fully rounded */
+
+  /* ===== Shadow System ===== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.5);
+  --shadow-2xl: 0 30px 60px rgba(0, 0, 0, 0.6);
+
+  /* ===== Transition System ===== */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  --transition-bounce: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  /* ===== Z-Index Layers ===== */
+  --z-base: 1;
+  --z-elevated: 10;
+  --z-sticky: 50;
+  --z-modal: 100;
+  --z-toast: 9999;
+
+  /* ===== Typography ===== */
+  --font-size-xs: 0.75rem;      /* 12px */
+  --font-size-sm: 0.875rem;     /* 14px */
+  --font-size-base: 1rem;       /* 16px */
+  --font-size-lg: 1.125rem;     /* 18px */
+  --font-size-xl: 1.25rem;      /* 20px */
+  --font-size-2xl: 1.5rem;      /* 24px */
+  --font-size-3xl: 1.875rem;    /* 30px */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-black: 900;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
 }
