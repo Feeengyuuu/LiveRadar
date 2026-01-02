@@ -24,7 +24,9 @@
       "Bash(timeout 5 npm run dev:*)",
       "Bash(git checkout:*)",
       "Bash(find:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git branch:*)",
+      "Bash(dir:*)"
     ]
   },
   "hooks": {
