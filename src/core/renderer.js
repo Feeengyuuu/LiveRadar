@@ -402,7 +402,7 @@ export function updateCard(card, roomInfo, data, cardState) {
     card.classList.remove('is-live-card', 'is-offline-card', 'is-loop-card');
 
     let newThumbSrc = '';
-    let newAvatarSrc = data.avatar || '';
+    const newAvatarSrc = data.avatar || '';
 
     switch (cardState) {
         case 'live':

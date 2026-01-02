@@ -43,7 +43,7 @@ export function initSniffers(deps) {
  * @returns {Promise<Object>} Room status object
  */
 export async function getDouyuStatus(id, fetchAvatar, prevData) {
-    let res = {
+    const res = {
         isLive: false,
         isReplay: false,
         title: prevData?.title || "信号波动",
@@ -121,7 +121,7 @@ export async function getDouyuStatus(id, fetchAvatar, prevData) {
  * @returns {Promise<Object|null>} Room status object or null on failure
  */
 export async function getBilibiliStatus(id, fetchAvatar, prevData) {
-    let res = {
+    const res = {
         isLive: false,
         isReplay: false,
         title: prevData?.title || "",
@@ -156,10 +156,10 @@ export async function getBilibiliStatus(id, fetchAvatar, prevData) {
     res.isReplay = liveStatus === 2;
 
     // Try to get UID from init first
-    let uid = init?.data?.uid || null;
+    const uid = init?.data?.uid || null;
 
-    // Offline or replay: reuse cached info but allow basic profile fetch below
-    if (!res.isLive) {
+    // Offline: reuse cached info but allow basic profile fetch below
+    if (!res.isLive && !res.isReplay) {
         if (prevData) {
             if (!res.title) res.title = prevData.title;
             if (!res.owner) res.owner = prevData.owner;
@@ -171,15 +171,15 @@ export async function getBilibiliStatus(id, fetchAvatar, prevData) {
         }
     }
 
-    if (res.isLive) {
-        // Step 2: Only fetch detailed info when live
+    // Fetch detailed info when live or replay
+    if (res.isLive || res.isReplay) {
         const info = await fetchWithProxy(`https://api.live.bilibili.com/room/v1/Room/get_info?room_id=${id}`, false, 8000);
         if (info?.code === 0) {
             const d = info.data;
             res.heatValue = d.online || 0;
 
-            // Get live start time
-            if (d.live_time) {
+            // Get live start time (only for live streams)
+            if (res.isLive && d.live_time) {
                 // Bilibili returns "2024-01-01 12:00:00" format
                 const liveTime = new Date(d.live_time.replace(' ', 'T') + '+08:00');
                 if (!isNaN(liveTime.getTime())) {
@@ -188,9 +188,15 @@ export async function getBilibiliStatus(id, fetchAvatar, prevData) {
             }
 
             res.title = d.title;
-            res.cover = d.keyframe || d.user_cover;
-            // 优化：直播中使用实时时间戳（每次刷新都更新）
-            if (res.cover) res.cover += `?t=${Date.now()}`;
+
+            // 优化：直播中使用实时截图（keyframe）+ 时间戳，录播使用固定封面（user_cover）不加时间戳
+            if (res.isLive) {
+                res.cover = d.keyframe || d.user_cover;
+                if (res.cover) res.cover += `?t=${Date.now()}`;
+            } else if (res.isReplay) {
+                // 录播使用固定封面，不添加时间戳（避免缓存失效）
+                res.cover = d.user_cover || d.keyframe || prevData?.cover;
+            }
         } else if (info) {
             console.warn(`[Bilibili] ⚠ get_info error code ${info.code} for room ${id}, message: ${info.message || 'N/A'} - using cached data`);
         } else {
@@ -302,7 +308,7 @@ async function fetchTwitchAvatarAsync(id) {
 export async function getTwitchStatus(id, fetchAvatar, prevData) {
     // Remove region restriction - all users try to fetch data
     // On failure, return null, caller will mark isError, renderer shows "Connection Error"
-    let res = {
+    const res = {
         isLive: false,
         isReplay: false,
         title: "",
@@ -395,7 +401,7 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
  * @returns {Promise<Object|null>} Channel status object or null on failure
  */
 export async function getKickStatus(id, fetchAvatar, prevData) {
-    let res = {
+    const res = {
         isLive: false,
         isReplay: false,
         title: "",

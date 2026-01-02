@@ -27,7 +27,7 @@ import { executeWithProxyControl } from '../utils/proxy-pool-manager.js';
  * Proxy performance statistics
  * Structure: { [proxyName]: { success, fail, lastSuccessTime, totalResponseTime, avgResponseTime } }
  */
-let proxyStats = SafeStorage.getJSON('pro_proxy_stats', {});
+const proxyStats = SafeStorage.getJSON('pro_proxy_stats', {});
 
 // ====================================================================
 // Smart Proxy Selection
