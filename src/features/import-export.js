@@ -3,7 +3,7 @@
  * JSON-based room list import and export functionality
  */
 
-import { SafeStorage } from '../utils/safe-storage.js';
+import { getRooms, getRoomDataCache, updateRooms, updateRoomDataCache } from '../core/state.js';
 
 /**
  * Export rooms to JSON file
@@ -105,7 +105,7 @@ export function importRooms(event) {
  * @param {string} version - Version from import file
  */
 function showImportDialog(importRooms, version) {
-    const rooms = window.rooms || [];
+    const rooms = getRooms();
 
     // Create dialog HTML
     const dialogHTML = `
@@ -147,7 +147,7 @@ function showImportDialog(importRooms, version) {
  */
 window.doImport = function(mode, importRooms) {
     try {
-        const rooms = window.rooms || [];
+        const rooms = getRooms();
         let newRooms = [];
         let message = '';
 
@@ -173,19 +173,12 @@ window.doImport = function(mode, importRooms) {
         }
 
         // Update rooms in place to keep references stable
-        const roomsRef = window.rooms || [];
-        roomsRef.length = 0;
-        roomsRef.push(...newRooms);
-        window.rooms = roomsRef;
-
-        // Save to localStorage
-        SafeStorage.setJSON('pro_monitored_rooms', newRooms);
+        updateRooms(newRooms, true);
 
         // Clear cache (force re-fetch)
-        const roomDataCache = window.roomDataCache || {};
+        const roomDataCache = getRoomDataCache();
         Object.keys(roomDataCache).forEach(key => delete roomDataCache[key]);
-        window.roomDataCache = roomDataCache;
-        SafeStorage.setJSON('pro_room_cache', roomDataCache);
+        updateRoomDataCache(roomDataCache, true);
 
         // Close dialog
         closeImportDialog();

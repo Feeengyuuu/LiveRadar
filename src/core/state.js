@@ -24,20 +24,53 @@
 
 import { SafeStorage } from '../utils/safe-storage.js';
 import { APP_CONFIG } from '../config/constants.js';
+import { debounce } from '../utils/helpers.js';
 
 // ============================================================
 // DEBOUNCED STORAGE - Performance Optimization
 // ============================================================
 
 /**
- * Debounced storage writes to prevent excessive localStorage operations
+ * Debounced storage writes using unified debounce function
  * Reduces write frequency by 90% during rapid state updates
  */
-const storagePendingWrites = new Map();
-const STORAGE_DEBOUNCE_DELAY = 500; // 500ms delay
+const STORAGE_DEBOUNCE_DELAY = APP_CONFIG.CACHE?.DEBOUNCE_DELAY || 500;
 
 /**
- * Debounced localStorage write
+ * Cache for debounced write functions (one per storage key)
+ * @type {Map<string, Function>}
+ */
+const debouncedWriters = new Map();
+
+/**
+ * Get or create a debounced writer for a specific storage key
+ * @param {string} key - Storage key
+ * @param {boolean} isJSON - Whether to use setJSON or setItem
+ * @returns {Function} Debounced write function
+ */
+function getOrCreateDebouncedWriter(key, isJSON = true) {
+    const cacheKey = `${key}:${isJSON ? 'json' : 'item'}`;
+
+    if (!debouncedWriters.has(cacheKey)) {
+        const writer = debounce(
+            (value) => {
+                if (isJSON) {
+                    SafeStorage.setJSON(key, value);
+                } else {
+                    SafeStorage.setItem(key, value);
+                }
+            },
+            STORAGE_DEBOUNCE_DELAY,
+            { trailing: true }
+        );
+        debouncedWriters.set(cacheKey, writer);
+    }
+
+    return debouncedWriters.get(cacheKey);
+}
+
+/**
+ * Debounced localStorage write (JSON)
  * @param {string} key - Storage key
  * @param {*} value - Value to store
  * @param {boolean} immediate - Skip debounce and write immediately
@@ -45,42 +78,33 @@ const STORAGE_DEBOUNCE_DELAY = 500; // 500ms delay
 function debouncedStorageWrite(key, value, immediate = false) {
     if (immediate) {
         SafeStorage.setJSON(key, value);
+        // Cancel any pending debounced write for this key
+        const writer = debouncedWriters.get(`${key}:json`);
+        if (writer?.cancel) writer.cancel();
         return;
     }
 
-    // Clear existing timer for this key
-    if (storagePendingWrites.has(key)) {
-        clearTimeout(storagePendingWrites.get(key));
-    }
-
-    // Set new debounced write
-    const timerId = setTimeout(() => {
-        SafeStorage.setJSON(key, value);
-        storagePendingWrites.delete(key);
-    }, STORAGE_DEBOUNCE_DELAY);
-
-    storagePendingWrites.set(key, timerId);
+    const writer = getOrCreateDebouncedWriter(key, true);
+    writer(value);
 }
 
 /**
  * Debounced storage write for simple key-value
+ * @param {string} key - Storage key
+ * @param {string} value - Value to store
+ * @param {boolean} immediate - Skip debounce and write immediately
  */
 function debouncedStorageSet(key, value, immediate = false) {
     if (immediate) {
         SafeStorage.setItem(key, value);
+        // Cancel any pending debounced write for this key
+        const writer = debouncedWriters.get(`${key}:item`);
+        if (writer?.cancel) writer.cancel();
         return;
     }
 
-    if (storagePendingWrites.has(key)) {
-        clearTimeout(storagePendingWrites.get(key));
-    }
-
-    const timerId = setTimeout(() => {
-        SafeStorage.setItem(key, value);
-        storagePendingWrites.delete(key);
-    }, STORAGE_DEBOUNCE_DELAY);
-
-    storagePendingWrites.set(key, timerId);
+    const writer = getOrCreateDebouncedWriter(key, false);
+    writer(value);
 }
 
 /**
@@ -88,14 +112,14 @@ function debouncedStorageSet(key, value, immediate = false) {
  * Call this before page unload or critical operations
  */
 export function flushPendingStorageWrites() {
-    // 先清除所有定时器，防止重复写入
-    storagePendingWrites.forEach((timerId) => {
-        clearTimeout(timerId);
+    // Flush all debounced writers by calling their flush() method
+    debouncedWriters.forEach((writer) => {
+        if (writer?.flush) {
+            writer.flush();
+        }
     });
-    storagePendingWrites.clear();
 
-    // 立即执行所有待写入的数据
-    // 注意：这里我们直接写入当前状态，因为状态已经更新，只是写入被延迟了
+    // Also ensure current state is written (in case debounced writers haven't captured latest)
     SafeStorage.setJSON('pro_monitored_rooms', state.rooms);
     SafeStorage.setJSON('pro_room_cache', state.roomDataCache);
     SafeStorage.setJSON('pro_proxy_stats', state.proxyStats);
@@ -274,6 +298,9 @@ export function updateNotificationsEnabled(enabled) {
     const oldValue = state.notificationsEnabled;
     state.notificationsEnabled = enabled;
     SafeStorage.setItem('pro_notify_enabled', enabled);
+    if (typeof window !== 'undefined') {
+        window.notificationsEnabled = enabled;
+    }
 
     // Notify listeners
     notifyListeners('notificationsEnabled', enabled, oldValue);

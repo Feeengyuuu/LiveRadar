@@ -1,10 +1,16 @@
 /**
  * Auto Refresh Module
  * Automatic room status refresh with countdown timer
+ *
+ * Uses ResourceManager for proper timer lifecycle management
+ * to prevent memory leaks.
  */
 
 import { SafeStorage } from '../utils/safe-storage.js';
 import { APP_CONFIG } from '../config/constants.js';
+import { getDOMCache } from '../utils/dom-cache.js';
+import { ResourceManager } from '../utils/resource-manager.js';
+import { updateAutoRefreshEnabled } from '../core/state.js';
 
 // State
 let autoRefreshEnabled = SafeStorage.getItem('pro_auto_refresh', 'false') === 'true';
@@ -26,8 +32,9 @@ function formatCountdown(seconds) {
  * Update auto-refresh button UI
  */
 function updateAutoRefreshBtn() {
-    const btn = document.getElementById('auto-refresh-btn');
-    const label = document.getElementById('auto-refresh-label');
+    const cache = getDOMCache();
+    const btn = cache.autoRefreshBtn || document.getElementById('auto-refresh-btn');
+    const label = cache.autoRefreshLabel || document.getElementById('auto-refresh-label');
     if (!btn || !label) return;
 
     if (autoRefreshEnabled) {
@@ -40,13 +47,26 @@ function updateAutoRefreshBtn() {
 }
 
 /**
+ * Reset auto-refresh countdown (used by manual refresh)
+ */
+export function resetAutoRefreshCountdown() {
+    autoRefreshCountdown = APP_CONFIG.AUTO_REFRESH.INTERVAL;
+    updateAutoRefreshBtn();
+}
+
+/**
  * Start auto-refresh timer
+ * Uses ResourceManager for proper lifecycle management
  */
 export function startAutoRefresh() {
-    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    // Clear existing timer if any (using ResourceManager)
+    if (autoRefreshTimer) {
+        ResourceManager.clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+    }
     autoRefreshCountdown = APP_CONFIG.AUTO_REFRESH.INTERVAL;
 
-    autoRefreshTimer = setInterval(() => {
+    const timerId = setInterval(() => {
         autoRefreshCountdown--;
         updateAutoRefreshBtn();
 
@@ -56,14 +76,18 @@ export function startAutoRefresh() {
             window.refreshAll?.(false, true); // Second parameter indicates auto-refresh
         }
     }, 1000);
+
+    // Track with ResourceManager for proper cleanup
+    autoRefreshTimer = ResourceManager.addInterval(timerId);
 }
 
 /**
  * Stop auto-refresh timer
+ * Properly removes timer from ResourceManager
  */
 export function stopAutoRefresh() {
     if (autoRefreshTimer) {
-        clearInterval(autoRefreshTimer);
+        ResourceManager.clearInterval(autoRefreshTimer);
         autoRefreshTimer = null;
     }
     autoRefreshCountdown = APP_CONFIG.AUTO_REFRESH.INTERVAL;
@@ -74,7 +98,7 @@ export function stopAutoRefresh() {
  */
 export function toggleAutoRefresh() {
     autoRefreshEnabled = !autoRefreshEnabled;
-    SafeStorage.setItem('pro_auto_refresh', autoRefreshEnabled);
+    updateAutoRefreshEnabled(autoRefreshEnabled);
 
     if (autoRefreshEnabled) {
         startAutoRefresh();
@@ -95,3 +119,7 @@ export function initAutoRefresh() {
     }
     updateAutoRefreshBtn();
 }
+
+// Make globally accessible for cross-module usage
+window.updateAutoRefreshBtn = updateAutoRefreshBtn;
+window.resetAutoRefreshCountdown = resetAutoRefreshCountdown;

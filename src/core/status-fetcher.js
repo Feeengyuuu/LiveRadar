@@ -15,11 +15,35 @@
  */
 
 import { APP_CONFIG } from '../config/constants.js';
-import { sniffDouyu, sniffBilibili, sniffTwitch, sniffKick } from '../api/platform-sniffers.js';
+import { registerDefaultAdapters, fetchPlatformStatus } from '../api/platform-adapter.js';
 import { fetchQuick } from '../api/proxy-manager.js';
 import { DataDiffer } from '../utils/data-differ.js';
 import { getRoomDataCache, updateRoomCache } from './state.js';
 import { formatHeat } from '../utils/helpers.js';
+
+// ====================================================================
+// Cover Timestamp Helpers
+// ====================================================================
+
+function stripTimestampParam(url) {
+    if (!url) return '';
+    return url
+        .replace(/([?&])t=\d+(&)?/, (match, sep, trailing) => {
+            if (sep === '?' && trailing) return '?';
+            if (sep === '&' && trailing) return '&';
+            return '';
+        })
+        .replace(/[?&]$/, '');
+}
+
+function applyTimestampParam(url, timestamp) {
+    if (!url) return '';
+    if (/([?&])t=\d+/.test(url)) {
+        return url.replace(/([?&])t=\d+/, `$1t=${timestamp}`);
+    }
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}t=${timestamp}`;
+}
 
 // External dependencies (only notification check needs injection)
 let checkAndNotify = null;
@@ -30,6 +54,7 @@ let checkAndNotify = null;
  */
 export function initStatusFetcher(deps) {
     if (deps.checkAndNotify) checkAndNotify = deps.checkAndNotify;
+    registerDefaultAdapters();
 }
 
 /**
@@ -45,20 +70,23 @@ export async function fetchRoomStatus(room, jitter = 0) {
     const roomDataCache = getRoomDataCache();
     const prevData = roomDataCache[cacheKey];
     const now = Date.now();
-    const needAvatarUpdate = !prevData?.avatar || !prevData?.lastAvatarUpdate || (now - prevData.lastAvatarUpdate > APP_CONFIG.CACHE.AVATAR_UPDATE_INTERVAL);
+    const ownerNeedsRefresh = (room.platform === 'douyu' || room.platform === 'bilibili')
+        && prevData?.owner
+        && (prevData.owner === room.id || prevData.owner === String(room.id));
+    const needProfileUpdate = !prevData?.avatar
+        || !prevData?.lastAvatarUpdate
+        || (now - prevData.lastAvatarUpdate > APP_CONFIG.CACHE.AVATAR_UPDATE_INTERVAL)
+        || ownerNeedsRefresh;
 
     let result = null;
 
     try {
-        if (room.platform === 'douyu') {
-            result = await sniffDouyu(room.id, needAvatarUpdate, prevData);
-        } else if (room.platform === 'bilibili') {
-            result = await sniffBilibili(room.id, needAvatarUpdate, prevData);
-        } else if (room.platform === 'twitch') {
-            result = await sniffTwitch(room.id, needAvatarUpdate, prevData);
-        } else if (room.platform === 'kick') {
-            result = await sniffKick(room.id, needAvatarUpdate, prevData);
-        }
+        result = await fetchPlatformStatus(
+            room.platform,
+            room.id,
+            { fetchAvatar: needProfileUpdate },
+            prevData
+        );
     } catch (error) {
         console.error(`[fetchStatus] ${room.platform}-${room.id} fetch failed:`, error.message);
         result = null;
@@ -89,12 +117,12 @@ export async function fetchRoomStatus(room, jitter = 0) {
         if (!finalIsLive && !result.isReplay && prevData) {
             if (!result.title) result.title = prevData.title;
             if (!result.owner) result.owner = prevData.owner;
-            if (!result.cover) result.cover = prevData.cover;
+            if (prevData.cover) result.cover = prevData.cover;
             if (!result.avatar) result.avatar = prevData.avatar;
         }
 
         // Douyu avatar fallback fetch
-        if (room.platform === 'douyu' && !result.avatar && !result.isError) {
+        if (room.platform === 'douyu' && !result.avatar && !result.isError && needProfileUpdate) {
             fetchQuick(`https://open.douyucdn.cn/api/RoomApi/room/${room.id}`)
                 .then(o => {
                     const cache = getRoomDataCache();
@@ -111,12 +139,36 @@ export async function fetchRoomStatus(room, jitter = 0) {
             checkAndNotify(room, finalIsLive, result.owner || room.id);
         }
 
+        const prevCover = prevData?.cover || '';
+        const prevCoverBase = stripTimestampParam(prevCover);
+        const nextCoverBase = stripTimestampParam(result.cover || '');
+        const lastCoverUpdate = prevData?.lastCoverUpdate || 0;
+        const coverRefreshDue = now - lastCoverUpdate > APP_CONFIG.CACHE.IMAGE_TIMESTAMP_INTERVAL;
+        const coverBaseChanged = !!nextCoverBase && !!prevCoverBase && nextCoverBase !== prevCoverBase;
+
+        let finalCover = result.cover || '';
+        if (finalIsLive) {
+            if (!nextCoverBase) {
+                finalCover = prevCover;
+            } else if (!coverBaseChanged && !coverRefreshDue) {
+                finalCover = prevCover;
+            } else {
+                finalCover = applyTimestampParam(nextCoverBase, now);
+            }
+        } else if (!result.isReplay && prevCover) {
+            finalCover = prevCover;
+        }
+
+        const shouldUpdateCoverTimestamp = finalIsLive
+            && nextCoverBase
+            && (coverBaseChanged || coverRefreshDue || !lastCoverUpdate);
+
         const updateData = {
             ...result,
             isLive: finalIsLive,
             viewers,
             avatar: result.avatar || prevData?.avatar || "",
-            cover: result.cover,
+            cover: finalCover,
             platform: room.platform,
             id: room.id,
             loading: false,
@@ -125,13 +177,24 @@ export async function fetchRoomStatus(room, jitter = 0) {
             _stale: false
         };
 
-        // Handle avatar update timestamp
-        if (result.avatar && result.avatar !== prevData?.avatar) {
+        if (!needProfileUpdate) {
+            if (prevData?.avatar) updateData.avatar = prevData.avatar;
+            if (prevData?.owner) updateData.owner = prevData.owner;
+        }
+
+        // Handle profile update timestamp (avatar + owner)
+        const profileFetched = result._profileFetched === true;
+        delete updateData._profileFetched;
+        const avatarChanged = updateData.avatar && updateData.avatar !== prevData?.avatar;
+        const ownerChanged = updateData.owner && updateData.owner !== prevData?.owner;
+        const shouldUpdateProfileTimestamp = profileFetched || avatarChanged || ownerChanged;
+        if (shouldUpdateProfileTimestamp) {
             updateData.lastAvatarUpdate = now;
         } else {
-            updateData.avatar = prevData?.avatar || "";
             updateData.lastAvatarUpdate = prevData?.lastAvatarUpdate || 0;
         }
+
+        updateData.lastCoverUpdate = shouldUpdateCoverTimestamp ? now : (prevData?.lastCoverUpdate || 0);
 
         // Incremental update: Compare old and new data, detect changes
         const diffResult = DataDiffer.compare(prevData, updateData);

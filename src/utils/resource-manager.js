@@ -39,7 +39,7 @@ export const ResourceManager = {
      * @param {number} id - Timer ID to clear
      */
     clearTimer(id) {
-        clearTimeout(id);
+        window.clearTimeout(id);
         this._timers.delete(id);
     },
 
@@ -48,7 +48,7 @@ export const ResourceManager = {
      * @param {number} id - Interval ID to clear
      */
     clearInterval(id) {
-        clearInterval(id);
+        window.clearInterval(id);
         this._intervals.delete(id);
     },
 
@@ -73,11 +73,11 @@ export const ResourceManager = {
      */
     cleanup() {
         // Clear all timers
-        this._timers.forEach(id => clearTimeout(id));
+        this._timers.forEach(id => window.clearTimeout(id));
         this._timers.clear();
 
         // Clear all intervals
-        this._intervals.forEach(id => clearInterval(id));
+        this._intervals.forEach(id => window.clearInterval(id));
         this._intervals.clear();
 
         // Remove all event listeners

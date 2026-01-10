@@ -4,7 +4,8 @@
  */
 
 import { SafeStorage } from '../utils/safe-storage.js';
-import { getRooms, addRoom as addRoomToState, removeRoom as removeRoomFromState } from '../core/state.js';
+import { getDOMCache } from '../utils/dom-cache.js';
+import { getRooms, getRoomDataCache, updateRoomDataCache, addRoom as addRoomToState, removeRoom as removeRoomFromState, toggleRoomFavorite } from '../core/state.js';
 
 // State
 let searchHistory = SafeStorage.getJSON('pro_search_history', []);
@@ -23,7 +24,8 @@ const isMobile = () => {
  */
 export function toggleDropdown(e) {
     if (e) e.stopPropagation();
-    const menu = document.getElementById('selector-menu');
+    const cache = getDOMCache();
+    const menu = cache.selectorMenu || document.getElementById('selector-menu');
     if (!menu) return;
 
     if (menu.classList.contains('dropdown-enter')) {
@@ -38,7 +40,8 @@ export function toggleDropdown(e) {
  * Close platform selector dropdown
  */
 export function closeDropdown() {
-    const menu = document.getElementById('selector-menu');
+    const cache = getDOMCache();
+    const menu = cache.selectorMenu || document.getElementById('selector-menu');
     if (!menu) return;
 
     if (!menu.classList.contains('dropdown-enter')) {
@@ -54,9 +57,10 @@ export function closeDropdown() {
  * @param {string} label - Platform display label
  */
 export function selectPlatform(value, color, label) {
-    const select = document.getElementById('platform-select');
-    const labelEl = document.getElementById('current-platform-label');
-    const indicator = document.getElementById('selected-indicator');
+    const cache = getDOMCache();
+    const select = cache.platformSelect || document.getElementById('platform-select');
+    const labelEl = cache.currentPlatformLabel || document.getElementById('current-platform-label');
+    const indicator = cache.selectedIndicator || document.getElementById('selected-indicator');
 
     if (select) select.value = value;
     if (labelEl) {
@@ -76,8 +80,9 @@ export function selectPlatform(value, color, label) {
  * Update input placeholder based on selected platform
  */
 export function updatePlaceholder() {
-    const platformSelect = document.getElementById('platform-select');
-    const input = document.getElementById('room-id-input');
+    const cache = getDOMCache();
+    const platformSelect = cache.platformSelect || document.getElementById('platform-select');
+    const input = cache.roomIdInput || document.getElementById('room-id-input');
     if (!platformSelect || !input) return;
 
     const platform = platformSelect.value;
@@ -97,9 +102,10 @@ export function showHistory() {
     // 在移动端禁用历史记录功能
     if (isMobile()) return;
 
-    const input = document.getElementById('room-id-input');
+    const cache = getDOMCache();
+    const input = cache.roomIdInput || document.getElementById('room-id-input');
     renderHistory(input ? input.value : '');
-    const menu = document.getElementById('history-dropdown');
+    const menu = cache.historyDropdown || document.getElementById('history-dropdown');
     if (!menu) return;
 
     menu.classList.remove('dropdown-enter');
@@ -115,7 +121,8 @@ export function hideHistory(e) {
         return;
     }
 
-    const menu = document.getElementById('history-dropdown');
+    const cache = getDOMCache();
+    const menu = cache.historyDropdown || document.getElementById('history-dropdown');
     if (!menu) return;
 
     if (!menu.classList.contains('dropdown-enter')) {
@@ -135,7 +142,8 @@ export function handleInput(e) {
     const value = e && e.target ? e.target.value : '';
     renderHistory(value);
 
-    const menu = document.getElementById('history-dropdown');
+    const cache = getDOMCache();
+    const menu = cache.historyDropdown || document.getElementById('history-dropdown');
     if (!menu) return;
 
     if (menu.classList.contains('dropdown-enter')) {
@@ -148,8 +156,9 @@ export function handleInput(e) {
  * Handle add room button click
  */
 export function handleAddInput() {
-    const input = document.getElementById('room-id-input');
-    const platformSelect = document.getElementById('platform-select');
+    const cache = getDOMCache();
+    const input = cache.roomIdInput || document.getElementById('room-id-input');
+    const platformSelect = cache.platformSelect || document.getElementById('platform-select');
     if (!input || !platformSelect) return;
 
     const value = input.value.trim();
@@ -197,9 +206,9 @@ export function removeRoom(id, platform) {
     removeRoomFromState(id, platform);
 
     // Remove from cache
-    const roomDataCache = window.roomDataCache || {};
+    const roomDataCache = getRoomDataCache();
     delete roomDataCache[`${platform}-${id}`];
-    SafeStorage.setJSON('pro_room_cache', roomDataCache);
+    updateRoomDataCache(roomDataCache, true);
 
     window.renderAll?.();
 }
@@ -210,12 +219,7 @@ export function removeRoom(id, platform) {
  * @param {string} platform - Platform
  */
 export function toggleFavorite(id, platform) {
-    const rooms = getRooms();
-    const room = rooms.find(r => r.id === id && r.platform === platform);
-    if (!room) return;
-
-    room.isFav = !room.isFav;
-    SafeStorage.setJSON('pro_monitored_rooms', rooms);
+    toggleRoomFavorite(id, platform);
     window.renderAll?.();
 }
 
@@ -224,7 +228,8 @@ export function toggleFavorite(id, platform) {
  * @param {string} value - History value to apply
  */
 export function applyHistory(value) {
-    const input = document.getElementById('room-id-input');
+    const cache = getDOMCache();
+    const input = cache.roomIdInput || document.getElementById('room-id-input');
     if (!input) return;
 
     input.value = value;
@@ -267,7 +272,8 @@ export function saveSearchHistory(value) {
 function bindHistoryEvents() {
     if (historyEventsBound) return;
 
-    const historyEl = document.getElementById('history-dropdown');
+    const cache = getDOMCache();
+    const historyEl = cache.historyDropdown || document.getElementById('history-dropdown');
     if (!historyEl) return;
 
     historyEl.addEventListener('click', (e) => {
@@ -287,13 +293,14 @@ function bindHistoryEvents() {
 }
 
 function updateHistoryDropdownPosition() {
-    const historyEl = document.getElementById('history-dropdown');
+    const cache = getDOMCache();
+    const historyEl = cache.historyDropdown || document.getElementById('history-dropdown');
     if (!historyEl) return;
 
     const container = historyEl.offsetParent;
     if (!container) return;
 
-    const input = document.getElementById('room-id-input');
+    const input = cache.roomIdInput || document.getElementById('room-id-input');
     if (!input) return;
 
     // 找到添加按钮
@@ -334,7 +341,8 @@ export function renderHistory(query = '') {
     // 在移动端禁用历史记录功能
     if (isMobile()) return;
 
-    const historyEl = document.getElementById('history-dropdown');
+    const cache = getDOMCache();
+    const historyEl = cache.historyDropdown || document.getElementById('history-dropdown');
     if (!historyEl) return;
 
     bindHistoryEvents();

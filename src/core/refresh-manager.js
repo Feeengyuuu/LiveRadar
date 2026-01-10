@@ -22,9 +22,6 @@ import { getDOMCache } from '../utils/dom-cache.js';
 
 // External dependencies (only callbacks need injection)
 let detectStatusChanges = null;
-let loaderStartTime = 0;
-
-const MIN_LOADER_DISPLAY_TIME = 1500; // Minimum display 1.5 seconds
 
 /**
  * Initialize refresh manager with external dependencies
@@ -32,7 +29,6 @@ const MIN_LOADER_DISPLAY_TIME = 1500; // Minimum display 1.5 seconds
  */
 export function initRefreshManager(deps = {}) {
     if (deps.detectStatusChanges) detectStatusChanges = deps.detectStatusChanges;
-    if (deps.loaderStartTime !== undefined) loaderStartTime = deps.loaderStartTime;
 }
 
 // ====================================================================
@@ -139,8 +135,12 @@ export async function refreshAll(sl = false, isAutoRefresh = false) {
 
     // Manual refresh resets auto-refresh countdown
     if (!isAutoRefresh && state.autoRefreshEnabled) {
-        state.autoRefreshCountdown = APP_CONFIG.AUTO_REFRESH.INTERVAL;
-        if (window.updateAutoRefreshBtn) window.updateAutoRefreshBtn();
+        if (window.resetAutoRefreshCountdown) {
+            window.resetAutoRefreshCountdown();
+        } else {
+            state.autoRefreshCountdown = APP_CONFIG.AUTO_REFRESH.INTERVAL;
+            if (window.updateAutoRefreshBtn) window.updateAutoRefreshBtn();
+        }
     }
 
     updateLastRefreshTime(now);
@@ -167,8 +167,8 @@ export async function refreshAll(sl = false, isAutoRefresh = false) {
         if (a.isFav !== b.isFav) return b.isFav - a.isFav;
 
         // 2. 视口内优先（第二优先级）
-        const aCard = document.querySelector(`[data-room-id="${a.id}"][data-platform="${a.platform}"]`);
-        const bCard = document.querySelector(`[data-room-id="${b.id}"][data-platform="${b.platform}"]`);
+        const aCard = document.getElementById(`card-${a.platform}-${a.id}`);
+        const bCard = document.getElementById(`card-${b.platform}-${b.id}`);
         const aInView = isInViewport(aCard);
         const bInView = isInViewport(bCard);
 
@@ -236,26 +236,6 @@ export async function refreshAll(sl = false, isAutoRefresh = false) {
 
         if (cache.globalRefreshBtn) cache.globalRefreshBtn.classList.remove('animate-spin-reverse');
 
-        // Ensure initial loader is always removed (minimum display 1.5 seconds)
-        if (sl) {
-            const l = document.getElementById('initial-loader');
-            if (l) {
-                // Calculate elapsed display time
-                const elapsedTime = Date.now() - loaderStartTime;
-                const remainingTime = Math.max(0, MIN_LOADER_DISPLAY_TIME - elapsedTime);
-
-                // Ensure at least 1.5 seconds display before fade out
-                const timerId = setTimeout(() => {
-                    l.style.opacity = '0';
-                    // 恢复主内容的可见性 - 移除loading class
-                    document.body.classList.remove('loading');
-                    document.body.style.overflow = '';
-                    const fadeTimerId = setTimeout(() => l.remove(), APP_CONFIG.UI.LOADER_FADE_DURATION);
-                    ResourceManager.addTimer(fadeTimerId);
-                }, remainingTime);
-                ResourceManager.addTimer(timerId);
-            }
-        }
     }
 }
 

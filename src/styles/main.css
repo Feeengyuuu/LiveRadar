@@ -1,18 +1,54 @@
-/* Import custom CSS FIRST (before Tailwind) */
+/**
+ * ====================================================================
+ * Main Stylesheet
+ * ====================================================================
+ *
+ * IMPORTANT: In PostCSS/Vite, @import must come BEFORE @tailwind directives.
+ * Tailwind processes these in order, so custom styles imported first
+ * can be properly extended by Tailwind utilities.
+ *
+ * Import order:
+ * 1. CSS Variables (needed by all other styles)
+ * 2. Custom styles (base, layout, components)
+ * 3. Tailwind directives (base, components, utilities)
+ */
+
+/* ============================================================
+   1. CSS Variables - Must be first (used by everything else)
+   ============================================================ */
 @import './variables.css';
-@import './animations.css';  /* Centralized animations - loaded before components */
+
+/* ============================================================
+   2. Custom Base & Layout Styles
+   ============================================================ */
+@import './animations.css';
 @import './base.css';
 @import './layout.css';
+
+/* ============================================================
+   3. Component Styles
+   ============================================================ */
 @import './components/card.css';
 @import './components/ui.css';
 @import './components/warning-banner.css';
-@import './components/secret-button.css'; /* Secret audio button */
+@import './components/secret-button.css';
+
+/* ============================================================
+   4. Effects
+   ============================================================ */
 @import './effects/snow.css';
+
+/* ============================================================
+   5. Utilities & Responsive
+   ============================================================ */
 @import './utilities.css';
 @import './responsive.css';
-@import './mobile-optimized.css'; /* iPhone-optimized layout */
+@import './mobile-optimized.css';
 
-/* Import Tailwind directives AFTER custom imports */
+/* ============================================================
+   6. Tailwind Directives - MUST come after @import statements
+   PostCSS requires this order for proper processing
+   ============================================================ */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

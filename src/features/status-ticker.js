@@ -3,11 +3,26 @@
  * Displays live status change announcements (streamer went online/offline)
  */
 
+import { getState } from '../core/state.js';
+import { getDOMCache } from '../utils/dom-cache.js';
+
 // State
-let previousLiveStatus = {}; // Store previous online status
+let previousLiveStatus = null; // Store previous online status (state-backed)
 let statusChangeQueue = []; // Status change message queue
 let currentTickerIndex = 0; // Current displayed message index
 let tickerTimer = null; // Scroll timer
+
+function getTickerEl() {
+    const cache = getDOMCache();
+    return cache.statusTicker || document.getElementById('status-ticker');
+}
+
+function getPreviousLiveStatusRef() {
+    if (!previousLiveStatus) {
+        previousLiveStatus = getState().previousLiveStatus || {};
+    }
+    return previousLiveStatus;
+}
 
 /**
  * Detect status changes across all rooms
@@ -16,6 +31,7 @@ let tickerTimer = null; // Scroll timer
  */
 export function detectStatusChanges(rooms, roomDataCache) {
     const changes = [];
+    const statusSnapshot = getPreviousLiveStatusRef();
 
     // Iterate through all rooms, detect status changes
     rooms.forEach(room => {
@@ -24,7 +40,7 @@ export function detectStatusChanges(rooms, roomDataCache) {
 
         if (!currentData || currentData.loading || currentData.isError) return;
 
-        const wasLive = previousLiveStatus[key] === true;
+        const wasLive = statusSnapshot[key] === true;
         const isLive = currentData.isLive === true;
 
         // Detect went online
@@ -46,7 +62,7 @@ export function detectStatusChanges(rooms, roomDataCache) {
         }
 
         // Update status snapshot
-        previousLiveStatus[key] = isLive;
+        statusSnapshot[key] = isLive;
     });
 
     // If there are changes, add to queue and start scrolling
@@ -66,7 +82,7 @@ export function startStatusTicker() {
         clearInterval(tickerTimer);
     }
 
-    const ticker = document.getElementById('status-ticker');
+    const ticker = getTickerEl();
     if (!ticker || statusChangeQueue.length === 0) return;
 
     // Show ticker container
@@ -110,7 +126,7 @@ export function stopStatusTicker() {
         tickerTimer = null;
     }
 
-    const ticker = document.getElementById('status-ticker');
+    const ticker = getTickerEl();
     if (ticker) {
         ticker.style.display = 'none';
     }
@@ -121,7 +137,7 @@ export function stopStatusTicker() {
  * @param {number} index - Message index in queue
  */
 function showTickerMessage(index) {
-    const ticker = document.getElementById('status-ticker');
+    const ticker = getTickerEl();
     if (!ticker) return;
 
     const message = statusChangeQueue[index];
@@ -179,7 +195,7 @@ export function updateTicker(rooms, roomDataCache) {
  */
 export function initStatusTicker() {
     // Reset state
-    previousLiveStatus = {};
+    previousLiveStatus = getState().previousLiveStatus || {};
     statusChangeQueue = [];
     currentTickerIndex = 0;
     tickerTimer = null;
@@ -191,7 +207,8 @@ export function initStatusTicker() {
  * Clear status ticker state
  */
 export function clearTickerState() {
-    previousLiveStatus = {};
+    const statusSnapshot = getPreviousLiveStatusRef();
+    Object.keys(statusSnapshot).forEach(key => delete statusSnapshot[key]);
     statusChangeQueue = [];
     currentTickerIndex = 0;
 
@@ -200,7 +217,7 @@ export function clearTickerState() {
         tickerTimer = null;
     }
 
-    const ticker = document.getElementById('status-ticker');
+    const ticker = getTickerEl();
     if (ticker) {
         ticker.style.display = 'none';
         ticker.innerHTML = '';

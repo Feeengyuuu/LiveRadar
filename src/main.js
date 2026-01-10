@@ -70,12 +70,14 @@ checkFileProtocolAndWarn();
 async function startApp() {
     try {
         await initializeApp(loaderStartTime);
-        hideLoader(loaderStartTime);
         console.log('[LiveRadar] ✓ Application started successfully');
     } catch (error) {
         console.error('[LiveRadar] ✗ Application startup failed:', error);
         // showToast is exposed by bootstrap, so it should be available here
-        window.showToast?.('应用初始化失败，请刷新页面重试');
+        window.showToast?.('应用初始化失败，请刷新页面重试', 'error');
+    } finally {
+        // 确保 loader 始终被移除，即使初始化失败
+        hideLoader(loaderStartTime);
     }
 }
 

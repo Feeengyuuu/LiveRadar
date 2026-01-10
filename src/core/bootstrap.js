@@ -14,7 +14,6 @@
  * 5. Hide loader
  * ==================================================================== */
 
-import { SafeStorage } from '../utils/safe-storage.js';
 import { debounce, formatHeat } from '../utils/helpers.js';
 import { APP_CONFIG, MIN_LOADER_DISPLAY_TIME } from '../config/constants.js';
 import { initDOMCache } from '../utils/dom-cache.js';
@@ -66,14 +65,13 @@ export async function initializeApp(loaderStartTime) {
         exposeGlobals();
 
         // Expose core dependencies (for features to access)
-        const notificationsEnabled = SafeStorage.getItem('pro_notify_enabled', 'false') === 'true';
         exposeCoreDependencies({
             rooms,
             roomDataCache,
             previousLiveStatus: state.previousLiveStatus,
             renderAll,
             fetchStatus,
-            notificationsEnabled
+            notificationsEnabled: state.notificationsEnabled
         });
 
         // === Step 3: Wire Up Module Dependencies (Simplified) ===
@@ -91,8 +89,7 @@ export async function initializeApp(loaderStartTime) {
 
         // Initialize refresh manager (only callbacks needed)
         initRefreshManager({
-            detectStatusChanges: () => updateTicker(window.rooms, window.roomDataCache),
-            loaderStartTime
+            detectStatusChanges: () => updateTicker(getRooms(), getRoomDataCache())
         });
 
         // Initialize renderer (no dependencies needed - uses state.js directly)
@@ -112,12 +109,9 @@ export async function initializeApp(loaderStartTime) {
 
         // Pass notifyAudio to init dependencies (must be called after initNotificationAudio)
         initAppDependencies({
-            rooms: window.rooms,
-            roomDataCache: window.roomDataCache,
-            previousLiveStatus: window.previousLiveStatus,
-            notificationsEnabled: window.notificationsEnabled,
-            notifyAudio,
-            loaderStartTime
+            rooms,
+            roomDataCache,
+            previousLiveStatus: state.previousLiveStatus
         });
 
         console.log('[Bootstrap] All features initialized');
@@ -144,6 +138,9 @@ export async function initializeApp(loaderStartTime) {
 
     } catch (error) {
         console.error('[Bootstrap] ✗ Initialization failed:', error);
+        console.error('[Bootstrap] Error name:', error?.name);
+        console.error('[Bootstrap] Error message:', error?.message);
+        console.error('[Bootstrap] Error stack:', error?.stack);
         throw error;
     }
 }
@@ -165,6 +162,11 @@ export function hideLoader(loaderStartTime) {
 
     setTimeout(() => {
         loader.style.opacity = '0';
+
+        // 重要：移除 body 上的 loading class 以显示主内容
+        document.body.classList.remove('loading');
+        document.body.style.overflow = '';
+
         setTimeout(() => {
             loader.remove();
             console.log('[Bootstrap] ✓ Loader removed');

@@ -32,7 +32,7 @@ export function initNotificationAudio() {
  * Play notification sound
  * @param {boolean} forcePlay - Force play even if notifications disabled (for testing)
  */
-export function playNotificationSound(forcePlay = false) {
+export function playNotificationSound(forcePlay = false, bypassUnlock = false) {
     // Check if notification enabled (bypass if force play)
     const notificationsEnabled = window.notificationsEnabled || false;
     if (!notificationsEnabled && !forcePlay) {
@@ -54,7 +54,7 @@ export function playNotificationSound(forcePlay = false) {
     }
 
     // Check if audio context unlocked (iOS/Chrome requirement)
-    if (!window.audioContextUnlocked) {
+    if (!window.audioContextUnlocked && !bypassUnlock) {
         if (APP_CONFIG.DEBUG.LOG_AUDIO) {
             console.warn('[Notification Audio] Audio context not unlocked yet');
         }
@@ -70,11 +70,17 @@ export function playNotificationSound(forcePlay = false) {
     // Play sound
     try {
         notifyAudio.currentTime = 0; // Reset to start
-        notifyAudio.play().catch(error => {
-            if (APP_CONFIG.DEBUG.LOG_AUDIO) {
-                console.warn('[Notification Audio] Play failed:', error);
-            }
-        });
+        notifyAudio.volume = APP_CONFIG.AUDIO.NOTIFICATION_VOLUME;
+        const playPromise = notifyAudio.play();
+        if (playPromise && typeof playPromise.then === 'function') {
+            playPromise.then(() => {
+                window.audioContextUnlocked = true;
+            }).catch(error => {
+                if (APP_CONFIG.DEBUG.LOG_AUDIO) {
+                    console.warn('[Notification Audio] Play failed:', error);
+                }
+            });
+        }
 
         if (APP_CONFIG.DEBUG.LOG_AUDIO) {
             console.log(`[Notification Audio] Playing notification sound, volume: ${(notifyAudio.volume * 100).toFixed(0)}%`);

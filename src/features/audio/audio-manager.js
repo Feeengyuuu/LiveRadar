@@ -10,6 +10,8 @@ import { getNotificationAudio } from './notification-audio.js';
 // State
 let keepAliveEnabled = SafeStorage.getItem('pro_keepalive_enabled', 'false') === 'true';
 let keepAliveAudio = null;
+let unlockPromise = null;
+let unlockToastEnabled = true;
 
 // Global audio unlock state
 window.audioContextUnlocked = false;
@@ -19,8 +21,15 @@ window.hasShownAudioUnlockToast = false;
  * Unlock all audio contexts (iOS/Chrome requirement)
  * Must be triggered by user interaction (click/touch)
  */
-export function unlockAllAudio() {
-    if (window.audioContextUnlocked) return;
+export function unlockAllAudio(options = {}) {
+    if (window.audioContextUnlocked) return Promise.resolve(true);
+
+    const hasSilentFlag = typeof options === 'object' && options !== null && Object.prototype.hasOwnProperty.call(options, 'silent');
+    const silent = hasSilentFlag ? options.silent === true : false;
+
+    if (unlockPromise) return unlockPromise;
+
+    unlockToastEnabled = !silent;
 
     const promises = [];
 
@@ -56,22 +65,36 @@ export function unlockAllAudio() {
         promises.push(keepAlivePromise);
     }
 
-    Promise.all(promises).then(() => {
-        if (promises.length > 0) {
-            window.audioContextUnlocked = true;
-            console.log('[Audio Manager] Global audio context unlocked');
-            window.showToast?.('音效已激活', 'info');
+    if (promises.length === 0) {
+        unlockPromise = Promise.resolve(false);
+    } else {
+        unlockPromise = Promise.allSettled(promises).then(results => {
+            const anySuccess = results.some(r => r.status === 'fulfilled');
+            if (anySuccess) {
+                window.audioContextUnlocked = true;
+                console.log('[Audio Manager] Global audio context unlocked');
+                if (unlockToastEnabled) {
+                    window.showToast?.('音效已激活', 'info');
+                }
 
-            // If keep-alive is enabled, start it immediately
-            if (keepAliveEnabled) {
-                startKeepAlive();
+                // If keep-alive is enabled, start it immediately
+                if (keepAliveEnabled) {
+                    startKeepAlive();
+                }
             }
-        }
+            return anySuccess;
+        });
+    }
+
+    unlockPromise = unlockPromise.finally(() => {
+        unlockPromise = null;
     });
 
     // Only try once, remove event listeners
     document.removeEventListener('click', unlockAllAudio);
     document.removeEventListener('touchstart', unlockAllAudio);
+
+    return unlockPromise;
 }
 
 /**

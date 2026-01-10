@@ -22,7 +22,7 @@ import { toggleKeepAlive, unlockAllAudio } from '../features/audio/audio-manager
 import { toggleRegionMode } from '../features/region-detector.js';
 import { exportRooms, importRooms } from '../features/import-export.js';
 import { refreshAll } from '../core/refresh-manager.js';
-import { dismissFileWarning, dismissFileWarningPermanently, showDeploymentGuide } from '../features/warning-banner.js';
+import { dismissFileWarning, dismissFileWarningPermanently, showDeploymentGuide } from './file-protocol-warning.js';
 import { playNotificationSound } from '../features/audio/notification-audio.js';
 import { showToast } from '../utils/helpers.js';
 import { getRooms } from '../core/state.js';

@@ -3,10 +3,11 @@
  * Browser notification system with permission management
  */
 
-import { SafeStorage } from '../utils/safe-storage.js';
+import { isNotificationsEnabled, updateNotificationsEnabled } from '../core/state.js';
+import { getDOMCache } from '../utils/dom-cache.js';
 
 // State
-let notificationsEnabled = SafeStorage.getItem('pro_notify_enabled', 'false') === 'true';
+let notificationsEnabled = isNotificationsEnabled();
 
 // Device detection
 const iOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -15,7 +16,9 @@ const iOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStre
  * Update notification button UI
  */
 function updateNotifyBtn() {
-    const btn = document.getElementById('notify-btn');
+    notificationsEnabled = isNotificationsEnabled();
+    const cache = getDOMCache();
+    const btn = cache.notifyBtn || document.getElementById('notify-btn');
     if (!btn) return;
 
     if (notificationsEnabled) {
@@ -40,16 +43,14 @@ export function toggleNotifications() {
     // Toggle state
     if (notificationsEnabled) {
         notificationsEnabled = false;
-        window.notificationsEnabled = false; // Sync global state
-        SafeStorage.setItem('pro_notify_enabled', false);
+        updateNotificationsEnabled(false);
         updateNotifyBtn();
         window.showToast?.("推送通知已关闭");
     } else {
         Notification.requestPermission().then(permission => {
             if (permission === "granted") {
                 notificationsEnabled = true;
-                window.notificationsEnabled = true; // Sync global state
-                SafeStorage.setItem('pro_notify_enabled', true);
+                updateNotificationsEnabled(true);
                 updateNotifyBtn();
 
                 // Skip audio on iOS (strict audio restrictions)
@@ -87,7 +88,8 @@ export function requestNotificationPermission() {
  * @returns {boolean} Whether to send notification
  */
 export function checkNotifications(room, data) {
-    if (!notificationsEnabled || !data || !data.isLive) {
+    const enabled = isNotificationsEnabled();
+    if (!enabled || !data || !data.isLive) {
         return false;
     }
 

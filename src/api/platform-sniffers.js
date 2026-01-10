@@ -20,6 +20,7 @@
 import { APP_CONFIG } from '../config/constants.js';
 import { fetchWithProxy, fetchQuick } from './proxy-manager.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { getRoomDataCache, updateRoomCache } from '../core/state.js';
 
 /**
  * Initialize sniffer module (no longer needs dependencies)
@@ -70,8 +71,8 @@ export async function getDouyuStatus(id, fetchAvatar, prevData) {
         res.heatValue = parseInt(bizAll.online || roomInfo.online || 0);
 
         const baseCover = bizAll.room_pic || roomInfo.room_pic;
-        // 优化：直播中使用实时时间戳（每次刷新都更新），离线不添加时间戳（长缓存）
-        res.cover = res.isLive && baseCover ? `${baseCover}?t=${Date.now()}` : baseCover || res.cover;
+        // 直播中使用基础封面（时间戳由统一逻辑控制刷新）
+        res.cover = baseCover || res.cover;
         res.avatar = bizAll.owner_avatar || roomInfo.avatar || res.avatar;
 
         // Get live start time
@@ -92,8 +93,8 @@ export async function getDouyuStatus(id, fetchAvatar, prevData) {
         res.title = d.room_name || res.title;
         res.owner = d.nickname || res.owner;
         res.heatValue = parseInt(d.online || 0);
-        // 优化：直播中使用实时时间戳（每次刷新都更新），离线不添加时间戳（长缓存）
-        res.cover = res.isLive && d.room_pic ? `${d.room_pic}?t=${Date.now()}` : d.room_pic || res.cover;
+        // 直播中使用基础封面（时间戳由统一逻辑控制刷新）
+        res.cover = d.room_pic || res.cover;
         res.avatar = d.owner_avatar || res.avatar;
 
         // Get live start time
@@ -171,48 +172,16 @@ export async function getBilibiliStatus(id, fetchAvatar, prevData) {
         }
     }
 
-    // Fetch detailed info when live or replay
-    if (res.isLive || res.isReplay) {
-        const info = await fetchWithProxy(`https://api.live.bilibili.com/room/v1/Room/get_info?room_id=${id}`, false, 8000);
-        if (info?.code === 0) {
-            const d = info.data;
-            res.heatValue = d.online || 0;
-
-            // Get live start time (only for live streams)
-            if (res.isLive && d.live_time) {
-                // Bilibili returns "2024-01-01 12:00:00" format
-                const liveTime = new Date(d.live_time.replace(' ', 'T') + '+08:00');
-                if (!isNaN(liveTime.getTime())) {
-                    res.startTime = liveTime.getTime();
-                }
-            }
-
-            res.title = d.title;
-
-            // 优化：直播中使用实时截图（keyframe）+ 时间戳，录播使用固定封面（user_cover）不加时间戳
-            if (res.isLive) {
-                res.cover = d.keyframe || d.user_cover;
-                if (res.cover) res.cover += `?t=${Date.now()}`;
-            } else if (res.isReplay) {
-                // 录播使用固定封面，不添加时间戳（避免缓存失效）
-                res.cover = d.user_cover || d.keyframe || prevData?.cover;
-            }
-        } else if (info) {
-            console.warn(`[Bilibili] ⚠ get_info error code ${info.code} for room ${id}, message: ${info.message || 'N/A'} - using cached data`);
-        } else {
-            console.warn(`[Bilibili] ⚠ get_info failed for room ${id} - using cached data`);
-        }
-        if (!res.title) res.title = prevData?.title || "信号波动";
-    }
-
     // Get user avatar and name
     // Only fetch if we don't have valid owner data
     const hasValidOwner = prevData?.owner && prevData.owner !== id && prevData.owner !== String(id);
     const needUserInfo = !prevData?.avatar || !hasValidOwner;
+    const shouldFetchUserInfo = uid && (needUserInfo || fetchAvatar);
 
-    console.log(`[Bilibili] uid=${uid}, needUserInfo=${needUserInfo}, hasAvatar=${!!prevData?.avatar}, owner=${prevData?.owner}`);
-
-    if (uid && needUserInfo) {
+    const infoPromise = (res.isLive || res.isReplay)
+        ? fetchWithProxy(`https://api.live.bilibili.com/room/v1/Room/get_info?room_id=${id}`, false, 8000)
+        : Promise.resolve(null);
+    const userPromise = shouldFetchUserInfo ? (async () => {
         console.log(`[Bilibili] Starting to fetch user info: uid=${uid}`);
 
         // Use Bilibili Live API instead of main site API (main site has CORS restrictions)
@@ -220,21 +189,64 @@ export async function getBilibiliStatus(id, fetchAvatar, prevData) {
         console.log(`[Bilibili] Master API response:`, masterInfo?.code, masterInfo?.data?.info?.uname);
 
         if (masterInfo?.code === 0 && masterInfo?.data?.info) {
-            res.avatar = masterInfo.data.info.face || res.avatar;
-            res.owner = masterInfo.data.info.uname || res.owner;
-            console.log(`[Bilibili] ✓ Fetch successful: ${res.owner}, Avatar: ${res.avatar ? 'yes' : 'no'}`);
-        } else {
-            // Fallback: Try main site API
-            console.log(`[Bilibili] Master API failed, trying main site API...`);
-            const userInfo = await fetchWithProxy(`https://api.bilibili.com/x/space/acc/info?mid=${uid}`, false, 8000);
-            if (userInfo?.code === 0 && userInfo?.data) {
-                res.avatar = userInfo.data.face || res.avatar;
-                res.owner = userInfo.data.name || res.owner;
-                console.log(`[Bilibili] ✓ Main site API fetch successful: ${res.owner}`);
-            } else {
-                console.log(`[Bilibili] ✗ All APIs failed`);
+            return {
+                avatar: masterInfo.data.info.face || res.avatar,
+                owner: masterInfo.data.info.uname || res.owner
+            };
+        }
+
+        // Fallback: Try main site API
+        console.log(`[Bilibili] Master API failed, trying main site API...`);
+        const userInfo = await fetchWithProxy(`https://api.bilibili.com/x/space/acc/info?mid=${uid}`, false, 8000);
+        if (userInfo?.code === 0 && userInfo?.data) {
+            return {
+                avatar: userInfo.data.face || res.avatar,
+                owner: userInfo.data.name || res.owner
+            };
+        }
+
+        console.log(`[Bilibili] ✗ All APIs failed`);
+        return null;
+    })() : Promise.resolve(null);
+
+    const [infoResult, userResult] = await Promise.allSettled([infoPromise, userPromise]);
+
+    const info = infoResult.status === 'fulfilled' ? infoResult.value : null;
+    if (info?.code === 0) {
+        const d = info.data;
+        res.heatValue = d.online || 0;
+
+        // Get live start time (only for live streams)
+        if (res.isLive && d.live_time) {
+            // Bilibili returns "2024-01-01 12:00:00" format
+            const liveTime = new Date(d.live_time.replace(' ', 'T') + '+08:00');
+            if (!isNaN(liveTime.getTime())) {
+                res.startTime = liveTime.getTime();
             }
         }
+
+        res.title = d.title;
+
+        // 直播中使用实时截图（keyframe），录播使用固定封面（user_cover）
+        if (res.isLive) {
+            res.cover = d.keyframe || d.user_cover;
+        } else if (res.isReplay) {
+            // 录播使用固定封面，不添加时间戳（避免缓存失效）
+            res.cover = d.user_cover || d.keyframe || prevData?.cover;
+        }
+    } else if (info) {
+        console.warn(`[Bilibili] ⚠ get_info error code ${info.code} for room ${id}, message: ${info.message || 'N/A'} - using cached data`);
+    } else if (res.isLive || res.isReplay) {
+        console.warn(`[Bilibili] ⚠ get_info failed for room ${id} - using cached data`);
+    }
+    if ((res.isLive || res.isReplay) && !res.title) res.title = prevData?.title || "信号波动";
+
+    const userInfo = userResult.status === 'fulfilled' ? userResult.value : null;
+    if (userInfo) {
+        res.avatar = userInfo.avatar || res.avatar;
+        res.owner = userInfo.owner || res.owner;
+        res._profileFetched = true;
+        console.log(`[Bilibili] ✓ Fetch successful: ${res.owner}, Avatar: ${res.avatar ? 'yes' : 'no'}`);
     }
 
     // Keep previous avatar and name (if not fetched this time)
@@ -249,6 +261,27 @@ export async function getBilibiliStatus(id, fetchAvatar, prevData) {
 // ====================================================================
 // Twitch Sniffer
 // ====================================================================
+
+/**
+ * Fetch text with timeout
+ * @param {string} url - Request URL
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<string|null>} Text response or null
+ */
+async function fetchTextWithTimeout(url, timeout) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) return null;
+        return await res.text();
+    } catch (e) {
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
 /**
  * Parse Twitch uptime string to milliseconds
@@ -283,12 +316,14 @@ const TWITCH_OFFLINE_TITLE_REFRESH_MS = 30 * 60 * 1000;
  */
 async function fetchTwitchAvatarAsync(id) {
     try {
-        const av = await fetch(`https://decapi.me/twitch/avatar/${id}`).then(r => r.text());
-        if (!av.includes("No user")) {
+        const av = await fetchTextWithTimeout(`https://decapi.me/twitch/avatar/${id}`, APP_CONFIG.NETWORK.PROXY_TIMEOUT_TWITCH_META);
+        if (av && !av.includes("No user")) {
             const cacheKey = `twitch-${id}`;
+            const roomDataCache = getRoomDataCache();
             if (roomDataCache[cacheKey]) {
                 roomDataCache[cacheKey].avatar = av;
-                if (debouncedSaveCache) debouncedSaveCache();
+                roomDataCache[cacheKey].lastAvatarUpdate = Date.now();
+                updateRoomCache(cacheKey, roomDataCache[cacheKey], true);
                 if (window.renderAll) window.renderAll();
             }
         }
@@ -331,9 +366,11 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
         const isOffline = uptime.toLowerCase().includes("offline") || uptime.toLowerCase().includes("not found") || uptime.toLowerCase().includes("error");
         res.isLive = !isOffline;
 
+        const metaTimeout = Math.min(APP_CONFIG.NETWORK.PROXY_TIMEOUT_TWITCH, APP_CONFIG.NETWORK.PROXY_TIMEOUT_TWITCH_META);
+
         if (res.isLive) {
             // Fetch title and viewers only when live
-            const titlePromise = fetch(`https://decapi.me/twitch/title/${id}`).then(r => r.text()).catch(() => "");
+            const titlePromise = fetchTextWithTimeout(`https://decapi.me/twitch/title/${id}`, metaTimeout).then(t => t || "");
             // Parse uptime to calculate stream start time
             // uptime format: "2 hours, 30 minutes, 15 seconds" or "30 minutes, 15 seconds"
             const uptimeMs = parseUptimeToMs(uptime);
@@ -344,7 +381,7 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
             // Parallel fetch title and viewers
             const [t, v] = await Promise.all([
                 titlePromise,
-                fetch(`https://decapi.me/twitch/viewers/${id}`).then(r => r.text()).catch(() => "0")
+                fetchTextWithTimeout(`https://decapi.me/twitch/viewers/${id}`, metaTimeout).then(t => t || "0")
             ]);
             res.title = t || prevData?.title || ""; // Use actual fetched title, empty if none
             res.lastTitleUpdate = now;
@@ -354,8 +391,8 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
             if (cleanV && !isNaN(parseInt(cleanV)) && parseInt(cleanV) >= 0 && !/error|not found|404/i.test(v)) {
                 res.heatValue = parseInt(cleanV);
             }
-            // 优化：直播中使用实时时间戳（每次刷新都更新）
-            res.cover = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${id}-640x360.jpg?t=${Date.now()}`;
+            // 直播中使用基础封面（时间戳由统一逻辑控制刷新）
+            res.cover = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${id}-640x360.jpg`;
         } else {
             // Offline: reuse cached title and refresh at low frequency
             const cachedTitle = prevData?.title || "";
@@ -364,7 +401,7 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
 
             if (shouldRefreshTitle) {
                 try {
-                    const t = await fetch(`https://decapi.me/twitch/title/${id}`).then(r => r.text());
+                    const t = await fetchTextWithTimeout(`https://decapi.me/twitch/title/${id}`, metaTimeout);
                     res.title = t || cachedTitle;
                     res.lastTitleUpdate = now;
                 } catch (e) {
@@ -429,10 +466,14 @@ export async function getKickStatus(id, fetchAvatar, prevData) {
             if (response.ok) {
                 data = await response.json();
                 console.log(`[Kick] ✓ Direct connection successful for ${id}`);
+            } else {
+                console.log(`[Kick] Direct connection failed for ${id}, status ${response.status}`);
             }
         } catch (directError) {
             console.log(`[Kick] Direct connection failed for ${id}, trying proxy...`, directError.message);
-            // Fallback to proxy
+        }
+
+        if (!data) {
             data = await fetchWithProxy(apiUrl, false, 8000);
         }
 
@@ -465,9 +506,9 @@ export async function getKickStatus(id, fetchAvatar, prevData) {
                                  livestream.thumbnail;
 
             if (thumbnailUrl) {
-                // 优化：直播中使用实时时间戳（每次刷新都更新）
+                // 直播中使用基础封面（时间戳由统一逻辑控制刷新）
                 res.cover = typeof thumbnailUrl === 'string'
-                    ? `${thumbnailUrl}?t=${Date.now()}`
+                    ? thumbnailUrl
                     : res.cover;
                 console.log(`[Kick] Thumbnail URL for ${id}:`, res.cover);
             } else {

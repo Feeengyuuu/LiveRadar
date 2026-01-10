@@ -17,55 +17,82 @@
 import { APP_CONFIG } from '../config/constants.js';
 import { getDOMCache } from '../utils/dom-cache.js';
 import { getRooms, getRoomDataCache, subscribe } from './state.js';
+import { debounce } from '../utils/helpers.js';
 
 // ====================================================================
-// Debounce Utility
+// Image Event Handler Management (Memory Leak Prevention)
 // ====================================================================
 
 /**
- * 防抖函数 - 优化renderAll调用频率
- * 在短时间内多次调用时，只执行最后一次
- * @param {Function} func - 需要防抖的函数
- * @param {number} wait - 等待时间（毫秒）
- * @returns {Function} 防抖后的函数
+ * WeakMap to track image event handlers for cleanup
+ * Using WeakMap allows garbage collection when elements are removed
  */
-function debounce(func, wait = 16) {
-    let timeout;
-    let lastCallTime = 0;
+const imageHandlers = new WeakMap();
 
-    const debounced = function(...args) {
-        const now = Date.now();
-        const timeSinceLastCall = now - lastCallTime;
+/**
+ * Safely set image load/error handlers with cleanup
+ * Prevents memory leak from accumulating event handlers
+ * @param {HTMLImageElement} img - Image element
+ * @param {Function} onLoad - Load handler
+ * @param {Function} onError - Error handler
+ */
+function setImageHandlers(img, onLoad, onError) {
+    // Clean up previous handlers if they exist
+    const prevHandlers = imageHandlers.get(img);
+    if (prevHandlers) {
+        img.removeEventListener('load', prevHandlers.load);
+        img.removeEventListener('error', prevHandlers.error);
+    }
 
-        // 清除之前的定时器
-        if (timeout) {
-            clearTimeout(timeout);
-        }
-
-        // 如果距离上次调用超过wait时间，立即执行
-        // 这样可以保证第一次调用和长时间没有调用后的首次调用能立即执行
-        if (timeSinceLastCall > wait * 2) {
-            lastCallTime = now;
-            func.apply(this, args);
-        } else {
-            // 否则延迟执行
-            timeout = setTimeout(() => {
-                lastCallTime = Date.now();
-                func.apply(this, args);
-            }, wait);
-        }
+    // Create new handler references
+    const handlers = {
+        load: onLoad,
+        error: onError
     };
 
-    // 添加立即执行方法，用于需要强制刷新的场景
-    debounced.immediate = function(...args) {
-        if (timeout) {
-            clearTimeout(timeout);
-        }
-        lastCallTime = Date.now();
-        func.apply(this, args);
-    };
+    // Store for future cleanup
+    imageHandlers.set(img, handlers);
 
-    return debounced;
+    // Add new listeners
+    img.addEventListener('load', onLoad, { once: true });
+    img.addEventListener('error', onError, { once: true });
+}
+
+// ====================================================================
+// Display Title Helper (Eliminates Code Duplication)
+// ====================================================================
+
+/**
+ * Get display title based on room state and platform
+ * @param {Object} data - Room data
+ * @param {Object} roomInfo - Room info with platform
+ * @param {string} cardState - Current card state
+ * @returns {string} Display title
+ */
+function getDisplayTitle(data, roomInfo, cardState) {
+    const isInternational = roomInfo.platform === 'twitch' || roomInfo.platform === 'kick';
+    const hasConnectionIssue = data.isError || data._stale;
+
+    // Connection error for international platforms
+    if (isInternational && hasConnectionIssue) {
+        return '连接异常';
+    }
+
+    // State-specific defaults
+    switch (cardState) {
+        case 'live':
+        case 'loop':
+            return data.title || '';
+        case 'offline':
+            return data.title || '未开播';
+        case 'error':
+            return data.title || '获取失败';
+        case 'retrying':
+            return '正在重试连接...';
+        case 'loading':
+        default:
+            return '连接中...';
+    }
 }
 
 /**
@@ -124,7 +151,7 @@ function renderAllImmediate() {
         offline: cache.gridOffline,
         loop: cache.gridLoop
     };
-    const zones = document.querySelectorAll('.zone-container');
+    const zones = [cache.zoneLive, cache.zoneOffline, cache.zoneLoop].filter(Boolean);
 
     if (rooms.length === 0) {
         cache.emptyState?.classList.remove('hidden');
@@ -134,17 +161,14 @@ function renderAllImmediate() {
     }
     cache.emptyState?.classList.add('hidden');
 
-    const sortedRooms = [...rooms].sort((a, b) => {
-        const dA = roomDataCache[`${a.platform}-${a.id}`] || {};
-        const dB = roomDataCache[`${b.platform}-${b.id}`] || {};
-        if (a.isFav !== b.isFav) return b.isFav - a.isFav;
-        if (dA.isLive !== dB.isLive) return dB.isLive - dA.isLive;
-        if (dA.isReplay !== dB.isReplay) return dB.isReplay - dA.isReplay;
-        return (dB.heatValue || 0) - (dA.heatValue || 0);
-    });
+    const favorites = [];
+    const others = [];
+    rooms.forEach(room => (room.isFav ? favorites : others).push(room));
+    const sortedRooms = favorites.concat(others);
 
     const presentCardIds = new Set();
     let hasLive = false, hasOffline = false, hasLoop = false;
+    const gridPositions = { live: 0, offline: 0, loop: 0 };
 
     // Incremental update: Count changes
     let updatedCount = 0;
@@ -259,14 +283,12 @@ function renderAllImmediate() {
             return;
         }
 
-        if (card.parentElement !== targetGrid) {
-            // 卡片在错误的区域，需要移动
-            targetGrid.appendChild(card);
-        } else {
-            // 卡片已在正确区域，简单检查：如果不是最后一个元素且下一个元素存在，就按原逻辑插入
-            // 为了避免indexOf性能问题，我们直接appendChild，浏览器会自动处理已存在的元素
-            targetGrid.appendChild(card);
+        const targetIndex = gridPositions[targetGridKey];
+        const currentAtIndex = targetGrid.children[targetIndex];
+        if (currentAtIndex !== card) {
+            targetGrid.insertBefore(card, currentAtIndex || null);
         }
+        gridPositions[targetGridKey] = targetIndex + 1;
     });
 
     // Incremental update: Record statistics
@@ -281,9 +303,9 @@ function renderAllImmediate() {
         }
     });
 
-    document.getElementById('zone-live').classList.toggle('active', hasLive);
-    document.getElementById('zone-offline').classList.toggle('active', hasOffline);
-    document.getElementById('zone-loop').classList.toggle('active', hasLoop);
+    cache.zoneLive?.classList.toggle('active', hasLive);
+    cache.zoneOffline?.classList.toggle('active', hasOffline);
+    cache.zoneLoop?.classList.toggle('active', hasLoop);
 }
 
 // ====================================================================
@@ -302,6 +324,8 @@ export function createCard(cardId, roomInfo, data, cardState) {
     const clone = document.getElementById('card-template').content.cloneNode(true);
     const card = clone.querySelector('.room-card');
     card.id = cardId;
+    card.dataset.roomId = roomInfo.id;
+    card.dataset.platform = roomInfo.platform;
 
     card.href = {
         douyu: `https://www.douyu.com/${roomInfo.id}`,
@@ -404,20 +428,17 @@ export function updateCard(card, roomInfo, data, cardState) {
     let newThumbSrc = '';
     const newAvatarSrc = data.avatar || '';
 
+    // Get display title using unified helper (eliminates code duplication)
+    const displayTitle = getDisplayTitle(data, roomInfo, cardState);
+    const ownerText = `${data.owner || roomInfo.id} - ${roomInfo.id}`;
+
     switch (cardState) {
         case 'live':
             card.classList.add('is-live-card');
             chip.className = 'status-chip chip-live';
             if (chipText.textContent !== '直播中') chipText.textContent = '直播中';
-
-            // International platforms display different content based on data status
-            let displayTitle = data.title;
-            if ((roomInfo.platform === 'twitch' || roomInfo.platform === 'kick') && (data.isError || data._stale)) {
-                displayTitle = '连接异常';
-            }
             if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
-
-            if (ownerEl.textContent !== `${data.owner} - ${roomInfo.id}`) ownerEl.textContent = `${data.owner} - ${roomInfo.id}`;
+            if (ownerEl.textContent !== ownerText) ownerEl.textContent = ownerText;
             if (viewerNum.textContent !== data.viewers) viewerNum.textContent = data.viewers;
             newThumbSrc = data.cover;
 
@@ -434,15 +455,8 @@ export function updateCard(card, roomInfo, data, cardState) {
             card.classList.add('is-loop-card');
             chip.className = 'status-chip chip-loop';
             if (chipText.textContent !== '轮播') chipText.textContent = '轮播';
-
-            // International platforms display different content based on data status
-            let displayTitleLoop = data.title;
-            if ((roomInfo.platform === 'twitch' || roomInfo.platform === 'kick') && (data.isError || data._stale)) {
-                displayTitleLoop = '连接异常';
-            }
-            if (titleEl.textContent !== displayTitleLoop) titleEl.textContent = displayTitleLoop;
-
-            if (ownerEl.textContent !== `${data.owner} - ${roomInfo.id}`) ownerEl.textContent = `${data.owner} - ${roomInfo.id}`;
+            if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
+            if (ownerEl.textContent !== ownerText) ownerEl.textContent = ownerText;
             if (viewerNum.textContent !== '轮播中') viewerNum.textContent = '轮播中';
             newThumbSrc = data.cover;
             if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
@@ -452,46 +466,30 @@ export function updateCard(card, roomInfo, data, cardState) {
             card.classList.add('is-offline-card');
             chip.className = 'status-chip chip-off';
             if (chipText.textContent !== '离线') chipText.textContent = '离线';
-
-            // International platforms display different content based on data status
-            let displayTitleOffline = data.title || "未开播";
-            if ((roomInfo.platform === 'twitch' || roomInfo.platform === 'kick') && (data.isError || data._stale)) {
-                displayTitleOffline = '连接异常';
-            }
-            if (titleEl.textContent !== displayTitleOffline) titleEl.textContent = displayTitleOffline;
-
-            if (ownerEl.textContent !== `${data.owner || roomInfo.id} - ${roomInfo.id}`) ownerEl.textContent = `${data.owner || roomInfo.id} - ${roomInfo.id}`;
+            if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
+            if (ownerEl.textContent !== ownerText) ownerEl.textContent = ownerText;
             if (viewerNum.textContent !== '离线') viewerNum.textContent = '离线';
             newThumbSrc = data.avatar || data.cover;
             if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
             break;
 
         case 'error':
-            // Error state after all retries failed
             card.classList.add('is-offline-card', 'is-error-card');
             chip.className = 'status-chip chip-error';
             if (chipText.textContent !== '连接失败') chipText.textContent = '连接失败';
-
-            const errorTitle = data.title || '获取失败';
-            if (titleEl.textContent !== errorTitle) titleEl.textContent = errorTitle;
-
-            if (ownerEl.textContent !== `${data.owner || roomInfo.id} - ${roomInfo.id}`) {
-                ownerEl.textContent = `${data.owner || roomInfo.id} - ${roomInfo.id}`;
-            }
+            if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
+            if (ownerEl.textContent !== ownerText) ownerEl.textContent = ownerText;
             if (viewerNum.textContent !== data.viewers) viewerNum.textContent = data.viewers;
             newThumbSrc = data.avatar || data.cover;
             if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
             break;
 
         case 'retrying':
-            // Retrying state
             chip.className = 'status-chip chip-loading';
             const retryText = `重试中${data._retryCount ? ` (${data._retryCount}/2)` : ''}`;
             if (chipText.textContent !== retryText) chipText.textContent = retryText;
-            if (titleEl.textContent !== '正在重试连接...') titleEl.textContent = '正在重试连接...';
-            if (ownerEl.textContent !== `${data.owner || roomInfo.id} - ${roomInfo.id}`) {
-                ownerEl.textContent = `${data.owner || roomInfo.id} - ${roomInfo.id}`;
-            }
+            if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
+            if (ownerEl.textContent !== ownerText) ownerEl.textContent = ownerText;
             if (viewerNum.textContent !== '请稍候') viewerNum.textContent = '请稍候';
             if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
             break;
@@ -500,7 +498,7 @@ export function updateCard(card, roomInfo, data, cardState) {
         default:
             chip.className = 'status-chip chip-off';
             if (chipText.textContent !== '加载中') chipText.textContent = '加载中';
-            if (titleEl.textContent !== '连接中...') titleEl.textContent = '连接中...';
+            if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
             if (ownerEl.textContent !== '---') ownerEl.textContent = '---';
             if (viewerNum.textContent !== '--') viewerNum.textContent = '--';
             if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
@@ -513,42 +511,34 @@ export function updateCard(card, roomInfo, data, cardState) {
         thumb.classList.remove('loaded');
         loader.classList.remove('hidden');
         thumb.src = newThumbSrc;
-        thumb.onload = () => {
-            thumb.classList.add('loaded');
-            loader.classList.add('hidden');
-            // Clear fallback flags on success
-            delete thumb.dataset.triedHD;
-            delete thumb.dataset.triedStandard;
-            console.log(`[Renderer] ✓ Thumbnail loaded successfully: ${newThumbSrc.substring(0, 80)}...`);
-        };
-        thumb.onerror = (e) => {
-            // Multi-level fallback for live thumbnails
-            const fallbackHD = data._coverFallbackHD;
-            const fallbackStandard = data._coverFallback;
 
-            // Try HD fallback first (if available and not tried yet)
-            if (fallbackHD && thumb.src !== fallbackHD && !thumb.dataset.triedHD) {
-                console.warn(`[Renderer] ⚠ Primary thumbnail failed, trying HD fallback`);
-                thumb.dataset.triedHD = 'true';
-                thumb.src = fallbackHD;
-            }
-            // Then try standard fallback
-            else if (fallbackStandard && thumb.src !== fallbackStandard && !thumb.dataset.triedStandard) {
-                console.warn(`[Renderer] ⚠ HD fallback failed, trying standard fallback`);
-                thumb.dataset.triedStandard = 'true';
-                thumb.src = fallbackStandard;
-            }
-            // All fallbacks exhausted
-            else {
+        // Use setImageHandlers to prevent memory leak from accumulated handlers
+        setImageHandlers(thumb,
+            // onLoad handler
+            () => {
+                thumb.classList.add('loaded');
                 loader.classList.add('hidden');
-                console.error(`[Renderer] ✗ All thumbnail URLs failed:`, newThumbSrc);
-                console.error(`[Renderer] Error details:`, e);
-                // Clear fallback flags for next attempt
                 delete thumb.dataset.triedHD;
                 delete thumb.dataset.triedStandard;
-                // Visual indicator removed for production
+            },
+            // onError handler
+            (e) => {
+                const fallbackHD = data._coverFallbackHD;
+                const fallbackStandard = data._coverFallback;
+
+                if (fallbackHD && thumb.src !== fallbackHD && !thumb.dataset.triedHD) {
+                    thumb.dataset.triedHD = 'true';
+                    thumb.src = fallbackHD;
+                } else if (fallbackStandard && thumb.src !== fallbackStandard && !thumb.dataset.triedStandard) {
+                    thumb.dataset.triedStandard = 'true';
+                    thumb.src = fallbackStandard;
+                } else {
+                    loader.classList.add('hidden');
+                    delete thumb.dataset.triedHD;
+                    delete thumb.dataset.triedStandard;
+                }
             }
-        };
+        );
     } else if (!newThumbSrc && thumb.src) {
         thumb.src = '';
         thumb.classList.remove('loaded');
@@ -558,14 +548,18 @@ export function updateCard(card, roomInfo, data, cardState) {
     const avatarSkeleton = avt.nextElementSibling;
     if (newAvatarSrc && avt.src !== newAvatarSrc) {
         avt.src = newAvatarSrc;
-        avt.onload = () => {
-            avt.classList.remove('hidden');
-            if (avatarSkeleton) avatarSkeleton.classList.add('hidden');
-        };
-        avt.onerror = () => {
-            avt.classList.add('hidden');
-            if (avatarSkeleton) avatarSkeleton.classList.remove('hidden');
-        };
+
+        // Use setImageHandlers to prevent memory leak
+        setImageHandlers(avt,
+            () => {
+                avt.classList.remove('hidden');
+                if (avatarSkeleton) avatarSkeleton.classList.add('hidden');
+            },
+            () => {
+                avt.classList.add('hidden');
+                if (avatarSkeleton) avatarSkeleton.classList.remove('hidden');
+            }
+        );
     } else if (!newAvatarSrc && avt.src) {
         avt.src = '';
         avt.classList.add('hidden');
@@ -589,7 +583,9 @@ export const debouncedRenderAll = debounce(renderAllImmediate, 16);
  * 用于需要强制刷新的场景（如手动刷新、初始化等）
  */
 export function renderAll() {
-    debouncedRenderAll.immediate();
+    // 取消任何待执行的防抖渲染，直接执行
+    debouncedRenderAll.cancel();
+    renderAllImmediate();
 }
 
 // ====================================================================

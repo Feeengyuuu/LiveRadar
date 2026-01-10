@@ -79,6 +79,13 @@ const elements = {
     playlistContainer: null,
 };
 
+/**
+ * 存储播放列表项的点击事件处理函数引用
+ * 用于正确移除事件监听器，防止内存泄漏
+ * @type {WeakMap<HTMLElement, Function>}
+ */
+const playlistItemHandlers = new WeakMap();
+
 // ====================================================================
 // 初始化
 // ====================================================================
@@ -518,8 +525,10 @@ function createPlaylist() {
             </div>
         `;
 
-        // 点击切换歌曲
-        item.addEventListener('click', () => switchTrack(index));
+        // 点击切换歌曲 - 存储处理函数引用以便后续移除
+        const clickHandler = () => switchTrack(index);
+        playlistItemHandlers.set(item, clickHandler);
+        item.addEventListener('click', clickHandler);
 
         elements.playlistContainer.appendChild(item);
     });
@@ -752,11 +761,15 @@ export function destroyMusicPlayer() {
     // 移除外部点击事件
     document.removeEventListener('click', eventHandlers.outsideClick);
 
-    // 清空播放列表事件监听器
+    // 清空播放列表事件监听器 - 使用WeakMap中存储的处理函数引用
     if (elements.playlistContainer) {
         const items = elements.playlistContainer.querySelectorAll('.playlist-item');
         items.forEach(item => {
-            item.removeEventListener('click', switchTrack);
+            const handler = playlistItemHandlers.get(item);
+            if (handler) {
+                item.removeEventListener('click', handler);
+                playlistItemHandlers.delete(item);
+            }
         });
     }
 
