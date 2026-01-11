@@ -3,6 +3,9 @@
   "version": "3.1.1",
   "type": "module",
   "description": "Multi-platform live streaming monitor",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
