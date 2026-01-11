@@ -145,11 +145,18 @@ function getConcurrency(roomCount) {
  * Refresh all rooms with smart concurrency management
  * @param {boolean} sl - Silent mode (initial load)
  * @param {boolean} isAutoRefresh - Whether triggered by auto-refresh
+ * @param {Object} [options] - Optional overrides
+ * @param {Array} [options.rooms] - Rooms list override
+ * @param {boolean} [options.sequential] - Force sequential fetching
+ * @param {boolean} [options.preserveOrder] - Skip sorting, keep list order
+ * @param {number} [options.concurrency] - Override concurrency limit
+ * @param {boolean} [options.disableJitter] - Disable initial jitter delays
  * @returns {Promise<void>}
  */
-export async function refreshAll(sl = false, isAutoRefresh = false) {
+export async function refreshAll(sl = false, isAutoRefresh = false, options = {}) {
     const state = getState();
     const rooms = getRooms();
+    const roomsToRefresh = Array.isArray(options.rooms) ? options.rooms : rooms;
 
     // Debounce: Prevent duplicate refresh
     const now = Date.now();
@@ -186,22 +193,28 @@ export async function refreshAll(sl = false, isAutoRefresh = false) {
     // 🔥 Performance: Use IntersectionObserver-based viewport tracking
     // Eliminates getBoundingClientRect() calls which force synchronous layout
     // O(1) map lookup vs O(n) DOM queries + forced reflow
-    const sortedRooms = [...rooms].sort((a, b) => {
-        // 1. 收藏优先（最高优先级）
-        if (a.isFav !== b.isFav) return b.isFav - a.isFav;
+    const sequential = options.sequential === true;
+    const preserveOrder = options.preserveOrder === true || (sequential && options.preserveOrder !== false);
+    const sortedRooms = preserveOrder
+        ? [...roomsToRefresh]
+        : [...roomsToRefresh].sort((a, b) => {
+            // 1. 收藏优先（最高优先级）
+            if (a.isFav !== b.isFav) return b.isFav - a.isFav;
 
-        // 2. 视口内优先（第二优先级）- IntersectionObserver查表，O(1) 操作
-        // No getBoundingClientRect, no forced synchronous layout!
-        const aInView = viewportTracker.isInViewport(getCardId(a.platform, a.id));
-        const bInView = viewportTracker.isInViewport(getCardId(b.platform, b.id));
+            // 2. 视口内优先（第二优先级）- IntersectionObserver查表，O(1) 操作
+            // No getBoundingClientRect, no forced synchronous layout!
+            const aInView = viewportTracker.isInViewport(getCardId(a.platform, a.id));
+            const bInView = viewportTracker.isInViewport(getCardId(b.platform, b.id));
 
-        if (aInView !== bInView) return bInView ? 1 : -1;
+            if (aInView !== bInView) return bInView ? 1 : -1;
 
-        return 0;
-    });
+            return 0;
+        });
 
-    // 🔥 Simplified: Extract concurrency logic to separate function
-    const concurrency = getConcurrency(sortedRooms.length);
+    const concurrencyOverride = Number.isFinite(options.concurrency)
+        ? Math.max(1, Math.floor(options.concurrency))
+        : null;
+    const concurrency = concurrencyOverride ?? (sequential ? 1 : getConcurrency(sortedRooms.length));
 
     // Initialize statistics
     updateRefreshStats({
@@ -217,7 +230,8 @@ export async function refreshAll(sl = false, isAutoRefresh = false) {
         : APP_CONFIG.BATCH.SIZE_SMALL;
 
     try {
-        await promisePool(sortedRooms, concurrency, fetchRoomStatus, batchSize, sl === true);
+        const applyInitialJitter = sl === true && options.disableJitter !== true;
+        await promisePool(sortedRooms, concurrency, fetchRoomStatus, batchSize, applyInitialJitter);
 
         // Incremental update: Count data changes
         const roomDataCache = getRoomDataCache();

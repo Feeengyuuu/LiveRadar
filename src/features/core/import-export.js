@@ -204,9 +204,9 @@ window.doImport = function(mode, importRooms) {
         // Close dialog
         closeImportDialog();
 
-        // Refresh UI (batch fetch with concurrency control, works fine with 50+ rooms)
-        console.log(`[导入] 开始批量刷新 ${newRooms.length} 个主播（并发控制：3-5个）`);
-        window.refreshAll?.(true);
+        // Refresh UI (顺序加载，避免导入时同时验证触发平台风控)
+        console.log(`[导入] 开始顺序刷新 ${newRooms.length} 个主播（并发：1）`);
+        window.refreshAll?.(true, false, { sequential: true, preserveOrder: true, disableJitter: true });
 
         console.log('[导入] 成功导入，新列表长度:', newRooms.length);
     } catch (error) {
