@@ -197,6 +197,19 @@ export const APP_CONFIG = {
     STATS_HIDE_DELAY: 2000,
   },
 
+  // Toast configuration
+  TOAST: {
+    MAX_VISIBLE: 5,           // Maximum number of toasts visible at once
+    DEFAULT_DURATION: 3000,   // Default display duration in ms
+    FADE_DURATION: 300,       // Fade in/out animation duration
+  },
+
+  // Search history configuration
+  HISTORY: {
+    MAX_ITEMS: 5,             // Maximum number of history items to keep
+    DROPDOWN_RIGHT_GAP: 8,    // Gap between dropdown and add button (px)
+  },
+
   // Concurrency control (优化：提升并发数以加快刷新速度)
   CONCURRENCY: {
     DEFAULT: 4,        // 恢复到4，提升50-100%刷新速度

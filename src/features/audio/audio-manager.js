@@ -187,6 +187,5 @@ export function initAudioManager() {
     console.log('[Audio Manager] Initialized');
 }
 
-// Make globally accessible for onclick handlers
-window.toggleKeepAlive = toggleKeepAlive;
-window.unlockAllAudio = unlockAllAudio;
+// Note: Global function exposure is handled by globals.js
+// toggleKeepAlive and unlockAllAudio are automatically available on window object

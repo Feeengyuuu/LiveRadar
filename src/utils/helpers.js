@@ -11,6 +11,8 @@
  * - Toast notifications
  */
 
+import { APP_CONFIG } from '../config/constants.js';
+
 // ====================================================================
 // Number Formatting
 // ====================================================================
@@ -29,31 +31,30 @@ export function formatHeat(num) {
 
 /**
  * Parse viewer/heat values into a number (handles units like 万/K/M).
+ * 🔥 Modern JS: Uses optional chaining (?.) and nullish coalescing (??)
  * @param {*} value - Raw viewer value
  * @returns {number} Parsed viewer count
  */
 export function parseHeatValue(value) {
+  // Handle numeric input
   if (typeof value === 'number') {
     return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
   }
-  if (typeof value !== 'string') return 0;
 
-  const raw = value.trim();
+  // Convert to string and normalize (nullish coalescing handles null/undefined)
+  const raw = (value ?? '').toString().trim().toLowerCase();
   if (!raw) return 0;
 
-  const normalized = raw.replace(/,/g, '').toLowerCase();
-  const match = normalized.match(/([\d.]+)\s*([万wkm])?/);
-  if (!match) return 0;
+  const match = raw.replace(/,/g, '').match(/([\d.]+)\s*([万wkm])?/);
+  const num = parseFloat(match?.[1] ?? '0'); // Optional chaining for safe array access
 
-  const num = parseFloat(match[1]);
   if (!Number.isFinite(num)) return 0;
 
-  const unit = match[2];
-  if (unit === '万' || unit === 'w') return Math.round(num * 10000);
-  if (unit === 'k') return Math.round(num * 1000);
-  if (unit === 'm') return Math.round(num * 1000000);
+  // Unit multipliers lookup table
+  const unit = match?.[2];
+  const multipliers = { '万': 10000, 'w': 10000, 'k': 1000, 'm': 1000000 };
 
-  return Math.max(0, Math.floor(num));
+  return Math.max(0, Math.floor(num * (multipliers[unit] ?? 1))); // Nullish coalescing for default
 }
 
 /**
@@ -305,6 +306,40 @@ export function getRandomItem(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// ====================================================================
+// Room ID Helpers
+// ====================================================================
+
+/**
+ * Generate cache key for room data
+ * Eliminates duplicate string concatenation throughout codebase
+ *
+ * @param {string} platform - Platform name (douyu/bilibili/twitch/kick)
+ * @param {string|number} id - Room ID
+ * @returns {string} Cache key in format "platform-id"
+ *
+ * @example
+ * getRoomCacheKey('douyu', '123456') // => "douyu-123456"
+ */
+export function getRoomCacheKey(platform, id) {
+  return `${platform}-${id}`;
+}
+
+/**
+ * Generate DOM element ID for room card
+ * Eliminates duplicate string concatenation throughout codebase
+ *
+ * @param {string} platform - Platform name (douyu/bilibili/twitch/kick)
+ * @param {string|number} id - Room ID
+ * @returns {string} Card ID in format "card-platform-id"
+ *
+ * @example
+ * getCardId('bilibili', '987654') // => "card-bilibili-987654"
+ */
+export function getCardId(platform, id) {
+  return `card-${platform}-${id}`;
+}
+
 /**
  * Show toast notification
  * Limited to maximum 5 toasts to prevent infinite stacking
@@ -313,7 +348,7 @@ export function showToast(message, typeOrDuration = 3000, durationOverride) {
   const container = document.getElementById('toast-container');
   if (!container) return;
 
-  const DEFAULT_DURATION = 3000;
+  const DEFAULT_DURATION = APP_CONFIG.TOAST.DEFAULT_DURATION;
   let type = 'info';
   let duration = DEFAULT_DURATION;
 
@@ -337,8 +372,8 @@ export function showToast(message, typeOrDuration = 3000, durationOverride) {
   const allowedTypes = new Set(['info', 'success', 'error', 'warning']);
   const toastType = allowedTypes.has(finalType) ? finalType : 'info';
 
-  // Limit maximum number of toasts to 5
-  const MAX_TOASTS = 5;
+  // Limit maximum number of toasts
+  const MAX_TOASTS = APP_CONFIG.TOAST.MAX_VISIBLE;
   const existingToasts = container.querySelectorAll('.toast');
   if (existingToasts.length >= MAX_TOASTS) {
     // Remove oldest toast (first child)

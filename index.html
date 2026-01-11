@@ -87,7 +87,7 @@
     </style>
   </head>
 
-  <body class="loading p-6 md:p-10 page-top-offset" onclick="window.closeDropdown?.(event); window.hideHistory?.(event)">
+  <body class="loading p-6 md:p-10 page-top-offset" data-action="close-dropdown">
     <!-- Snow Canvas -->
     <canvas id="snow-canvas"></canvas>
 
@@ -113,7 +113,7 @@
         </h1>
         <button
           id="snow-toggle-btn"
-          onclick="window.toggleSnow?.()"
+          data-action="toggle-snow"
           class="snow-toggle-btn off"
           title="切换下雪特效"
         >
@@ -138,7 +138,7 @@
       >
         <div class="relative w-40" id="custom-selector-container">
           <button
-            onclick="window.toggleDropdown?.(event)"
+            data-action="toggle-dropdown"
             id="selector-trigger"
             class="w-full flex items-center justify-between bg-transparent text-sm font-bold px-4 py-3 rounded-xl text-gray-400 hover:text-white border-r border-[#262626] cursor-pointer transition-colors focus:outline-none"
           >
@@ -164,7 +164,10 @@
             class="dropdown-enter absolute top-full left-0 mt-3 w-full bg-[#161616]/95 backdrop-blur-xl border border-[#333] rounded-2xl shadow-[0_15px_30px_-5px_rgba(0,0,0,0.8)] overflow-hidden z-[100]"
           >
             <div
-              onclick="window.selectPlatform?.('douyu', '#ff5d23', '斗鱼')"
+              data-action="select-platform"
+              data-platform="douyu"
+              data-color="#ff5d23"
+              data-label="斗鱼"
               class="cursor-pointer px-5 py-3 hover:bg-[#262626] transition-colors border-b border-white/5 flex items-center justify-between group"
             >
               <span
@@ -173,7 +176,10 @@
               >
             </div>
             <div
-              onclick="window.selectPlatform?.('bilibili', '#fb7299', 'B站')"
+              data-action="select-platform"
+              data-platform="bilibili"
+              data-color="#fb7299"
+              data-label="B站"
               class="cursor-pointer px-5 py-3 hover:bg-[#262626] transition-colors border-b border-white/5 flex items-center justify-between group"
             >
               <span
@@ -182,7 +188,10 @@
               >
             </div>
             <div
-              onclick="window.selectPlatform?.('twitch', '#9146ff', 'Twitch')"
+              data-action="select-platform"
+              data-platform="twitch"
+              data-color="#9146ff"
+              data-label="Twitch"
               class="cursor-pointer px-5 py-3 hover:bg-[#262626] transition-colors border-b border-white/5 flex items-center justify-between group"
             >
               <span
@@ -191,7 +200,10 @@
               >
             </div>
             <div
-              onclick="window.selectPlatform?.('kick', '#53fc18', 'Kick')"
+              data-action="select-platform"
+              data-platform="kick"
+              data-color="#53fc18"
+              data-label="Kick"
               class="cursor-pointer px-5 py-3 hover:bg-[#262626] transition-colors border-b border-white/5 flex items-center justify-between group"
             >
               <span
@@ -204,15 +216,12 @@
         <input
           type="text"
           id="room-id-input"
-          onfocus="window.showHistory?.()"
-          oninput="window.handleInput?.(event)"
-          onkeydown="if(event.key === 'Enter') window.handleAddInput?.()"
           placeholder="输入房间号..."
           class="bg-transparent text-sm flex-1 outline-none text-gray-200 placeholder:text-gray-700 font-medium px-4 py-3 h-full"
         />
         <div id="history-dropdown" class="dropdown-enter"></div>
         <button
-          onclick="window.handleAddInput?.()"
+          data-action="add-room"
           class="bg-gray-100 text-black hover:bg-orange-500 hover:text-white text-sm font-bold px-6 py-3 rounded-xl transition-all active:scale-95"
         >
           添加
@@ -221,7 +230,7 @@
 
       <!-- Control Buttons -->
       <div class="flex items-center gap-4 px-4">
-        <button id="auto-refresh-btn" onclick="window.toggleAutoRefresh?.()" class="auto-refresh-btn off">
+        <button id="auto-refresh-btn" data-action="toggle-auto-refresh" class="auto-refresh-btn off">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="h-4 w-4"
@@ -238,10 +247,10 @@
           </svg>
           <span id="auto-refresh-label">自动: 关</span>
         </button>
-        <button id="notify-btn" onclick="window.toggleNotifications?.()" class="notify-btn off">
+        <button id="notify-btn" data-action="toggle-notifications" class="notify-btn off">
           <span>推送: 关</span>
         </button>
-        <button id="keepalive-btn" onclick="window.toggleKeepAlive?.()" class="keepalive-btn off">
+        <button id="keepalive-btn" data-action="toggle-keep-alive" class="keepalive-btn off">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="h-4 w-4"
@@ -260,7 +269,7 @@
         </button>
         <button
           id="region-btn"
-          onclick="window.toggleRegionMode?.()"
+          data-action="toggle-region-mode"
           class="region-btn"
           title="切换地区模式"
         >
@@ -280,7 +289,7 @@
           </svg>
           <span id="region-label">地区: 自动</span>
         </button>
-        <button onclick="window.exportRooms?.()" class="import-export-btn" title="导出主播列表">
+        <button data-action="export-rooms" class="import-export-btn" title="导出主播列表">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               stroke-linecap="round"
@@ -292,7 +301,7 @@
           <span>导出</span>
         </button>
         <button
-          onclick="document.getElementById('import-file-input')?.click()"
+          data-action="import-rooms"
           class="import-export-btn"
           title="导入主播列表"
         >
@@ -311,11 +320,10 @@
           id="import-file-input"
           accept=".json,.liveradar"
           style="display: none"
-          onchange="window.importRooms?.(event)"
         />
         <span id="refresh-stats" class="refresh-stats hidden">--</span>
         <button
-          onclick="window.refreshAll?.()"
+          data-action="refresh-all"
           id="global-refresh-btn"
           class="p-3 text-gray-600 hover:text-white transition-colors rounded-full hover:bg-[#1f1f1f]"
         >
@@ -426,7 +434,7 @@
               <div class="card-actions">
                 <button
                   class="action-btn fav-btn"
-                  onclick="event.preventDefault(); event.stopPropagation(); window.toggleFavorite?.(this.dataset.id, this.dataset.platform)"
+                  data-action="toggle-favorite"
                 >
                   <svg viewBox="0 0 24 24">
                     <path
@@ -439,7 +447,7 @@
                 </button>
                 <button
                   class="action-btn delete-btn"
-                  onclick="event.preventDefault(); event.stopPropagation(); window.removeRoom?.(this.dataset.id, this.dataset.platform)"
+                  data-action="remove-room"
                 >
                   <svg viewBox="0 0 24 24">
                     <path

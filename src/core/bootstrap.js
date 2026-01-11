@@ -28,17 +28,20 @@ import { init, initAppDependencies } from './init.js';
 import { fetchStatus } from './status-fetcher.js';
 
 // Feature modules
-import { initSnow } from '../features/snow-effect.js';
-import { initAutoRefresh } from '../features/auto-refresh.js';
-import { initNotifications, checkNotifications } from '../features/notifications.js';
-import { initRegionDetection } from '../features/region-detector.js';
-import { initStatusTicker, updateTicker } from '../features/status-ticker.js';
+import { initSnow } from '../features/enhancements/snow-effect.js';
+import { initAutoRefresh } from '../features/core/auto-refresh.js';
+import { initNotifications, checkNotifications } from '../features/core/notifications.js';
+import { initRegionDetection } from '../features/enhancements/region-detector.js';
+import { initStatusTicker, updateTicker } from '../features/core/status-ticker.js';
 import { initNotificationAudio } from '../features/audio/notification-audio.js';
 import { initAudioManager } from '../features/audio/audio-manager.js';
-import { initMusicPlayer } from '../features/music-player.js';
+import { initMusicPlayer } from '../features/enhancements/music-player.js';
 
 // Globals exposure
 import { exposeGlobals, exposeCoreDependencies } from './globals.js';
+
+// Event delegation
+import { initEventRouter } from './event-router.js';
 
 /**
  * Main application initialization function
@@ -61,7 +64,10 @@ export async function initializeApp(loaderStartTime) {
         initDOMCache();
         console.log('[Bootstrap] DOM cache initialized');
 
-        // === Step 2: Expose Global Functions (for HTML inline handlers) ===
+        // === Step 2: Initialize Event Delegation Router ===
+        initEventRouter();
+
+        // === Step 2.5: Expose Global Functions (temporary, for transition period) ===
         exposeGlobals();
 
         // Expose core dependencies (for features to access)

@@ -96,5 +96,5 @@ export function getNotificationAudio() {
     return notifyAudio;
 }
 
-// Make globally accessible for onclick handlers and testing
-window.playNotificationSound = playNotificationSound;
+// Note: Global function exposure is handled by globals.js
+// playNotificationSound is automatically available on window object

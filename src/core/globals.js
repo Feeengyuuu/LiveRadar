@@ -1,84 +1,39 @@
 /**
  * ====================================================================
- * Global Functions Exposure Module
+ * Global Functions Exposure Module (Deprecated - Transitioning to Event Delegation)
  * ====================================================================
  *
- * Exposes internal functions to the window object for HTML inline event handlers.
+ * MIGRATION STATUS:
+ * ✅ HTML inline event handlers have been replaced with data-action attributes
+ * ✅ Event delegation router (event-router.js) now handles all UI events
+ * ⚠️  This module is kept temporarily for backwards compatibility and debugging
  *
- * Why this is needed:
- * - HTML uses inline event handlers (onclick="functionName()")
- * - These handlers expect functions to be available on window object
- * - This module centralizes all global function exports
+ * Functions exposed here are for:
+ * 1. Core module dependencies (renderAll, fetchStatus, etc.)
+ * 2. Utility functions called from JS modules (showToast)
+ * 3. Debugging/testing purposes
  *
- * TODO: Migrate HTML to use addEventListener and remove this module
  * ==================================================================== */
 
-// Import all functions that need to be exposed
-import { toggleSnow } from '../features/snow-effect.js';
-import { toggleDropdown, selectPlatform, closeDropdown, showHistory, hideHistory, handleInput, handleAddInput, applyHistory, deleteHistory, removeRoom } from '../features/room-management.js';
-import { toggleNotifications } from '../features/notifications.js';
-import { toggleAutoRefresh } from '../features/auto-refresh.js';
-import { toggleKeepAlive, unlockAllAudio } from '../features/audio/audio-manager.js';
-import { toggleRegionMode } from '../features/region-detector.js';
-import { exportRooms, importRooms } from '../features/import-export.js';
-import { refreshAll } from '../core/refresh-manager.js';
-import { dismissFileWarning, dismissFileWarningPermanently, showDeploymentGuide } from './file-protocol-warning.js';
-import { playNotificationSound } from '../features/audio/notification-audio.js';
+// Minimal imports for utilities still needed
+import { toggleFavorite } from '../features/core/room-management.js';
 import { showToast } from '../utils/helpers.js';
-import { getRooms } from '../core/state.js';
 
 /**
- * Expose all functions to window object
- * Call this once during app initialization
+ * Expose minimal functions to window object
+ * Most UI event handlers are now managed by event-router.js
  */
 export function exposeGlobals() {
-    console.log('[Globals] Exposing functions to window object...');
+    console.log('[Globals] Exposing minimal global functions...');
 
-    // === Utilities ===
+    // === Utilities (still needed by modules) ===
     window.showToast = showToast;
 
-    // === Snow Effect ===
-    window.toggleSnow = toggleSnow;
+    // === Room management (still needed by renderer) ===
+    window.toggleFavorite = toggleFavorite;
 
-    // === Platform Selector & Dropdown ===
-    window.toggleDropdown = toggleDropdown;
-    window.selectPlatform = selectPlatform;
-    window.closeDropdown = closeDropdown;
-
-    // === Search & History ===
-    window.showHistory = showHistory;
-    window.hideHistory = hideHistory;
-    window.handleInput = handleInput;
-    window.handleAddInput = handleAddInput;
-    window.applyHistory = applyHistory;
-    window.deleteHistory = deleteHistory;
-
-    // === Room Management ===
-    window.removeRoom = removeRoom;
-
-    // === Settings Toggles ===
-    window.toggleNotifications = toggleNotifications;
-    window.toggleAutoRefresh = toggleAutoRefresh;
-    window.toggleKeepAlive = toggleKeepAlive;
-    window.toggleRegionMode = toggleRegionMode;
-
-    // === Import/Export ===
-    window.exportRooms = () => exportRooms(getRooms());
-    window.importRooms = importRooms;
-
-    // === Refresh ===
-    window.refreshAll = refreshAll;
-
-    // === Warning Banner ===
-    window.dismissFileWarning = dismissFileWarning;
-    window.dismissFileWarningPermanently = dismissFileWarningPermanently;
-    window.showDeploymentGuide = showDeploymentGuide;
-
-    // === Audio ===
-    window.unlockAllAudio = unlockAllAudio;
-    window.playNotificationSound = playNotificationSound;
-
-    console.log('[Globals] ✓ All functions exposed to window');
+    console.log('[Globals] ✓ Minimal globals exposed');
+    console.log('[Globals] ℹ️  Most UI events handled by event-router.js');
 }
 
 /**

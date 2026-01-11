@@ -145,6 +145,45 @@ export function getDOMCache() {
 }
 
 /**
+ * Get a DOM element with automatic cache fallback
+ * Eliminates the repetitive "cache.x || document.getElementById()" pattern
+ *
+ * @param {string} id - Element ID (kebab-case like 'room-id-input')
+ * @param {boolean} updateCache - Whether to update cache if element found (default: false)
+ * @returns {HTMLElement|null} The element or null if not found
+ *
+ * @example
+ * // Old pattern (3 lines):
+ * const cache = getDOMCache();
+ * const input = cache.roomIdInput || document.getElementById('room-id-input');
+ * if (!input) return;
+ *
+ * // New pattern (1 line):
+ * const input = getElement('room-id-input');
+ * if (!input) return;
+ */
+export function getElement(id, updateCache = false) {
+    // Convert kebab-case to camelCase for cache lookup
+    // room-id-input -> roomIdInput
+    const cacheKey = id.replace(/-./g, match => match[1].toUpperCase());
+
+    // Try cache first
+    let element = domCache[cacheKey];
+
+    // Fallback to DOM query if not cached
+    if (!element) {
+        element = document.getElementById(id);
+
+        // Optionally update cache with newly found element
+        if (element && updateCache && cacheKey in domCache) {
+            domCache[cacheKey] = element;
+        }
+    }
+
+    return element;
+}
+
+/**
  * Refresh a specific cached element (if it was dynamically created/replaced)
  * @param {string} key - Cache key
  * @param {string} selector - Element ID

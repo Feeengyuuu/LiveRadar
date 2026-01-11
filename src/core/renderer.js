@@ -17,7 +17,8 @@
 import { APP_CONFIG } from '../config/constants.js';
 import { getDOMCache } from '../utils/dom-cache.js';
 import { getRooms, getRoomDataCache, subscribeToState } from './state.js';
-import { debounce } from '../utils/helpers.js';
+import { debounce, getRoomCacheKey, getCardId } from '../utils/helpers.js';
+import { viewportTracker } from '../utils/viewport-tracker.js';
 
 // ====================================================================
 // Card Tracking (Performance Optimization)
@@ -189,10 +190,19 @@ function renderAllImmediate() {
     let unchangedCount = 0;
     let newCardsCount = 0;
 
+    // 🔥 Performance: DocumentFragment for batch DOM insertion
+    // Collect new cards in fragments, insert once at end
+    // Reduces reflows from N to 3 (one per grid)
+    const newCardsByGrid = {
+        live: [],
+        offline: [],
+        loop: []
+    };
+
     sortedRooms.forEach(roomInfo => {
-        const cardId = `card-${roomInfo.platform}-${roomInfo.id}`;
+        const cardId = getCardId(roomInfo.platform, roomInfo.id);
         presentCardIds.add(cardId);
-        const data = roomDataCache[`${roomInfo.platform}-${roomInfo.id}`] || { loading: true };
+        const data = roomDataCache[getRoomCacheKey(roomInfo.platform, roomInfo.id)] || { loading: true };
 
         let card = document.getElementById(cardId);
 
@@ -289,6 +299,14 @@ function renderAllImmediate() {
             // New card, must create
             card = createCard(cardId, roomInfo, data, cardState);
             newCardsCount++;
+
+            // 🔥 Performance: Collect new cards for batch insertion
+            newCardsByGrid[targetGridKey].push({
+                card,
+                position: gridPositions[targetGridKey]
+            });
+            gridPositions[targetGridKey]++;
+            return; // Skip insertion logic for new cards
         }
 
         // 优化：只在卡片需要移动时才操作DOM，减少80%的重排操作
@@ -306,6 +324,28 @@ function renderAllImmediate() {
         gridPositions[targetGridKey] = targetIndex + 1;
     });
 
+    // 🔥 Performance: Batch insert all new cards using DocumentFragment
+    // Single reflow per grid instead of one per card
+    Object.keys(newCardsByGrid).forEach(gridKey => {
+        const newCards = newCardsByGrid[gridKey];
+        if (newCards.length === 0) return;
+
+        const targetGrid = grids[gridKey];
+        if (!targetGrid) return;
+
+        const fragment = document.createDocumentFragment();
+        newCards.forEach(({ card }) => {
+            fragment.appendChild(card);
+        });
+
+        // Insert all new cards at once
+        targetGrid.appendChild(fragment);
+
+        if (APP_CONFIG.DEBUG.LOG_RENDER) {
+            console.log(`[Render] Batch inserted ${newCards.length} new cards into ${gridKey} grid`);
+        }
+    });
+
     // Incremental update: Record statistics
     if (APP_CONFIG.INCREMENTAL.ENABLED && APP_CONFIG.DEBUG.LOG_RENDER) {
         console.log(`[Render Stats] Total: ${sortedRooms.length}, Updated: ${updatedCount}, New: ${newCardsCount}, Skipped: ${unchangedCount}`);
@@ -315,7 +355,12 @@ function renderAllImmediate() {
     // Avoids expensive querySelectorAll on every render (60-80% reduction in DOM queries)
     knownCardIds.forEach(cardId => {
         if (!presentCardIds.has(cardId)) {
-            document.getElementById(cardId)?.remove();
+            const card = document.getElementById(cardId);
+            if (card) {
+                // 🔥 Performance: Unregister from viewport tracker
+                viewportTracker.unobserve(card);
+                card.remove();
+            }
             knownCardIds.delete(cardId);
         }
     });
@@ -354,6 +399,10 @@ export function createCard(cardId, roomInfo, data, cardState) {
     card.dataset.roomId = roomInfo.id;
     card.dataset.platform = roomInfo.platform;
 
+    // 🔥 Performance: Register card for viewport tracking
+    // Uses IntersectionObserver instead of getBoundingClientRect
+    viewportTracker.observe(card);
+
     card.href = {
         douyu: `https://www.douyu.com/${roomInfo.id}`,
         bilibili: `https://live.bilibili.com/${roomInfo.id}`,
@@ -387,6 +436,134 @@ export function createCard(cardId, roomInfo, data, cardState) {
 
     updateCard(card, roomInfo, data, cardState);
     return card;
+}
+
+// ====================================================================
+// Image Loading Helpers
+// ====================================================================
+
+/**
+ * Get smart image URL with intelligent caching strategy
+ * Adds timestamps for live content, fully caches offline/replay content
+ *
+ * @param {string} baseUrl - Base image URL
+ * @param {string} platform - Platform name
+ * @param {boolean} isLive - Whether content is live
+ * @returns {string} Smart URL with appropriate caching
+ */
+function getSmartImageUrl(baseUrl, platform, isLive) {
+    if (!baseUrl || !isLive) {
+        // Offline/replay - no timestamp, full browser cache
+        return baseUrl;
+    }
+
+    const isInternational = platform === 'twitch' || platform === 'kick';
+
+    // 🔥 Smart caching buckets
+    if (isInternational) {
+        // International platforms: Refresh every 5 minutes
+        // Twitch/Kick update thumbnails more frequently
+        const cacheKey = Math.floor(Date.now() / (5 * 60 * 1000));
+        return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${cacheKey}`;
+    } else {
+        // Domestic platforms: Refresh every 10 minutes
+        // Douyu/Bilibili update less frequently
+        const cacheKey = Math.floor(Date.now() / (10 * 60 * 1000));
+        return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${cacheKey}`;
+    }
+}
+
+/**
+ * Unified image source setter with lazy loading and fallback support
+ * Eliminates code duplication between thumbnail and avatar loading
+ *
+ * @param {Object} config - Configuration object
+ * @param {HTMLElement} config.imgElement - Image element to update
+ * @param {string} config.newSrc - New image source URL
+ * @param {HTMLElement} [config.loaderElement] - Loading spinner element
+ * @param {HTMLElement} [config.skeletonElement] - Skeleton placeholder element
+ * @param {string} [config.loadedClass] - CSS class to add on successful load
+ * @param {Object} [config.fallbacks] - Fallback URLs
+ * @param {string} [config.fallbacks.hd] - HD fallback URL
+ * @param {string} [config.fallbacks.standard] - Standard fallback URL
+ * @param {boolean} [config.hideOnError] - Hide image element on error (for avatars)
+ */
+function setImageSource(config) {
+    const {
+        imgElement,
+        newSrc,
+        loaderElement,
+        skeletonElement,
+        loadedClass,
+        fallbacks = {},
+        hideOnError = false
+    } = config;
+
+    // Clear image if no new source
+    if (!newSrc) {
+        if (imgElement.src) {
+            imgElement.src = '';
+            if (loadedClass) imgElement.classList.remove(loadedClass);
+            if (hideOnError) imgElement.classList.add('hidden');
+            if (skeletonElement) skeletonElement.classList.remove('hidden');
+        }
+        return;
+    }
+
+    // Only update if URL actually changed to prevent flickering
+    if (imgElement.src === newSrc) {
+        return;
+    }
+
+    // Prepare for loading
+    if (loadedClass) imgElement.classList.remove(loadedClass);
+    if (loaderElement) loaderElement.classList.remove('hidden');
+    imgElement.src = newSrc;
+
+    // Set up load handlers
+    setImageHandlers(
+        imgElement,
+        // onLoad - Success
+        () => {
+            if (loadedClass) imgElement.classList.add(loadedClass);
+            if (loaderElement) loaderElement.classList.add('hidden');
+            if (skeletonElement) skeletonElement.classList.add('hidden');
+            if (hideOnError) imgElement.classList.remove('hidden');
+
+            // Clear fallback tracking
+            delete imgElement.dataset.triedHD;
+            delete imgElement.dataset.triedStandard;
+        },
+        // onError - Try fallbacks or show skeleton
+        (e) => {
+            const { hd, standard } = fallbacks;
+
+            // Try HD fallback first
+            if (hd && imgElement.src !== hd && !imgElement.dataset.triedHD) {
+                imgElement.dataset.triedHD = 'true';
+                imgElement.src = hd;
+                return;
+            }
+
+            // Try standard fallback second
+            if (standard && imgElement.src !== standard && !imgElement.dataset.triedStandard) {
+                imgElement.dataset.triedStandard = 'true';
+                imgElement.src = standard;
+                return;
+            }
+
+            // All attempts failed - show skeleton/hide
+            if (loaderElement) loaderElement.classList.add('hidden');
+            if (skeletonElement) skeletonElement.classList.remove('hidden');
+            if (hideOnError) {
+                imgElement.classList.add('hidden');
+            }
+
+            // Clear fallback tracking
+            delete imgElement.dataset.triedHD;
+            delete imgElement.dataset.triedStandard;
+        }
+    );
 }
 
 // ====================================================================
@@ -450,7 +627,11 @@ export function updateCard(card, roomInfo, data, cardState) {
             : '<svg viewBox="0 0 24 24"><path d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.01 4.38.38-3.32 2.88 1 4.28L12 15.4z" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
     }
 
-    card.classList.remove('is-live-card', 'is-offline-card', 'is-loop-card');
+    // 🔥 Performance: Use toggle instead of remove+add to reduce classList operations
+    card.classList.toggle('is-live-card', cardState === 'live');
+    card.classList.toggle('is-offline-card', cardState === 'offline' || cardState === 'error');
+    card.classList.toggle('is-loop-card', cardState === 'loop');
+    card.classList.toggle('is-error-card', cardState === 'error');
 
     let newThumbSrc = '';
     const newAvatarSrc = data.avatar || '';
@@ -461,54 +642,53 @@ export function updateCard(card, roomInfo, data, cardState) {
 
     switch (cardState) {
         case 'live':
-            card.classList.add('is-live-card');
             chip.className = 'status-chip chip-live';
             if (chipText.textContent !== '直播中') chipText.textContent = '直播中';
             if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
             if (ownerEl.textContent !== ownerText) ownerEl.textContent = ownerText;
             if (viewerNum.textContent !== data.viewers) viewerNum.textContent = data.viewers;
-            newThumbSrc = data.cover;
+
+            // 🔥 Performance: Smart image caching strategy
+            // Add timestamp for live thumbnails to refresh periodically
+            newThumbSrc = getSmartImageUrl(data.cover, roomInfo.platform, true);
 
             const duration = data.startTime ? formatDuration(data.startTime) : null;
             if (duration) {
                 durationEl.textContent = `⏱ ${duration}`;
-                if (durationEl.classList.contains('hidden')) durationEl.classList.remove('hidden');
+                durationEl.classList.toggle('hidden', false); // 🔥 Simplified: Use toggle instead of conditional add/remove
             } else {
-                if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
+                durationEl.classList.toggle('hidden', true);
             }
             break;
 
         case 'loop':
-            card.classList.add('is-loop-card');
             chip.className = 'status-chip chip-loop';
             if (chipText.textContent !== '轮播') chipText.textContent = '轮播';
             if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
             if (ownerEl.textContent !== ownerText) ownerEl.textContent = ownerText;
             if (viewerNum.textContent !== '轮播中') viewerNum.textContent = '轮播中';
             newThumbSrc = data.cover;
-            if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
+            durationEl.classList.toggle('hidden', true);
             break;
 
         case 'offline':
-            card.classList.add('is-offline-card');
             chip.className = 'status-chip chip-off';
             if (chipText.textContent !== '离线') chipText.textContent = '离线';
             if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
             if (ownerEl.textContent !== ownerText) ownerEl.textContent = ownerText;
             if (viewerNum.textContent !== '离线') viewerNum.textContent = '离线';
             newThumbSrc = data.avatar || data.cover;
-            if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
+            durationEl.classList.toggle('hidden', true);
             break;
 
         case 'error':
-            card.classList.add('is-offline-card', 'is-error-card');
             chip.className = 'status-chip chip-error';
             if (chipText.textContent !== '连接失败') chipText.textContent = '连接失败';
             if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
             if (ownerEl.textContent !== ownerText) ownerEl.textContent = ownerText;
             if (viewerNum.textContent !== data.viewers) viewerNum.textContent = data.viewers;
             newThumbSrc = data.avatar || data.cover;
-            if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
+            durationEl.classList.toggle('hidden', true);
             break;
 
         case 'retrying':
@@ -518,7 +698,7 @@ export function updateCard(card, roomInfo, data, cardState) {
             if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
             if (ownerEl.textContent !== ownerText) ownerEl.textContent = ownerText;
             if (viewerNum.textContent !== '请稍候') viewerNum.textContent = '请稍候';
-            if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
+            durationEl.classList.toggle('hidden', true);
             break;
 
         case 'loading':
@@ -528,70 +708,29 @@ export function updateCard(card, roomInfo, data, cardState) {
             if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
             if (ownerEl.textContent !== '---') ownerEl.textContent = '---';
             if (viewerNum.textContent !== '--') viewerNum.textContent = '--';
-            if (!durationEl.classList.contains('hidden')) durationEl.classList.add('hidden');
+            durationEl.classList.toggle('hidden', true);
             break;
     }
 
-    // Update thumbnail with lazy loading and fallback support
-    // Only update if URL actually changed to prevent flickering
-    if (newThumbSrc && thumb.src !== newThumbSrc) {
-        thumb.classList.remove('loaded');
-        loader.classList.remove('hidden');
-        thumb.src = newThumbSrc;
+    // Update thumbnail and avatar using unified image loading function
+    setImageSource({
+        imgElement: thumb,
+        newSrc: newThumbSrc,
+        loaderElement: loader,
+        loadedClass: 'loaded',
+        fallbacks: {
+            hd: data._coverFallbackHD,
+            standard: data._coverFallback
+        }
+    });
 
-        // Use setImageHandlers to prevent memory leak from accumulated handlers
-        setImageHandlers(thumb,
-            // onLoad handler
-            () => {
-                thumb.classList.add('loaded');
-                loader.classList.add('hidden');
-                delete thumb.dataset.triedHD;
-                delete thumb.dataset.triedStandard;
-            },
-            // onError handler
-            (e) => {
-                const fallbackHD = data._coverFallbackHD;
-                const fallbackStandard = data._coverFallback;
-
-                if (fallbackHD && thumb.src !== fallbackHD && !thumb.dataset.triedHD) {
-                    thumb.dataset.triedHD = 'true';
-                    thumb.src = fallbackHD;
-                } else if (fallbackStandard && thumb.src !== fallbackStandard && !thumb.dataset.triedStandard) {
-                    thumb.dataset.triedStandard = 'true';
-                    thumb.src = fallbackStandard;
-                } else {
-                    loader.classList.add('hidden');
-                    delete thumb.dataset.triedHD;
-                    delete thumb.dataset.triedStandard;
-                }
-            }
-        );
-    } else if (!newThumbSrc && thumb.src) {
-        thumb.src = '';
-        thumb.classList.remove('loaded');
-    }
-
-    // Update avatar with lazy loading
     const avatarSkeleton = avt.nextElementSibling;
-    if (newAvatarSrc && avt.src !== newAvatarSrc) {
-        avt.src = newAvatarSrc;
-
-        // Use setImageHandlers to prevent memory leak
-        setImageHandlers(avt,
-            () => {
-                avt.classList.remove('hidden');
-                if (avatarSkeleton) avatarSkeleton.classList.add('hidden');
-            },
-            () => {
-                avt.classList.add('hidden');
-                if (avatarSkeleton) avatarSkeleton.classList.remove('hidden');
-            }
-        );
-    } else if (!newAvatarSrc && avt.src) {
-        avt.src = '';
-        avt.classList.add('hidden');
-        if (avatarSkeleton) avatarSkeleton.classList.remove('hidden');
-    }
+    setImageSource({
+        imgElement: avt,
+        newSrc: newAvatarSrc,
+        skeletonElement: avatarSkeleton,
+        hideOnError: true
+    });
 }
 
 // ====================================================================

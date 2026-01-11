@@ -19,7 +19,7 @@ import { registerDefaultAdapters, fetchPlatformStatus } from '../api/platform-ad
 import { fetchQuick } from '../api/proxy-manager.js';
 import { DataDiffer } from '../utils/data-differ.js';
 import { getRoomDataCache, updateRoomCache } from './state.js';
-import { formatHeat } from '../utils/helpers.js';
+import { formatHeat, getRoomCacheKey } from '../utils/helpers.js';
 
 // ====================================================================
 // Cover Timestamp Helpers
@@ -66,7 +66,7 @@ export function initStatusFetcher(deps) {
 export async function fetchRoomStatus(room, jitter = 0) {
     if (jitter > 0) await new Promise(r => setTimeout(r, jitter));
 
-    const cacheKey = `${room.platform}-${room.id}`;
+    const cacheKey = getRoomCacheKey(room.platform, room.id);
     const roomDataCache = getRoomDataCache();
     const prevData = roomDataCache[cacheKey];
     const now = Date.now();

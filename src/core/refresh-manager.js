@@ -19,6 +19,8 @@ import { ResourceManager } from '../utils/resource-manager.js';
 import { fetchRoomStatus } from './status-fetcher.js';
 import { getState, getRooms, getRoomDataCache, updateRefreshStatus, updateRefreshStats, updateLastRefreshTime } from './state.js';
 import { getDOMCache } from '../utils/dom-cache.js';
+import { viewportTracker } from '../utils/viewport-tracker.js';
+import { getCardId } from '../utils/helpers.js';
 
 // ====================================================================
 // Constants
@@ -119,6 +121,23 @@ function updateRefreshStatsDisplay() {
 }
 
 // ====================================================================
+// Concurrency Helper
+// ====================================================================
+
+/**
+ * Determine optimal concurrency based on room count
+ * @param {number} roomCount - Number of rooms to refresh
+ * @returns {number} Recommended concurrency level
+ */
+function getConcurrency(roomCount) {
+    const { THRESHOLD_HIGH, THRESHOLD_MEDIUM, HIGH, MEDIUM, DEFAULT } = APP_CONFIG.CONCURRENCY;
+
+    if (roomCount > THRESHOLD_HIGH) return HIGH;
+    if (roomCount > THRESHOLD_MEDIUM) return MEDIUM;
+    return DEFAULT;
+}
+
+// ====================================================================
 // Main Refresh Function
 // ====================================================================
 
@@ -164,41 +183,25 @@ export async function refreshAll(sl = false, isAutoRefresh = false) {
         window.showToast('开始刷新...', 'info');
     }
 
-    // 优化：预计算所有房间的视口状态，避免排序中重复查询 DOM
-    // 时间复杂度从 O(n log n) 次 DOM 查询降低到 O(n) 次
-    const viewportStatus = new Map();
-    rooms.forEach(room => {
-        const cardId = `card-${room.platform}-${room.id}`;
-        const card = document.getElementById(cardId);
-        if (card) {
-            const rect = card.getBoundingClientRect();
-            viewportStatus.set(cardId, rect.top < window.innerHeight && rect.bottom > 0);
-        } else {
-            viewportStatus.set(cardId, false);
-        }
-    });
-
-    // 优化：多级优先级排序 - 收藏 > 视口内 > 其他
+    // 🔥 Performance: Use IntersectionObserver-based viewport tracking
+    // Eliminates getBoundingClientRect() calls which force synchronous layout
+    // O(1) map lookup vs O(n) DOM queries + forced reflow
     const sortedRooms = [...rooms].sort((a, b) => {
         // 1. 收藏优先（最高优先级）
         if (a.isFav !== b.isFav) return b.isFav - a.isFav;
 
-        // 2. 视口内优先（第二优先级）- 直接查表，O(1) 操作
-        const aInView = viewportStatus.get(`card-${a.platform}-${a.id}`) || false;
-        const bInView = viewportStatus.get(`card-${b.platform}-${b.id}`) || false;
+        // 2. 视口内优先（第二优先级）- IntersectionObserver查表，O(1) 操作
+        // No getBoundingClientRect, no forced synchronous layout!
+        const aInView = viewportTracker.isInViewport(getCardId(a.platform, a.id));
+        const bInView = viewportTracker.isInViewport(getCardId(b.platform, b.id));
 
         if (aInView !== bInView) return bInView ? 1 : -1;
 
         return 0;
     });
 
-    // Dynamic concurrency: Adjust based on room count and device performance
-    let concurrency = APP_CONFIG.CONCURRENCY.DEFAULT;
-    if (sortedRooms.length > APP_CONFIG.CONCURRENCY.THRESHOLD_HIGH) {
-        concurrency = APP_CONFIG.CONCURRENCY.HIGH;
-    } else if (sortedRooms.length > APP_CONFIG.CONCURRENCY.THRESHOLD_MEDIUM) {
-        concurrency = APP_CONFIG.CONCURRENCY.MEDIUM;
-    }
+    // 🔥 Simplified: Extract concurrency logic to separate function
+    const concurrency = getConcurrency(sortedRooms.length);
 
     // Initialize statistics
     updateRefreshStats({

@@ -17,11 +17,12 @@
  */
 
 import { ResourceManager } from '../utils/resource-manager.js';
-import { getDOMCache } from '../utils/dom-cache.js';
+import { getDOMCache, getElement } from '../utils/dom-cache.js';
 import { PLACEHOLDERS } from '../config/ui-strings.js';
 import { updateRoomDataCache, isNotificationsEnabled } from './state.js';
 import { unlockAllAudio as unlockAllAudioManager } from '../features/audio/audio-manager.js';
 import { playNotificationSound as playNotificationSoundManager } from '../features/audio/notification-audio.js';
+import { getRoomCacheKey } from '../utils/helpers.js';
 
 // External dependencies (injected)
 let rooms = [];
@@ -193,7 +194,7 @@ function setupSecretAudioButton() {
  */
 function initializeStatusSnapshot() {
     rooms.forEach(room => {
-        const key = `${room.platform}-${room.id}`;
+        const key = getRoomCacheKey(room.platform, room.id);
         const cachedData = roomDataCache[key];
         if (cachedData && !cachedData.loading && !cachedData.isError) {
             previousLiveStatus[key] = cachedData.isLive === true;
