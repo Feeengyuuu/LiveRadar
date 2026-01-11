@@ -4,15 +4,13 @@
  */
 
 import { APP_CONFIG } from '../../config/constants.js';
+import { DeviceDetector } from '../../utils/device-detector.js';
 
 // Notification sound file path
 const NOTIFY_SOUND_PATH = '/yahaha.mp3';
 
 // Audio instance
 let notifyAudio = null;
-
-// Device detection
-const iOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 /**
  * Initialize notification audio
@@ -46,7 +44,7 @@ export function playNotificationSound(forcePlay = false, bypassUnlock = false) {
     }
 
     // iOS audio restrictions (can be enabled in config)
-    if (iOSDevice && !APP_CONFIG.AUDIO.ENABLE_ON_IOS) {
+    if (DeviceDetector.isiOS() && !APP_CONFIG.AUDIO.ENABLE_ON_IOS) {
         if (APP_CONFIG.DEBUG.LOG_AUDIO) {
             console.warn('[Notification Audio] iOS audio disabled (can be enabled in config)');
         }

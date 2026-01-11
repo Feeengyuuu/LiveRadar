@@ -32,6 +32,14 @@
         background-color: #050505;
         margin: 0;
       }
+      body.page-top-offset {
+        padding-top: 34px !important;
+      }
+      @media (min-width: 768px) {
+        body.page-top-offset {
+          padding-top: 50px !important;
+        }
+      }
       /* 使用class控制可见性和滚动，便于JavaScript移除 */
       body.loading {
         overflow: hidden;
@@ -79,7 +87,7 @@
     </style>
   </head>
 
-  <body class="loading p-6 md:p-10" onclick="window.closeDropdown?.(event); window.hideHistory?.(event)">
+  <body class="loading p-6 md:p-10 page-top-offset" onclick="window.closeDropdown?.(event); window.hideHistory?.(event)">
     <!-- Snow Canvas -->
     <canvas id="snow-canvas"></canvas>
 
@@ -336,7 +344,7 @@
     <div id="main-content" class="w-full relative z-10">
       <section id="zone-live" class="zone-container">
         <div class="zone-header">
-          <div class="zone-title">正在直播</div>
+          <div class="zone-title">目前有<span id="live-count">0</span>个主播 正在直播</div>
           <div class="zone-sub">LIVE NOW</div>
           <div class="status-ticker" id="status-ticker"></div>
         </div>

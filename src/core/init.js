@@ -18,6 +18,7 @@
 
 import { ResourceManager } from '../utils/resource-manager.js';
 import { getDOMCache } from '../utils/dom-cache.js';
+import { PLACEHOLDERS } from '../config/ui-strings.js';
 import { updateRoomDataCache, isNotificationsEnabled } from './state.js';
 import { unlockAllAudio as unlockAllAudioManager } from '../features/audio/audio-manager.js';
 import { playNotificationSound as playNotificationSoundManager } from '../features/audio/notification-audio.js';
@@ -50,12 +51,7 @@ function updatePlaceholder() {
     const p = cache.platformSelect?.value;
     if (!cache.roomIdInput) return;
 
-    const placeholders = {
-        twitch: "输入 ID (如 xqc)...",
-        douyu: "输入房间号...",
-        bilibili: "输入房间号..."
-    };
-    cache.roomIdInput.placeholder = placeholders[p] || "输入 ID...";
+    cache.roomIdInput.placeholder = PLACEHOLDERS[p] || "输入 ID...";
 }
 
 // ====================================================================
@@ -167,9 +163,10 @@ function setupSecretAudioButton() {
 
         // Visual feedback: scale animation
         secretButton.style.transform = 'scale(1.5)';
-        setTimeout(() => {
+        const timerId = setTimeout(() => {
             secretButton.style.transform = 'scale(1)';
         }, 200);
+        ResourceManager.addTimer(timerId);
 
         // If audio not unlocked, unlock first
         if (!window.audioContextUnlocked) {

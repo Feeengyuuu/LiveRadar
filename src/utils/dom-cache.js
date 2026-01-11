@@ -61,6 +61,7 @@ const domCache = {
     toastContainer: null,
     backToTop: null,
     statusTicker: null,
+    liveCount: null,
 
     // Selectors
     selectorTrigger: null,
@@ -113,6 +114,7 @@ export function initDOMCache() {
     domCache.toastContainer = document.getElementById('toast-container');
     domCache.backToTop = document.getElementById('back-to-top');
     domCache.statusTicker = document.getElementById('status-ticker');
+    domCache.liveCount = document.getElementById('live-count');
 
     // Selectors
     domCache.selectorTrigger = document.getElementById('selector-trigger');

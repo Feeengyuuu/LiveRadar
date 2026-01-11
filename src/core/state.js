@@ -139,11 +139,12 @@ const listeners = new Map();
 
 /**
  * Subscribe to state changes
+ * Renamed from subscribe() to avoid naming conflict with event-manager.js
  * @param {string} key - State key to watch
  * @param {Function} callback - Callback function (newValue, oldValue) => void
  * @returns {Function} Unsubscribe function
  */
-export function subscribe(key, callback) {
+export function subscribeToState(key, callback) {
     if (!listeners.has(key)) {
         listeners.set(key, new Set());
     }

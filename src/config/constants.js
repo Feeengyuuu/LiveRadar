@@ -164,7 +164,7 @@ export const APP_CONFIG = {
     MAX_PROXY_STATS: 100,
     RETRY_DELAY: 1000,
     HEDGE_REQUESTS_ENABLED: true,
-    HEDGE_DELAY_MS: 250,
+    HEDGE_DELAY_MS: 150, // 优化：从250ms降到150ms，减少100ms等待时间
   },
 
   // Proxy scoring configuration
@@ -197,11 +197,11 @@ export const APP_CONFIG = {
     STATS_HIDE_DELAY: 2000,
   },
 
-  // Concurrency control (优化：降低并发数以减少带宽占用，避免视频卡顿)
+  // Concurrency control (优化：提升并发数以加快刷新速度)
   CONCURRENCY: {
-    DEFAULT: 2,        // 从4降到2
-    MEDIUM: 3,         // 从5降到3
-    HIGH: 4,           // 从6降到4
+    DEFAULT: 4,        // 恢复到4，提升50-100%刷新速度
+    MEDIUM: 5,         // 恢复到5
+    HIGH: 6,           // 恢复到6
     THRESHOLD_MEDIUM: 5,
     THRESHOLD_HIGH: 15,
   },

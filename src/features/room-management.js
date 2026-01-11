@@ -5,6 +5,8 @@
 
 import { SafeStorage } from '../utils/safe-storage.js';
 import { getDOMCache } from '../utils/dom-cache.js';
+import { DeviceDetector } from '../utils/device-detector.js';
+import { PLACEHOLDERS } from '../config/ui-strings.js';
 import { getRooms, getRoomDataCache, updateRoomDataCache, addRoom as addRoomToState, removeRoom as removeRoomFromState, toggleRoomFavorite } from '../core/state.js';
 
 // State
@@ -12,11 +14,6 @@ let searchHistory = SafeStorage.getJSON('pro_search_history', []);
 let historyEventsBound = false;
 let historyPositionBound = false;
 const HISTORY_DROPDOWN_RIGHT_GAP = 8;
-
-// Device detection
-const isMobile = () => {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-};
 
 /**
  * Toggle platform selector dropdown
@@ -86,13 +83,7 @@ export function updatePlaceholder() {
     if (!platformSelect || !input) return;
 
     const platform = platformSelect.value;
-    const placeholders = {
-        twitch: "输入 ID (如 xqc)...",
-        douyu: "输入房间号...",
-        bilibili: "输入房间号...",
-        kick: "输入 ID (如 xqc)..."
-    };
-    input.placeholder = placeholders[platform] || "输入 ID...";
+    input.placeholder = PLACEHOLDERS[platform] || "输入 ID...";
 }
 
 /**
@@ -100,7 +91,7 @@ export function updatePlaceholder() {
  */
 export function showHistory() {
     // 在移动端禁用历史记录功能
-    if (isMobile()) return;
+    if (DeviceDetector.isMobile()) return;
 
     const cache = getDOMCache();
     const input = cache.roomIdInput || document.getElementById('room-id-input');
@@ -137,7 +128,7 @@ export function hideHistory(e) {
  */
 export function handleInput(e) {
     // 在移动端禁用历史记录功能
-    if (isMobile()) return;
+    if (DeviceDetector.isMobile()) return;
 
     const value = e && e.target ? e.target.value : '';
     renderHistory(value);
@@ -298,7 +289,10 @@ function updateHistoryDropdownPosition() {
     if (!historyEl) return;
 
     const container = historyEl.offsetParent;
-    if (!container) return;
+    if (!container) {
+        console.warn('[History] Container not found or element is hidden');
+        return;
+    }
 
     const input = cache.roomIdInput || document.getElementById('room-id-input');
     if (!input) return;
@@ -310,21 +304,31 @@ function updateHistoryDropdownPosition() {
     }
     if (!addButton) return;
 
-    const containerRect = container.getBoundingClientRect();
-    const inputRect = input.getBoundingClientRect();
-    const buttonRect = addButton.getBoundingClientRect();
+    try {
+        const containerRect = container.getBoundingClientRect();
+        const inputRect = input.getBoundingClientRect();
+        const buttonRect = addButton.getBoundingClientRect();
 
-    // 计算输入框左边缘相对于容器的偏移
-    const leftOffset = Math.max(0, Math.round(inputRect.left - containerRect.left));
+        // 验证 rect 对象的有效性
+        if (!containerRect || !inputRect || !buttonRect) {
+            console.warn('[History] Invalid bounding rectangles');
+            return;
+        }
 
-    // 计算添加按钮左边缘相对于容器的偏移（留一点间距）
-    const rightOffset = Math.max(
-        0,
-        Math.round(containerRect.right - buttonRect.left + HISTORY_DROPDOWN_RIGHT_GAP)
-    );
+        // 计算输入框左边缘相对于容器的偏移
+        const leftOffset = Math.max(0, Math.round(inputRect.left - containerRect.left));
 
-    historyEl.style.left = `${leftOffset}px`;
-    historyEl.style.right = `${rightOffset}px`;
+        // 计算添加按钮左边缘相对于容器的偏移（留一点间距）
+        const rightOffset = Math.max(
+            0,
+            Math.round(containerRect.right - buttonRect.left + HISTORY_DROPDOWN_RIGHT_GAP)
+        );
+
+        historyEl.style.left = `${leftOffset}px`;
+        historyEl.style.right = `${rightOffset}px`;
+    } catch (error) {
+        console.error('[History] Error updating dropdown position:', error);
+    }
 }
 
 function bindHistoryPosition() {
@@ -339,7 +343,7 @@ function bindHistoryPosition() {
  */
 export function renderHistory(query = '') {
     // 在移动端禁用历史记录功能
-    if (isMobile()) return;
+    if (DeviceDetector.isMobile()) return;
 
     const cache = getDOMCache();
     const historyEl = cache.historyDropdown || document.getElementById('history-dropdown');

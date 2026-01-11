@@ -5,12 +5,10 @@
 
 import { isNotificationsEnabled, updateNotificationsEnabled } from '../core/state.js';
 import { getDOMCache } from '../utils/dom-cache.js';
+import { DeviceDetector } from '../utils/device-detector.js';
 
 // State
 let notificationsEnabled = isNotificationsEnabled();
-
-// Device detection
-const iOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 /**
  * Update notification button UI
@@ -35,8 +33,8 @@ function updateNotifyBtn() {
  */
 export function toggleNotifications() {
     // iOS Safari doesn't support Notification API
-    if (!("Notification" in window) || iOSDevice) {
-        window.showToast?.(iOSDevice ? "iOS暂不支持通知功能" : "浏览器不支持通知", "error");
+    if (!("Notification" in window) || DeviceDetector.isiOS()) {
+        window.showToast?.(DeviceDetector.isiOS() ? "iOS暂不支持通知功能" : "浏览器不支持通知", "error");
         return;
     }
 
@@ -54,7 +52,7 @@ export function toggleNotifications() {
                 updateNotifyBtn();
 
                 // Skip audio on iOS (strict audio restrictions)
-                if (!iOSDevice && window.playNotificationSound) {
+                if (!DeviceDetector.isiOS() && window.playNotificationSound) {
                     window.playNotificationSound();
                 }
 
@@ -74,7 +72,7 @@ export function toggleNotifications() {
  * Request notification permission (without toggling)
  */
 export function requestNotificationPermission() {
-    if (!("Notification" in window) || iOSDevice) {
+    if (!("Notification" in window) || DeviceDetector.isiOS()) {
         return Promise.resolve('denied');
     }
 
@@ -88,8 +86,8 @@ export function requestNotificationPermission() {
  * @returns {boolean} Whether to send notification
  */
 export function checkNotifications(room, data) {
-    const enabled = isNotificationsEnabled();
-    if (!enabled || !data || !data.isLive) {
+    // Use module-level variable instead of querying again
+    if (!notificationsEnabled || !data || !data.isLive) {
         return false;
     }
 
@@ -108,7 +106,7 @@ export function checkNotifications(room, data) {
     if (shouldNotify) {
         // Play notification sound ONLY for favorite streamers
         // 只有收藏的主播上线时才播放音效
-        if (room.isFav && window.playNotificationSound && !iOSDevice) {
+        if (room.isFav && window.playNotificationSound && !DeviceDetector.isiOS()) {
             window.playNotificationSound();
         }
 
@@ -137,10 +135,6 @@ export function initNotifications() {
 
     return {
         enabled: notificationsEnabled,
-        supported: "Notification" in window && !iOSDevice
+        supported: "Notification" in window && !DeviceDetector.isiOS()
     };
 }
-
-// Make globally accessible
-window.toggleNotifications = toggleNotifications;
-window.updateNotifyBtn = updateNotifyBtn;

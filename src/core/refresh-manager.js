@@ -20,6 +20,16 @@ import { fetchRoomStatus } from './status-fetcher.js';
 import { getState, getRooms, getRoomDataCache, updateRefreshStatus, updateRefreshStats, updateLastRefreshTime } from './state.js';
 import { getDOMCache } from '../utils/dom-cache.js';
 
+// ====================================================================
+// Constants
+// ====================================================================
+
+/**
+ * Number of completed tasks before triggering a render update
+ * Prevents excessive re-rendering during bulk refresh operations
+ */
+const RENDER_BATCH_SIZE = 3;
+
 // External dependencies (only callbacks need injection)
 let detectStatusChanges = null;
 
@@ -44,7 +54,7 @@ export function initRefreshManager(deps = {}) {
  * @param {boolean} isInitial - Whether this is initial load (applies jitter)
  * @returns {Promise<void>}
  */
-async function promisePool(items, concurrentLimit, taskFn, notifyBatchSize = 3, isInitial = false) {
+async function promisePool(items, concurrentLimit, taskFn, notifyBatchSize = RENDER_BATCH_SIZE, isInitial = false) {
     const pool = new Set();
     let finishedCount = 0;
     const state = getState();
@@ -154,23 +164,28 @@ export async function refreshAll(sl = false, isAutoRefresh = false) {
         window.showToast('开始刷新...', 'info');
     }
 
-    // 优化：视口检测辅助函数
-    const isInViewport = (element) => {
-        if (!element) return false;
-        const rect = element.getBoundingClientRect();
-        return rect.top < window.innerHeight && rect.bottom > 0;
-    };
+    // 优化：预计算所有房间的视口状态，避免排序中重复查询 DOM
+    // 时间复杂度从 O(n log n) 次 DOM 查询降低到 O(n) 次
+    const viewportStatus = new Map();
+    rooms.forEach(room => {
+        const cardId = `card-${room.platform}-${room.id}`;
+        const card = document.getElementById(cardId);
+        if (card) {
+            const rect = card.getBoundingClientRect();
+            viewportStatus.set(cardId, rect.top < window.innerHeight && rect.bottom > 0);
+        } else {
+            viewportStatus.set(cardId, false);
+        }
+    });
 
     // 优化：多级优先级排序 - 收藏 > 视口内 > 其他
     const sortedRooms = [...rooms].sort((a, b) => {
         // 1. 收藏优先（最高优先级）
         if (a.isFav !== b.isFav) return b.isFav - a.isFav;
 
-        // 2. 视口内优先（第二优先级）
-        const aCard = document.getElementById(`card-${a.platform}-${a.id}`);
-        const bCard = document.getElementById(`card-${b.platform}-${b.id}`);
-        const aInView = isInViewport(aCard);
-        const bInView = isInViewport(bCard);
+        // 2. 视口内优先（第二优先级）- 直接查表，O(1) 操作
+        const aInView = viewportStatus.get(`card-${a.platform}-${a.id}`) || false;
+        const bInView = viewportStatus.get(`card-${b.platform}-${b.id}`) || false;
 
         if (aInView !== bInView) return bInView ? 1 : -1;
 

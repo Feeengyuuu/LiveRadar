@@ -28,6 +28,35 @@ export function formatHeat(num) {
 }
 
 /**
+ * Parse viewer/heat values into a number (handles units like 万/K/M).
+ * @param {*} value - Raw viewer value
+ * @returns {number} Parsed viewer count
+ */
+export function parseHeatValue(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  }
+  if (typeof value !== 'string') return 0;
+
+  const raw = value.trim();
+  if (!raw) return 0;
+
+  const normalized = raw.replace(/,/g, '').toLowerCase();
+  const match = normalized.match(/([\d.]+)\s*([万wkm])?/);
+  if (!match) return 0;
+
+  const num = parseFloat(match[1]);
+  if (!Number.isFinite(num)) return 0;
+
+  const unit = match[2];
+  if (unit === '万' || unit === 'w') return Math.round(num * 10000);
+  if (unit === 'k') return Math.round(num * 1000);
+  if (unit === 'm') return Math.round(num * 1000000);
+
+  return Math.max(0, Math.floor(num));
+}
+
+/**
  * Format duration from milliseconds to HH:MM:SS or MM:SS
  * @param {number} ms - Duration in milliseconds
  * @returns {string} Formatted duration string

@@ -73,17 +73,20 @@ function updateCardPositions(forceUpdate = false) {
 
 /**
  * Count accumulated snow on each card
+ * Optimized: O(n+m) instead of O(n*m) using Map lookup
  */
 function countAccumulatedSnow() {
-    // Reset counts
-    cardPositionsCache.forEach(cp => cp.accumulatedCount = 0);
+    // Build card map for O(1) lookup - O(m)
+    const cardMap = new Map();
+    cardPositionsCache.forEach(cp => {
+        cp.accumulatedCount = 0;
+        cardMap.set(cp.element, cp);
+    });
 
-    // Count snowflakes on each card
+    // Count snowflakes using map lookup - O(n)
     snowflakes.forEach(flake => {
         if (flake.isAccumulated && flake.accumulatedOn) {
-            const cardData = cardPositionsCache.find(
-                cp => cp.element === flake.accumulatedOn
-            );
+            const cardData = cardMap.get(flake.accumulatedOn);
             if (cardData) {
                 cardData.accumulatedCount++;
             }
@@ -455,6 +458,20 @@ export function toggleSnow() {
     }
 
     if (snowEnabled) {
+        // 重新创建 MutationObserver（如果不存在）
+        if (!domObserver) {
+            domObserver = new MutationObserver(() => {
+                updateCardPositions(true);
+            });
+            const mainContent = document.getElementById('main-content');
+            if (mainContent) {
+                domObserver.observe(mainContent, {
+                    childList: true,
+                    subtree: true
+                });
+            }
+        }
+
         if (canvas && ctx) {
             // 确保只启动一个循环
             if (!animationId) {
@@ -463,6 +480,12 @@ export function toggleSnow() {
         }
         window.showToast?.("❄️ 下雪特效已开启");
     } else {
+        // 关闭时清理 MutationObserver，防止内存泄漏
+        if (domObserver) {
+            domObserver.disconnect();
+            domObserver = null;
+        }
+
         if (ctx && canvas) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
