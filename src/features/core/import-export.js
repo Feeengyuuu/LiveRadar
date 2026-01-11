@@ -4,7 +4,7 @@
  */
 
 import { getRooms, getRoomDataCache, updateRooms, updateRoomDataCache } from '../../core/state.js';
-import { getRoomCacheKey } from '../../utils/helpers.js';
+import { getRoomCacheKey, normalizeRoomId } from '../../utils/helpers.js';
 
 /**
  * Export rooms to JSON file
@@ -70,18 +70,38 @@ export function importRooms(event) {
                 throw new Error('无效的文件格式');
             }
 
-            // Validate each room data
-            const validRooms = importData.rooms.filter(room => {
-                return room.id && room.platform &&
-                       ['douyu', 'bilibili', 'twitch', 'kick'].includes(room.platform);
+            // Normalize and validate each room data
+            const normalizedRooms = importData.rooms
+                .map(room => {
+                    const platform = typeof room.platform === 'string' ? room.platform.toLowerCase() : '';
+                    const id = normalizeRoomId(platform, room.id);
+                    return {
+                        id,
+                        platform,
+                        isFav: !!room.isFav
+                    };
+                })
+                .filter(room => room.id && ['douyu', 'bilibili', 'twitch', 'kick'].includes(room.platform));
+
+            const uniqueRooms = [];
+            const seen = new Map();
+            normalizedRooms.forEach(room => {
+                const key = getRoomCacheKey(room.platform, room.id);
+                const existing = seen.get(key);
+                if (existing) {
+                    if (room.isFav && !existing.isFav) existing.isFav = true;
+                    return;
+                }
+                seen.set(key, room);
+                uniqueRooms.push(room);
             });
 
-            if (validRooms.length === 0) {
+            if (uniqueRooms.length === 0) {
                 throw new Error('文件中没有有效的主播数据');
             }
 
             // Show import options dialog
-            showImportDialog(validRooms, importData.version);
+            showImportDialog(uniqueRooms, importData.version);
 
         } catch (error) {
             console.error('[导入] 解析失败:', error);

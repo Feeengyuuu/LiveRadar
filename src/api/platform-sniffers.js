@@ -395,7 +395,7 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
                 res.heatValue = parseHeatValue(cleanV);
             }
             // 直播中使用基础封面（时间戳由统一逻辑控制刷新）
-            res.cover = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${id}-640x360.jpg`;
+            res.cover = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${String(id).toLowerCase()}-640x360.jpg`;
         } else {
             // Offline: 优化：直接使用并行请求的title结果，无需再次请求
             const cachedTitle = prevData?.title || "";

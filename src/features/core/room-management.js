@@ -9,7 +9,7 @@ import { DeviceDetector } from '../../utils/device-detector.js';
 import { PLACEHOLDERS } from '../../config/ui-strings.js';
 import { APP_CONFIG } from '../../config/constants.js';
 import { getRooms, getRoomDataCache, updateRoomDataCache, addRoom as addRoomToState, removeRoom as removeRoomFromState, toggleRoomFavorite } from '../../core/state.js';
-import { getRoomCacheKey } from '../../utils/helpers.js';
+import { getRoomCacheKey, normalizeRoomId } from '../../utils/helpers.js';
 
 // State
 let searchHistory = SafeStorage.getJSON('pro_search_history', []);
@@ -165,7 +165,11 @@ window.addRoom = async function(id, platform) {
     if (!id) return;
 
     const rooms = getRooms();
-    const roomId = id.toString();
+    const roomId = normalizeRoomId(platform, id);
+    if (!roomId) {
+        window.showToast?.('无效ID', 'error');
+        return;
+    }
 
     if (rooms.some(r => r.id === roomId && r.platform === platform)) {
         window.showToast?.('已存在', 'error');

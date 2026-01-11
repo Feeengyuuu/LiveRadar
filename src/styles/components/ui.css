@@ -77,7 +77,32 @@ button, .btn, [class*="-btn"] {
 /* Grid布局已在 layout.css 和 responsive.css 中统一定义 */
 
 #zone-live .zone-header { border-left-color: var(--live); }
-#zone-live .zone-title { color: var(--live); text-shadow: 0 0 12px rgba(16, 185, 129, 0.3); }
+#zone-live .zone-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+#zone-live .zone-title-label { color: #9ca3af; text-shadow: none; }
+#zone-live .zone-title-count {
+    color: var(--live);
+    font-size: 20px;
+    line-height: 1;
+    letter-spacing: 0;
+    text-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+#zone-live .zone-title-unit { color: #d1d5db; text-shadow: none; }
+#zone-live .zone-title-status {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-shadow: none;
+}
 #zone-offline .zone-header { border-left-color: #333; }
 #zone-loop { background: rgba(99, 102, 241, 0.03); border: 2px dashed rgba(99, 102, 241, 0.2); border-radius: 24px; padding: 2.5rem; }
 #zone-loop .zone-header { border-left-color: var(--loop); padding-left: 0; margin-left: 0.5rem; }

@@ -326,6 +326,36 @@ export function getRoomCacheKey(platform, id) {
 }
 
 /**
+ * Normalize room ID for platforms with case-insensitive channel names
+ * Handles full URLs and @ prefixes.
+ *
+ * @param {string} platform - Platform name (twitch/kick)
+ * @param {string|number} rawId - Raw room ID or URL
+ * @returns {string} Normalized room ID
+ */
+export function normalizeRoomId(platform, rawId) {
+  if (!rawId) return '';
+  let id = rawId.toString().trim();
+  if (!id) return '';
+
+  if (platform === 'twitch') {
+    id = id.replace(/^@/, '');
+    id = id.replace(/^.*twitch\.tv\/?/i, '');
+    id = id.split(/[/?#]/)[0];
+    return id.toLowerCase();
+  }
+
+  if (platform === 'kick') {
+    id = id.replace(/^@/, '');
+    id = id.replace(/^.*kick\.com\/?/i, '');
+    id = id.split(/[/?#]/)[0];
+    return id.toLowerCase();
+  }
+
+  return id;
+}
+
+/**
  * Generate DOM element ID for room card
  * Eliminates duplicate string concatenation throughout codebase
  *

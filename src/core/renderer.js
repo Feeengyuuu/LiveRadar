@@ -496,7 +496,8 @@ function setImageSource(config) {
         skeletonElement,
         loadedClass,
         fallbacks = {},
-        hideOnError = false
+        hideOnError = false,
+        forceTransition = false
     } = config;
 
     // Clear image if no new source
@@ -520,19 +521,28 @@ function setImageSource(config) {
     if (loaderElement) loaderElement.classList.remove('hidden');
     imgElement.src = newSrc;
 
+    const applyLoadedState = () => {
+        if (loadedClass) imgElement.classList.add(loadedClass);
+        if (loaderElement) loaderElement.classList.add('hidden');
+        if (skeletonElement) skeletonElement.classList.add('hidden');
+        if (hideOnError) imgElement.classList.remove('hidden');
+
+        // Clear fallback tracking
+        delete imgElement.dataset.triedHD;
+        delete imgElement.dataset.triedStandard;
+    };
+
     // Set up load handlers
     setImageHandlers(
         imgElement,
         // onLoad - Success
         () => {
-            if (loadedClass) imgElement.classList.add(loadedClass);
-            if (loaderElement) loaderElement.classList.add('hidden');
-            if (skeletonElement) skeletonElement.classList.add('hidden');
-            if (hideOnError) imgElement.classList.remove('hidden');
-
-            // Clear fallback tracking
-            delete imgElement.dataset.triedHD;
-            delete imgElement.dataset.triedStandard;
+            if (forceTransition) {
+                // Ensure a paint happens before restoring opacity for cached images.
+                requestAnimationFrame(() => requestAnimationFrame(applyLoadedState));
+                return;
+            }
+            applyLoadedState();
         },
         // onError - Try fallbacks or show skeleton
         (e) => {
@@ -712,6 +722,8 @@ export function updateCard(card, roomInfo, data, cardState) {
             break;
     }
 
+    const forceTwitchThumbTransition = cardState === 'live' && roomInfo.platform === 'twitch';
+
     // Update thumbnail and avatar using unified image loading function
     setImageSource({
         imgElement: thumb,
@@ -721,7 +733,8 @@ export function updateCard(card, roomInfo, data, cardState) {
         fallbacks: {
             hd: data._coverFallbackHD,
             standard: data._coverFallback
-        }
+        },
+        forceTransition: forceTwitchThumbTransition
     });
 
     const avatarSkeleton = avt.nextElementSibling;

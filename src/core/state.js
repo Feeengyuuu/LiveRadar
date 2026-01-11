@@ -24,7 +24,7 @@
 
 import { SafeStorage } from '../utils/safe-storage.js';
 import { APP_CONFIG } from '../config/constants.js';
-import { debounce } from '../utils/helpers.js';
+import { debounce, getRoomCacheKey, normalizeRoomId } from '../utils/helpers.js';
 
 // ============================================================
 // DEBOUNCED STORAGE - Performance Optimization
@@ -557,6 +557,39 @@ export function getRefreshStats() {
 export function initState() {
     // State is already initialized on module load
     console.log('[State] State initialized');
+
+    if (!Array.isArray(state.rooms) || state.rooms.length === 0) return;
+
+    const normalizedRooms = [];
+    const seen = new Map();
+    let changed = false;
+
+    state.rooms.forEach(room => {
+        const normalizedId = normalizeRoomId(room.platform, room.id);
+        const nextId = normalizedId || room.id;
+        const key = getRoomCacheKey(room.platform, nextId);
+        const existing = seen.get(key);
+        if (existing) {
+            if (room.isFav && !existing.isFav) {
+                existing.isFav = true;
+                changed = true;
+            }
+            return;
+        }
+
+        if (nextId !== room.id) changed = true;
+        const nextRoom = { ...room, id: nextId };
+        seen.set(key, nextRoom);
+        normalizedRooms.push(nextRoom);
+    });
+
+    if (normalizedRooms.length !== state.rooms.length) changed = true;
+
+    if (changed) {
+        updateRooms(normalizedRooms, true);
+        updateRoomDataCache({}, true);
+        console.log('[State] Normalized room IDs for international platforms');
+    }
 }
 
 /**
