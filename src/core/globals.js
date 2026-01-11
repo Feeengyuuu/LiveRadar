@@ -43,7 +43,7 @@ export function exposeGlobals() {
  * @param {Object} core - Core dependencies
  */
 export function exposeCoreDependencies(core) {
-    const { rooms, roomDataCache, previousLiveStatus, renderAll, fetchStatus, notificationsEnabled } = core;
+    const { rooms, roomDataCache, previousLiveStatus, renderAll, fetchStatus, refreshAll, notificationsEnabled } = core;
 
     // Expose state references
     window.rooms = rooms;
@@ -53,6 +53,7 @@ export function exposeCoreDependencies(core) {
     // Expose core functions
     window.renderAll = renderAll;
     window.fetchStatus = fetchStatus;
+    window.refreshAll = refreshAll;
 
     // Expose flags
     window.notificationsEnabled = notificationsEnabled;

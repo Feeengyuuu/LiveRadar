@@ -22,7 +22,7 @@ import { initDOMCache } from '../utils/dom-cache.js';
 import { initState, getState, getRooms, getRoomDataCache, flushPendingStorageWrites } from './state.js';
 import { initSniffers } from '../api/platform-sniffers.js';
 import { initStatusFetcher } from './status-fetcher.js';
-import { initRefreshManager } from './refresh-manager.js';
+import { initRefreshManager, refreshAll } from './refresh-manager.js';
 import { initRenderer, renderAll } from './renderer.js';
 import { init, initAppDependencies } from './init.js';
 import { fetchStatus } from './status-fetcher.js';
@@ -77,6 +77,7 @@ export async function initializeApp(loaderStartTime) {
             previousLiveStatus: state.previousLiveStatus,
             renderAll,
             fetchStatus,
+            refreshAll,
             notificationsEnabled: state.notificationsEnabled
         });
 
