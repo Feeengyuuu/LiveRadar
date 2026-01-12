@@ -17,7 +17,7 @@
 import { APP_CONFIG } from '../config/constants.js';
 import { ResourceManager } from '../utils/resource-manager.js';
 import { fetchRoomStatus } from './status-fetcher.js';
-import { getState, getRooms, getRoomDataCache, updateRefreshStatus, updateRefreshStats, updateLastRefreshTime } from './state.js';
+import { getState, getRooms, getRoomDataCache, updateRefreshStatus, updateRefreshStats } from './state.js';
 import { getDOMCache } from '../utils/dom-cache.js';
 import { viewportTracker } from '../utils/viewport-tracker.js';
 import { getCardId } from '../utils/helpers.js';
@@ -102,6 +102,7 @@ async function promisePool(items, concurrentLimit, taskFn, notifyBatchSize = REN
 /**
  * Update refresh progress display
  */
+let hideStatsTimer = null;
 function updateRefreshStatsDisplay() {
     const cache = getDOMCache();
     const el = cache.refreshStats;
@@ -109,14 +110,25 @@ function updateRefreshStatsDisplay() {
 
     const state = getState();
     if (state.isRefreshing) {
+        if (hideStatsTimer) {
+            ResourceManager.clearTimer(hideStatsTimer);
+            hideStatsTimer = null;
+        }
         const elapsed = ((Date.now() - state.refreshStats.startTime) / 1000).toFixed(1);
         el.textContent = `${state.refreshStats.completed}/${state.refreshStats.total} (${elapsed}s)`;
         el.classList.remove('hidden');
         el.classList.add('active');
     } else {
         el.classList.remove('active');
-        const timerId = setTimeout(() => el.classList.add('hidden'), APP_CONFIG.UI.STATS_HIDE_DELAY);
-        ResourceManager.addTimer(timerId);
+        if (hideStatsTimer) {
+            ResourceManager.clearTimer(hideStatsTimer);
+        }
+        hideStatsTimer = ResourceManager.addTimer(
+            setTimeout(() => {
+                el.classList.add('hidden');
+                hideStatsTimer = null;
+            }, APP_CONFIG.UI.STATS_HIDE_DELAY)
+        );
     }
 }
 
@@ -159,12 +171,7 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
     const roomsToRefresh = Array.isArray(options.rooms) ? options.rooms : rooms;
 
     // Debounce: Prevent duplicate refresh
-    const now = Date.now();
     if (!sl && state.isRefreshing) {
-        if (window.showToast) window.showToast("目前正在刷新", "info");
-        return;
-    }
-    if (!sl && !isAutoRefresh && state.lastRefreshTime && now - state.lastRefreshTime < APP_CONFIG.NETWORK.REFRESH_COOLDOWN) {
         if (window.showToast) window.showToast("目前正在刷新", "info");
         return;
     }
@@ -179,7 +186,6 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
         }
     }
 
-    updateLastRefreshTime(now);
     updateRefreshStatus(true);
 
     const cache = getDOMCache();
@@ -264,7 +270,6 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
     } finally {
         // Cleanup work - execute regardless of success or failure
         updateRefreshStatus(false);
-        updateLastRefreshTime(0);
         updateRefreshStatsDisplay();
 
         if (cache.globalRefreshBtn) cache.globalRefreshBtn.classList.remove('animate-spin-reverse');

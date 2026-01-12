@@ -457,6 +457,10 @@ function getSmartImageUrl(baseUrl, platform, isLive) {
         return baseUrl;
     }
 
+    if (/([?&])t=\d+/.test(baseUrl)) {
+        return baseUrl;
+    }
+
     const isInternational = platform === 'twitch' || platform === 'kick';
 
     // 🔥 Smart caching buckets

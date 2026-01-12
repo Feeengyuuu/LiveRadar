@@ -13,6 +13,7 @@ let statusChangeQueue = []; // Status change message queue
 let currentTickerIndex = 0; // Current displayed message index
 let tickerTimer = null; // Scroll timer
 let currentTickerItem = null; // Reusable ticker item element (performance optimization)
+let hideTimer = null; // Hide delay timer
 
 function getTickerEl() {
     return getElement('status-ticker');
@@ -82,6 +83,10 @@ export function startStatusTicker() {
     if (tickerTimer) {
         clearInterval(tickerTimer);
     }
+    if (hideTimer) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
+    }
 
     const ticker = getTickerEl();
     if (!ticker || statusChangeQueue.length === 0) return;
@@ -94,8 +99,9 @@ export function startStatusTicker() {
 
     // If only one message, hide after 2 seconds
     if (statusChangeQueue.length === 1) {
-        setTimeout(() => {
+        hideTimer = setTimeout(() => {
             ticker.style.display = 'none';
+            hideTimer = null;
         }, 2000);
         return;
     }
@@ -108,8 +114,9 @@ export function startStatusTicker() {
         if (currentTickerIndex >= statusChangeQueue.length) {
             clearInterval(tickerTimer);
             tickerTimer = null;
-            setTimeout(() => {
+            hideTimer = setTimeout(() => {
                 ticker.style.display = 'none';
+                hideTimer = null;
             }, 2000);
             return;
         }
@@ -125,6 +132,10 @@ export function stopStatusTicker() {
     if (tickerTimer) {
         clearInterval(tickerTimer);
         tickerTimer = null;
+    }
+    if (hideTimer) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
     }
 
     const ticker = getTickerEl();
@@ -213,6 +224,7 @@ export function initStatusTicker() {
     statusChangeQueue = [];
     currentTickerIndex = 0;
     tickerTimer = null;
+    hideTimer = null;
 
     console.log('[Status Ticker] Initialized');
 }
@@ -229,6 +241,10 @@ export function clearTickerState() {
     if (tickerTimer) {
         clearInterval(tickerTimer);
         tickerTimer = null;
+    }
+    if (hideTimer) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
     }
 
     const ticker = getTickerEl();

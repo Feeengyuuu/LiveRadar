@@ -98,6 +98,13 @@ const spatialPartition = new SpatialPartition(150); // Spatial index for O(1) qu
 let lastPositionUpdate = 0;
 let animationId = null;
 let domObserver = null;  // MutationObserver for DOM changes
+let cardsCache = [];
+let cardsCacheDirty = true;
+let pendingPositionUpdate = false;
+let hoveredCard = null;
+const accumulatedCountMap = new Map();
+const cardDataMap = new Map();
+const VIEWPORT_MARGIN = 120;
 
 // Performance monitoring
 let frameCount = 0;
@@ -110,6 +117,42 @@ let lastFpsCheck = Date.now();
 /**
  * Update all card positions with throttling
  */
+function getCards() {
+    if (!cardsCacheDirty && cardsCache.length) return cardsCache;
+    cardsCache = Array.from(document.querySelectorAll('.room-card'));
+    cardsCacheDirty = false;
+    return cardsCache;
+}
+
+function schedulePositionUpdate(forceUpdate = false) {
+    if (pendingPositionUpdate) return;
+    pendingPositionUpdate = true;
+    requestAnimationFrame(() => {
+        pendingPositionUpdate = false;
+        updateCardPositions(forceUpdate);
+    });
+}
+
+function incrementAccumulated(card) {
+    const next = (accumulatedCountMap.get(card) || 0) + 1;
+    accumulatedCountMap.set(card, next);
+    const cardData = cardDataMap.get(card);
+    if (cardData) cardData.accumulatedCount = next;
+}
+
+function decrementAccumulated(card) {
+    const current = accumulatedCountMap.get(card);
+    if (!current) return;
+    const next = current - 1;
+    if (next <= 0) {
+        accumulatedCountMap.delete(card);
+    } else {
+        accumulatedCountMap.set(card, next);
+    }
+    const cardData = cardDataMap.get(card);
+    if (cardData) cardData.accumulatedCount = Math.max(0, next);
+}
+
 function updateCardPositions(forceUpdate = false) {
     const now = Date.now();
     if (!forceUpdate && now - lastPositionUpdate < CONFIG.POSITION_UPDATE_INTERVAL) {
@@ -117,48 +160,38 @@ function updateCardPositions(forceUpdate = false) {
     }
     lastPositionUpdate = now;
 
-    const cards = document.querySelectorAll('.room-card');
+    const cards = getCards();
     cardPositionsCache = [];
+    cardDataMap.clear();
 
     // Clear and rebuild spatial partition index
     spatialPartition.clear();
 
     cards.forEach(card => {
         const rect = card.getBoundingClientRect();
+        const top = rect.top;
+        const bottom = rect.bottom;
         // Only cache cards in or near the viewport
-        if (rect.bottom > 0 && rect.top < height) {
+        if (bottom > -VIEWPORT_MARGIN && top < height + VIEWPORT_MARGIN) {
             const cardData = {
                 element: card,
                 rect: rect,
-                isHovered: card.matches(':hover'),
-                accumulatedCount: 0
+                top,
+                left: rect.left,
+                right: rect.right,
+                isHovered: card === hoveredCard,
+                accumulatedCount: accumulatedCountMap.get(card) || 0
             };
             cardPositionsCache.push(cardData);
+            cardDataMap.set(card, cardData);
             // Add to spatial partition for O(1) lookups
             spatialPartition.add(cardData);
         }
     });
-}
 
-/**
- * Count accumulated snow on each card
- * Optimized: O(n+m) instead of O(n*m) using Map lookup
- */
-function countAccumulatedSnow() {
-    // Build card map for O(1) lookup - O(m)
-    const cardMap = new Map();
-    cardPositionsCache.forEach(cp => {
-        cp.accumulatedCount = 0;
-        cardMap.set(cp.element, cp);
-    });
-
-    // Count snowflakes using map lookup - O(n)
-    snowflakes.forEach(flake => {
-        if (flake.isAccumulated && flake.accumulatedOn) {
-            const cardData = cardMap.get(flake.accumulatedOn);
-            if (cardData) {
-                cardData.accumulatedCount++;
-            }
+    accumulatedCountMap.forEach((_, card) => {
+        if (!document.contains(card)) {
+            accumulatedCountMap.delete(card);
         }
     });
 }
@@ -176,6 +209,9 @@ class Snowflake {
      * Reset snowflake to initial state
      */
     reset(initial = false) {
+        if (this.isAccumulated && this.accumulatedOn) {
+            decrementAccumulated(this.accumulatedOn);
+        }
         this.x = Math.random() * width;
         this.y = initial ? Math.random() * height : -10 - Math.random() * 50;
         this.size = Math.random() * (CONFIG.MAX_SIZE - CONFIG.MIN_SIZE) + CONFIG.MIN_SIZE;
@@ -265,7 +301,7 @@ class Snowflake {
             if (cardData.accumulatedCount >= CONFIG.MAX_ACCUMULATED) continue;
 
             // Check collision
-            if (this.checkCollision(cardData.rect)) {
+            if (this.checkCollision(cardData)) {
                 this.accumulateOn(cardData.element, cardData.rect);
                 return;
             }
@@ -280,15 +316,15 @@ class Snowflake {
     /**
      * Check collision with card top
      */
-    checkCollision(rect) {
-        const collisionTop = rect.top - CONFIG.COLLISION_OFFSET;
-        const collisionBottom = rect.top + 15;
+    checkCollision(cardData) {
+        const collisionTop = cardData.top - CONFIG.COLLISION_OFFSET;
+        const collisionBottom = cardData.top + 15;
 
         return (
             this.y + this.size >= collisionTop &&
             this.y <= collisionBottom &&
-            this.x >= rect.left &&
-            this.x <= rect.right
+            this.x >= cardData.left &&
+            this.x <= cardData.right
         );
     }
 
@@ -296,6 +332,7 @@ class Snowflake {
      * Accumulate on card
      */
     accumulateOn(card, rect) {
+        incrementAccumulated(card);
         this.isAccumulated = true;
         this.accumulatedOn = card;
 
@@ -313,6 +350,9 @@ class Snowflake {
      * Start falling from card (triggered by hover)
      */
     startFalling() {
+        if (this.isAccumulated && this.accumulatedOn) {
+            decrementAccumulated(this.accumulatedOn);
+        }
         this.isAccumulated = false;
         this.accumulatedOn = null;
 
@@ -412,9 +452,6 @@ function loop() {
     // Update card positions (throttled)
     updateCardPositions();
 
-    // Count accumulated snow
-    countAccumulatedSnow();
-
     // Update and draw all snowflakes
     snowflakes.forEach(flake => {
         flake.update();
@@ -452,7 +489,7 @@ export function initSnow() {
     ResourceManager.addEventListener(window, 'resize', resize);
 
     // Scroll handler: force update card positions
-    const scrollHandler = () => updateCardPositions(true);
+    const scrollHandler = () => schedulePositionUpdate(true);
     ResourceManager.addEventListener(window, 'scroll', scrollHandler, { passive: true });
 
     // Create snowflakes
@@ -466,7 +503,8 @@ export function initSnow() {
 
     // Watch for DOM changes (new/removed cards)
     domObserver = new MutationObserver(() => {
-        updateCardPositions(true);
+        cardsCacheDirty = true;
+        schedulePositionUpdate(true);
     });
 
     const mainContent = document.getElementById('main-content');
@@ -476,6 +514,31 @@ export function initSnow() {
             subtree: true
         });
     }
+
+    const handleHoverIn = (event) => {
+        const card = event.target.closest('.room-card');
+        if (card) hoveredCard = card;
+    };
+    const handleHoverOut = (event) => {
+        const card = event.target.closest('.room-card');
+        if (!card) return;
+        const related = event.relatedTarget;
+        if (related && card.contains(related)) return;
+        if (hoveredCard === card) hoveredCard = null;
+    };
+
+    ResourceManager.addEventListener(document, 'mouseover', handleHoverIn, true);
+    ResourceManager.addEventListener(document, 'mouseout', handleHoverOut, true);
+    ResourceManager.addEventListener(document, 'visibilitychange', () => {
+        if (document.hidden) {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+        } else if (snowEnabled && !animationId) {
+            loop();
+        }
+    });
 
     // Start animation if enabled
     if (snowEnabled) {

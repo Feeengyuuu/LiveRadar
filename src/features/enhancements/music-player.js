@@ -51,7 +51,7 @@ let isPlaying = false;
 let isDraggingProgress = false;
 let isDraggingVolume = false;
 let isMinimized = SafeStorage.getItem(CONFIG.SAVE_MINIMIZED_KEY, 'false') === 'true';
-let currentTrackIndex = parseInt(SafeStorage.getItem(CONFIG.SAVE_CURRENT_TRACK_KEY, '0'));
+let currentTrackIndex = parseInt(SafeStorage.getItem(CONFIG.SAVE_CURRENT_TRACK_KEY, '0'), 10);
 let hasEverPlayed = false; // 标记是否曾经播放过，用于控制封面显示
 let isAnimating = false;
 
@@ -126,7 +126,7 @@ export function initMusicPlayer() {
     }, 500);
 
     // 确保currentTrackIndex有效
-    if (currentTrackIndex >= PLAYLIST.length) {
+    if (!Number.isFinite(currentTrackIndex) || currentTrackIndex < 0 || currentTrackIndex >= PLAYLIST.length) {
         currentTrackIndex = 0;
     }
 
@@ -255,7 +255,7 @@ function bindEvents() {
     // 触摸事件支持
     elements.progressBar.addEventListener('touchstart', eventHandlers.progressBarTouchStart);
     elements.volumeSlider.addEventListener('touchstart', eventHandlers.volumeSliderTouchStart);
-    document.addEventListener('touchmove', handleTouchMove);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleMouseUp);
 
     // 最小化/展开

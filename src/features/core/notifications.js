@@ -6,6 +6,7 @@
 import { isNotificationsEnabled, updateNotificationsEnabled } from '../../core/state.js';
 import { getElement } from '../../utils/dom-cache.js';
 import { DeviceDetector } from '../../utils/device-detector.js';
+import { playNotificationSound } from '../audio/notification-audio.js';
 
 /**
  * Update notification button UI
@@ -45,8 +46,8 @@ export function toggleNotifications() {
                 updateNotifyBtn();
 
                 // Skip audio on iOS (strict audio restrictions)
-                if (!DeviceDetector.isiOS() && window.playNotificationSound) {
-                    window.playNotificationSound();
+                if (!DeviceDetector.isiOS()) {
+                    playNotificationSound();
                 }
 
                 window.showToast?.("推送通知已开启");
@@ -99,8 +100,8 @@ export function checkNotifications(room, data) {
     if (shouldNotify) {
         // Play notification sound ONLY for favorite streamers
         // 只有收藏的主播上线时才播放音效
-        if (room.isFav && window.playNotificationSound && !DeviceDetector.isiOS()) {
-            window.playNotificationSound();
+        if (room.isFav && !DeviceDetector.isiOS()) {
+            playNotificationSound();
         }
 
         // Send notification
