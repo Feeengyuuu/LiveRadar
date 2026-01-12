@@ -50,6 +50,60 @@ const CONFIG = {
 };
 
 // ====================================================================
+// Simple Data Obfuscation (for sensitive data)
+// ====================================================================
+
+/**
+ * Keys that should be obfuscated in storage
+ */
+const OBFUSCATED_KEYS = [
+    'pro_did',           // Device ID
+    'pro_proxy_stats'    // Proxy usage stats
+];
+
+/**
+ * Simple obfuscation using Base64 + character reversal
+ * NOTE: This is NOT encryption, just basic obfuscation to prevent casual inspection
+ * @param {string} data - Data to obfuscate
+ * @returns {string} Obfuscated data
+ */
+function obfuscate(data) {
+    try {
+        // Base64 encode + reverse string
+        const encoded = btoa(encodeURIComponent(data));
+        return encoded.split('').reverse().join('');
+    } catch (e) {
+        console.warn('[SafeStorage] Obfuscation failed, storing plain text');
+        return data;
+    }
+}
+
+/**
+ * Deobfuscate data
+ * @param {string} data - Obfuscated data
+ * @returns {string} Original data
+ */
+function deobfuscate(data) {
+    try {
+        // Reverse string + Base64 decode
+        const reversed = data.split('').reverse().join('');
+        return decodeURIComponent(atob(reversed));
+    } catch (e) {
+        // If deobfuscation fails, might be plain text from old version
+        return data;
+    }
+}
+
+/**
+ * Check if a key should be obfuscated
+ * @param {string} key - Storage key
+ * @returns {boolean} True if should be obfuscated
+ */
+function shouldObfuscate(key) {
+    return OBFUSCATED_KEYS.includes(key);
+}
+
+// ====================================================================
 // Memory Cache (Fallback)
 // ====================================================================
 
@@ -245,7 +299,16 @@ const SafeStorage = {
                 value = localStorage.getItem(key);
             }
 
-            return value !== null && value !== undefined ? value : defaultValue;
+            if (value === null || value === undefined) {
+                return defaultValue;
+            }
+
+            // Deobfuscate sensitive data
+            if (shouldObfuscate(key)) {
+                value = deobfuscate(value);
+            }
+
+            return value;
         } catch (e) {
             console.warn(`[SafeStorage] Read failed: ${key}`, e.message);
             return defaultValue;
@@ -260,12 +323,19 @@ const SafeStorage = {
      */
     setItem(key, value) {
         try {
+            let finalValue = String(value);
+
+            // Obfuscate sensitive data before storing
+            if (shouldObfuscate(key)) {
+                finalValue = obfuscate(finalValue);
+            }
+
             if (usingMemoryFallback) {
-                memoryCache.set(key, String(value));
+                memoryCache.set(key, finalValue);
                 return true;
             }
 
-            localStorage.setItem(key, value);
+            localStorage.setItem(key, finalValue);
             return true;
         } catch (e) {
             // Check if it's a quota error
@@ -278,13 +348,21 @@ const SafeStorage = {
 
                 // Retry
                 try {
-                    localStorage.setItem(key, value);
+                    let finalValue = String(value);
+                    if (shouldObfuscate(key)) {
+                        finalValue = obfuscate(finalValue);
+                    }
+                    localStorage.setItem(key, finalValue);
                     return true;
                 } catch (retryError) {
                     console.error(`[SafeStorage] Write failed after cleanup: ${key}`);
 
                     // Fallback to memory
-                    memoryCache.set(key, String(value));
+                    let finalValue = String(value);
+                    if (shouldObfuscate(key)) {
+                        finalValue = obfuscate(finalValue);
+                    }
+                    memoryCache.set(key, finalValue);
                     return true;
                 }
             }
