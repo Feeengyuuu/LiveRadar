@@ -21,10 +21,52 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Split vendor code
-          crypto: ['crypto-js'],
+        // 🔥 Advanced code splitting strategy
+        manualChunks(id) {
+          // Vendor dependencies (node_modules)
+          if (id.includes('node_modules')) {
+            // Separate crypto-js as it's only used for Bilibili
+            if (id.includes('crypto-js')) {
+              return 'vendor-crypto';
+            }
+            // All other vendor code in main vendor chunk
+            return 'vendor';
+          }
+
+          // Feature-based splitting (src/features/)
+          if (id.includes('/features/core/')) {
+            return 'features-core'; // Core features: refresh, notifications, etc.
+          }
+          if (id.includes('/features/enhancements/')) {
+            return 'features-enhancements'; // Enhancements: music, snow, region
+          }
+
+          // API modules (can be lazy loaded)
+          if (id.includes('/api/')) {
+            if (id.includes('/api/bilibili')) return 'api-bilibili';
+            if (id.includes('/api/douyu')) return 'api-douyu';
+            if (id.includes('/api/twitch')) return 'api-twitch';
+            if (id.includes('/api/kick')) return 'api-kick';
+            return 'api-common';
+          }
+
+          // Core renderer (already split into sub-modules)
+          if (id.includes('/core/renderer/')) {
+            return 'renderer';
+          }
+
+          // Utils (shared utilities)
+          if (id.includes('/utils/')) {
+            return 'utils';
+          }
+
+          // Everything else goes into main chunk
         },
+
+        // Optimize chunk file names
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
     chunkSizeWarningLimit: 1000, // Warn if chunk > 1MB
