@@ -1,17 +1,27 @@
 /**
  * ====================================================================
- * Global Functions Exposure Module (Deprecated - Transitioning to Event Delegation)
+ * Global Namespace Module - Organized Global Exposure
  * ====================================================================
  *
- * MIGRATION STATUS:
- * ✅ HTML inline event handlers have been replaced with data-action attributes
- * ✅ Event delegation router (event-router.js) now handles all UI events
- * ⚠️  This module is kept temporarily for backwards compatibility and debugging
+ * This module organizes global functions under a single namespace (window.LR)
+ * to reduce global namespace pollution.
  *
- * Functions exposed here are for:
- * 1. Core module dependencies (renderAll, fetchStatus, etc.)
- * 2. Utility functions called from JS modules (showToast)
- * 3. Debugging/testing purposes
+ * ARCHITECTURE:
+ * ✅ Single global namespace: window.LR (LiveRadar)
+ * ✅ Event delegation via event-router.js (no inline handlers)
+ * ✅ Organized into logical sections (core, utils, state, debug)
+ * ⚠️  Backward compatibility maintained (legacy window.* references)
+ *
+ * USAGE:
+ * - New code should use: LR.utils.showToast(...)
+ * - Legacy code can still use: window.showToast(...)
+ * - Eventually migrate all to use LR namespace
+ *
+ * MIGRATION PATH:
+ * 1. ✅ Phase 1: Organize under LR namespace (current)
+ * 2. ⏳ Phase 2: Update all references to use LR.* (future)
+ * 3. ⏳ Phase 3: Remove backward compatibility shims (future)
+ * 4. ⏳ Phase 4: Replace with proper DI or event bus (future)
  *
  * ==================================================================== */
 
@@ -20,20 +30,60 @@ import { toggleFavorite } from '../features/core/room-management.js';
 import { showToast } from '../utils/helpers.js';
 
 /**
+ * Create namespaced global object
+ * All LiveRadar functions are organized under window.LR
+ */
+function createNamespace() {
+    if (window.LR) {
+        console.warn('[Globals] LR namespace already exists, reusing...');
+        return;
+    }
+
+    window.LR = {
+        // Core application functions
+        core: {},
+
+        // Utility functions
+        utils: {
+            showToast,
+        },
+
+        // Application state (read-only access recommended)
+        state: {},
+
+        // Room management
+        rooms: {
+            toggleFavorite,
+        },
+
+        // Debug and development utilities
+        debug: {},
+
+        // Version info
+        version: '3.1.1',
+        name: 'LiveRadar',
+    };
+
+    console.log('[Globals] ✓ LR namespace created');
+}
+
+/**
  * Expose minimal functions to window object
- * Most UI event handlers are now managed by event-router.js
+ * Creates organized namespace and backward compatibility shims
  */
 export function exposeGlobals() {
-    console.log('[Globals] Exposing minimal global functions...');
+    console.log('[Globals] Initializing global namespace...');
 
-    // === Utilities (still needed by modules) ===
+    // Create LR namespace
+    createNamespace();
+
+    // === Backward Compatibility Shims ===
+    // These allow legacy code to work while we migrate to LR.*
     window.showToast = showToast;
-
-    // === Room management (still needed by renderer) ===
     window.toggleFavorite = toggleFavorite;
 
     console.log('[Globals] ✓ Minimal globals exposed');
-    console.log('[Globals] ℹ️  Most UI events handled by event-router.js');
+    console.log('[Globals] ℹ️  Prefer using LR.* namespace over window.* directly');
 }
 
 /**
@@ -45,18 +95,56 @@ export function exposeGlobals() {
 export function exposeCoreDependencies(core) {
     const { rooms, roomDataCache, previousLiveStatus, renderAll, fetchStatus, refreshAll, notificationsEnabled } = core;
 
-    // Expose state references
+    // Organize under LR namespace
+    window.LR.core = {
+        renderAll,
+        fetchStatus,
+        refreshAll,
+    };
+
+    window.LR.state = {
+        rooms,
+        roomDataCache,
+        previousLiveStatus,
+        notificationsEnabled,
+    };
+
+    // === Backward Compatibility Shims ===
+    // Legacy window.* access (to be removed in future)
     window.rooms = rooms;
     window.roomDataCache = roomDataCache;
     window.previousLiveStatus = previousLiveStatus;
-
-    // Expose core functions
     window.renderAll = renderAll;
     window.fetchStatus = fetchStatus;
     window.refreshAll = refreshAll;
-
-    // Expose flags
     window.notificationsEnabled = notificationsEnabled;
 
-    console.log('[Globals] ✓ Core dependencies exposed');
+    console.log('[Globals] ✓ Core dependencies exposed under LR namespace');
+    console.log('[Globals] ⚠️  Legacy window.* access still available (will be removed in future)');
+}
+
+/**
+ * Get global reference safely
+ * Provides future-proof access to global functions
+ *
+ * @param {string} path - Dot-separated path (e.g., 'core.renderAll')
+ * @returns {*} Function or value at path
+ *
+ * @example
+ * const renderAll = getGlobal('core.renderAll');
+ * renderAll();
+ */
+export function getGlobal(path) {
+    const parts = path.split('.');
+    let current = window.LR;
+
+    for (const part of parts) {
+        if (!current || !(part in current)) {
+            console.warn(`[Globals] Path not found: LR.${path}`);
+            return undefined;
+        }
+        current = current[part];
+    }
+
+    return current;
 }
