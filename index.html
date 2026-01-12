@@ -10,6 +10,24 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="referrer" content="no-referrer" />
+
+    <!-- Content Security Policy -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data: https: blob:;
+               media-src 'self' data: blob:;
+               connect-src 'self' https://www.douyu.com https://live.bilibili.com https://api.bilibili.com https://api.twitch.tv https://gql.twitch.tv https://kick.com;
+               font-src 'self' data:;
+               object-src 'none';
+               base-uri 'self';
+               form-action 'self';
+               frame-ancestors 'none';
+               upgrade-insecure-requests;"
+    />
+
     <title>直播监控室 - LiveRadar</title>
     <!-- Auto-deploy test: Cloudflare Pages -->
 
