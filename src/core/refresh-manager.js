@@ -195,21 +195,22 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
     // O(1) map lookup vs O(n) DOM queries + forced reflow
     const sequential = options.sequential === true;
     const preserveOrder = options.preserveOrder === true || (sequential && options.preserveOrder !== false);
+    const sortByViewport = (a, b) => {
+        const aInView = viewportTracker.isInViewport(getCardId(a.platform, a.id));
+        const bInView = viewportTracker.isInViewport(getCardId(b.platform, b.id));
+
+        if (aInView !== bInView) return bInView ? 1 : -1;
+
+        return 0;
+    };
     const sortedRooms = preserveOrder
         ? [...roomsToRefresh]
-        : [...roomsToRefresh].sort((a, b) => {
-            // 1. 收藏优先（最高优先级）
-            if (a.isFav !== b.isFav) return b.isFav - a.isFav;
-
-            // 2. 视口内优先（第二优先级）- IntersectionObserver查表，O(1) 操作
-            // No getBoundingClientRect, no forced synchronous layout!
-            const aInView = viewportTracker.isInViewport(getCardId(a.platform, a.id));
-            const bInView = viewportTracker.isInViewport(getCardId(b.platform, b.id));
-
-            if (aInView !== bInView) return bInView ? 1 : -1;
-
-            return 0;
-        });
+        : (() => {
+            const favorites = roomsToRefresh.filter(room => room.isFav);
+            const nonFavorites = roomsToRefresh.filter(room => !room.isFav);
+            nonFavorites.sort(sortByViewport);
+            return [...favorites, ...nonFavorites];
+        })();
 
     const concurrencyOverride = Number.isFinite(options.concurrency)
         ? Math.max(1, Math.floor(options.concurrency))
