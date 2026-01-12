@@ -372,7 +372,16 @@ export async function getTwitchStatus(id, fetchAvatar, prevData) {
 
         // 解析 uptime 结果
         const uptime = uptimeResult.status === 'fulfilled' ? uptimeResult.value : '';
-        const isOffline = uptime.toLowerCase().includes("offline") || uptime.toLowerCase().includes("not found") || uptime.toLowerCase().includes("error");
+
+        // 修复：只有当 uptime 包含有效的时间格式时才判定为在线
+        // 空字符串、包含错误关键字、或不包含有效时间格式的都应该判定为离线
+        const uptimeLower = uptime.toLowerCase();
+        const hasErrorKeyword = uptimeLower.includes("offline") ||
+                                 uptimeLower.includes("not found") ||
+                                 uptimeLower.includes("error");
+        const hasValidTimeFormat = /\d+\s*(hour|minute|second)/i.test(uptime);
+        const isOffline = !uptime || hasErrorKeyword || !hasValidTimeFormat;
+
         res.isLive = !isOffline;
 
         if (res.isLive) {
