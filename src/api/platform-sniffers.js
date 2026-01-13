@@ -240,7 +240,7 @@ export async function getBilibiliStatus(id, fetchAvatar, prevData) {
     } else if (res.isLive || res.isReplay) {
         console.warn(`[Bilibili] ⚠ get_info failed for room ${id} - using cached data`);
     }
-    if ((res.isLive || res.isReplay) && !res.title) res.title = prevData?.title || "信号波动";
+    if ((res.isLive || res.isReplay) && !res.title) res.title = prevData?.title || "";
 
     const userInfo = userResult.status === 'fulfilled' ? userResult.value : null;
     if (userInfo) {
