@@ -38,3 +38,8 @@ lerna-debug.log*
 # Temp files
 *.tmp
 *.temp
+tmpclaude-*-cwd/
+nul
+
+# Backup files
+*.backup
