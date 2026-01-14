@@ -231,7 +231,8 @@ export const state = {
     snowEnabled: SafeStorage.getItem('pro_snow_enabled', 'true') === 'true',
 
     // Status change notifications
-    previousLiveStatus: {}, // Stores previous online status
+    // 🔥 优化：previousLiveStatus 现在从 localStorage 恢复（避免页面刷新后误报）
+    previousLiveStatus: SafeStorage.getJSON('pro_previous_live_status', {}), // Stores previous online status
     statusChangeQueue: [], // Status change message queue
     currentTickerIndex: 0, // Current message index
     tickerTimer: null // Scroll timer
@@ -400,6 +401,8 @@ export function updateLastRefreshTime(timestamp) {
  */
 export function updatePreviousLiveStatus(newStatus) {
     state.previousLiveStatus = newStatus;
+    // 🔥 优化：持久化 previousLiveStatus，避免页面刷新后误报状态变化
+    debouncedStorageWrite('pro_previous_live_status', newStatus, false);
 }
 
 /**

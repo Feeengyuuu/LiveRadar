@@ -212,7 +212,11 @@ function renderAllImmediate() {
             if (APP_CONFIG.INCREMENTAL.ENABLED) {
                 // Incremental mode: Update if data changed OR favorite status changed OR live thumbnail needs refresh
                 const isLiveThumbnail = cardState === 'live' && (roomInfo.platform === 'twitch' || roomInfo.platform === 'kick');
-                const shouldUpdate = data._hasChanges !== false || favStatusChanged || isLiveThumbnail;
+                // 🔥 BUG FIX: 添加 _stale 检查，确保陈旧数据/错误恢复时强制更新
+                const shouldUpdate = data._hasChanges !== false
+                    || data._stale === true
+                    || favStatusChanged
+                    || isLiveThumbnail;
 
                 if (shouldUpdate) {
                     // Has changes, favorite status changed, or live thumbnail needs refresh

@@ -31,13 +31,23 @@ export const DataDiffer = {
         const changes = [];
         const fields = APP_CONFIG.INCREMENTAL.COMPARE_FIELDS;
 
-        for (const field of fields) {
+        // 🔥 优化：优先检查关键状态字段（isLive, isReplay）
+        // 这些字段的变化最重要，应该优先检测
+        const criticalFields = ['isLive', 'isReplay', 'isError', 'loading'];
+        const normalFields = fields.filter(f => !criticalFields.includes(f));
+        const sortedFields = [...criticalFields.filter(f => fields.includes(f)), ...normalFields];
+
+        for (const field of sortedFields) {
             const oldValue = oldData[field];
             const newValue = newData[field];
 
             // Deep comparison (handles different types)
             if (!this.isEqual(oldValue, newValue)) {
                 changes.push(field);
+                // 关键字段变化时立即标记为已变更（性能优化）
+                if (criticalFields.includes(field)) {
+                    // 继续检测其他字段以收集完整变更记录
+                }
             }
         }
 

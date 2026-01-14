@@ -3,7 +3,7 @@
  * Displays live status change announcements (streamer went online/offline)
  */
 
-import { getState } from '../../core/state.js';
+import { getState, updatePreviousLiveStatus } from '../../core/state.js';
 import { getElement } from '../../utils/dom-cache.js';
 import { getRoomCacheKey } from '../../utils/helpers.js';
 
@@ -40,7 +40,8 @@ export function detectStatusChanges(rooms, roomDataCache) {
         const key = getRoomCacheKey(room.platform, room.id);
         const currentData = roomDataCache[key];
 
-        if (!currentData || currentData.loading || currentData.isError) return;
+        // 🔥 优化：忽略加载中、错误和陈旧数据（避免误报）
+        if (!currentData || currentData.loading || currentData.isError || currentData._stale) return;
 
         const wasLive = statusSnapshot[key] === true;
         const isLive = currentData.isLive === true;
@@ -66,6 +67,9 @@ export function detectStatusChanges(rooms, roomDataCache) {
         // Update status snapshot
         statusSnapshot[key] = isLive;
     });
+
+    // 🔥 优化：持久化状态快照，避免页面刷新后误报
+    updatePreviousLiveStatus(statusSnapshot);
 
     // If there are changes, add to queue and start scrolling
     if (changes.length > 0) {

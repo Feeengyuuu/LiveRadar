@@ -198,8 +198,16 @@ export async function fetchRoomStatus(room, jitter = 0) {
 
         // Incremental update: Compare old and new data, detect changes
         const diffResult = DataDiffer.compare(prevData, updateData);
-        updateData._hasChanges = diffResult.changed;
-        updateData._changes = diffResult.changes;
+
+        // 🔥 优化：检测从错误/陈旧状态恢复的情况，强制标记为已变更
+        const wasStaleOrError = prevData?._stale === true || prevData?.isError === true;
+        const isNowValid = !updateData.isError && !updateData._stale;
+        const recoveredFromError = wasStaleOrError && isNowValid;
+
+        updateData._hasChanges = diffResult.changed || recoveredFromError;
+        updateData._changes = recoveredFromError
+            ? [...(diffResult.changes || []), '从错误状态恢复']
+            : diffResult.changes;
 
         // Debug logging: Record changes
         if (APP_CONFIG.INCREMENTAL.LOG_CHANGES && diffResult.changed) {
@@ -211,8 +219,19 @@ export async function fetchRoomStatus(room, jitter = 0) {
         updateRoomCache(cacheKey, updateData, false);
     } else {
         // Update failed but have previous data
+        // 🔥 BUG FIX: 清除 _hasChanges 标志，确保下次渲染时强制更新
+        // 原因：继承旧数据的 _hasChanges: false 会导致增量更新跳过渲染
         const errorData = prevData
-            ? { ...prevData, isError: false, loading: false, _stale: true }
+            ? (() => {
+                const { _hasChanges, _changes, ...rest } = prevData;
+                return {
+                    ...rest,
+                    isError: false,
+                    loading: false,
+                    _stale: true,
+                    _hasChanges: undefined  // 强制下次更新（双重保险）
+                };
+              })()
             : { loading: false, isError: true };
         updateRoomCache(cacheKey, errorData, false);
     }
