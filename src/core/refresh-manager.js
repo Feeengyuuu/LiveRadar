@@ -189,7 +189,7 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
     updateRefreshStatus(true);
 
     const cache = getDOMCache();
-    if (cache.globalRefreshBtn) cache.globalRefreshBtn.classList.add('animate-spin-reverse');
+    if (cache.globalRefreshBtn) cache.globalRefreshBtn.classList.add('animate-spin');
 
     // Show refresh start toast (silent mode skips toast)
     if (!sl && window.showToast) {
@@ -272,7 +272,7 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
         updateRefreshStatus(false);
         updateRefreshStatsDisplay();
 
-        if (cache.globalRefreshBtn) cache.globalRefreshBtn.classList.remove('animate-spin-reverse');
+        if (cache.globalRefreshBtn) cache.globalRefreshBtn.classList.remove('animate-spin');
 
     }
 }

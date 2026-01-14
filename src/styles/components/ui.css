@@ -256,6 +256,9 @@ button, .btn, [class*="-btn"] {
     color: white !important;
     /* PC端无需设置order，保持默认顺序 */
 }
+#global-refresh-btn svg {
+    transform: scaleX(-1); /* 水平镜像翻转图标 */
+}
 #global-refresh-btn:hover {
     background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
     box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4) !important;
