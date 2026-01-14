@@ -128,6 +128,28 @@ function renderAllImmediate() {
             else if (parentId === 'grid-offline') previousZone = 'offline';
         }
 
+        /**
+         * Card Zone Assignment Strategy (State Machine):
+         *
+         * State transitions:
+         * 1. LOADED (data.loading = false)
+         *    - Error/Failed → offline zone (error state)
+         *    - Live → live zone
+         *    - Replay → loop zone
+         *    - Offline → offline zone
+         *
+         * 2. RETRYING (data._retrying = true)
+         *    - Keep in previous zone to avoid visual jumping
+         *    - Why? User already saw the card, moving it would be disruptive
+         *    - Example: Live card fetches new data → stays in live zone during retry
+         *
+         * 3. LOADING (data.loading = true, initial load)
+         *    - Keep in previous zone if exists (for page refresh scenarios)
+         *    - Why? Cached data might indicate previous state
+         *    - New cards default to offline until data loads
+         *
+         * Design goal: Minimize visual disruption during data fetching
+         */
         if (!data.loading) {
             // Loading complete - assign zone based on current state
             if (data.isError || data._retryFailed) {
@@ -150,7 +172,8 @@ function renderAllImmediate() {
                 hasOffline = true;
             }
         } else if (data._retrying) {
-            // Retrying - keep in previous zone if it exists, otherwise default to offline
+            // Retrying - keep in previous zone to avoid visual jumping
+            // Example: Live stream momentarily fails fetch → card stays in live zone
             cardState = 'retrying';
             if (previousZone) {
                 targetGridKey = previousZone;
@@ -159,12 +182,13 @@ function renderAllImmediate() {
                 else if (previousZone === 'loop') hasLoop = true;
                 else hasOffline = true;
             } else {
-                // New card, no previous zone - default to offline
+                // New card retrying (rare case) - default to offline
                 targetGridKey = 'offline';
                 hasOffline = true;
             }
         } else {
-            // Loading - keep in previous zone if it exists, otherwise default to offline
+            // Initial loading - keep in previous zone if it exists
+            // Scenario: User refreshes page, cached data indicates previous state
             if (previousZone) {
                 targetGridKey = previousZone;
                 // Update zone flags based on preserved zone
@@ -172,7 +196,7 @@ function renderAllImmediate() {
                 else if (previousZone === 'loop') hasLoop = true;
                 else hasOffline = true;
             } else {
-                // New card, no previous zone - default to offline
+                // New card, no cached state - default to offline until loaded
                 targetGridKey = 'offline';
                 hasOffline = true;
             }

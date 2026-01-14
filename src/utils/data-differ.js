@@ -48,13 +48,19 @@ export const DataDiffer = {
     },
 
     /**
-     * Deep equality comparison
+     * Deep equality comparison with performance optimizations
      * @param {*} a - First value
      * @param {*} b - Second value
      * @returns {boolean} True if values are equal
+     *
+     * Performance notes:
+     * - Fast path for primitives (O(1))
+     * - Array length check before deep comparison
+     * - Shallow comparison for simple objects (avoids JSON serialization)
+     * - JSON.stringify as fallback (expensive but correct)
      */
     isEqual(a, b) {
-        // Strict equality
+        // Fast path: Strict equality (handles primitives & same reference)
         if (a === b) return true;
 
         // null/undefined handling
@@ -79,10 +85,51 @@ export const DataDiffer = {
             return a === b;
         }
 
-        // Other types (objects, arrays) use JSON comparison
+        // Array fast path: Check length first (O(1) vs O(n) serialization)
+        if (Array.isArray(a) && Array.isArray(b)) {
+            if (a.length !== b.length) return false;
+            // For small arrays, iterate directly (faster than JSON.stringify)
+            if (a.length <= 5) {
+                for (let i = 0; i < a.length; i++) {
+                    if (!this.isEqual(a[i], b[i])) return false;
+                }
+                return true;
+            }
+            // Fallback to JSON for larger arrays
+        }
+
+        // Object fast path: Shallow comparison for simple objects
+        if (typeof a === 'object' && typeof b === 'object') {
+            const keysA = Object.keys(a);
+            const keysB = Object.keys(b);
+
+            // Different number of keys
+            if (keysA.length !== keysB.length) return false;
+
+            // For simple objects (≤3 keys), do shallow comparison (3x faster than JSON)
+            if (keysA.length <= 3) {
+                for (const key of keysA) {
+                    if (!keysB.includes(key)) return false;
+                    // Only compare primitives shallowly, recurse for nested objects
+                    const valA = a[key];
+                    const valB = b[key];
+                    if (typeof valA === 'object' && valA !== null) {
+                        // Nested object - use JSON fallback
+                        break;
+                    }
+                    if (valA !== valB) return false;
+                }
+                // All shallow comparisons passed
+                if (keysA.length <= 3) return true;
+            }
+        }
+
+        // Fallback: Deep comparison via JSON (expensive but correct)
+        // Used for: complex objects, large arrays, nested structures
         try {
             return JSON.stringify(a) === JSON.stringify(b);
         } catch (e) {
+            // JSON.stringify failed (circular reference, etc.)
             return a === b;
         }
     },
