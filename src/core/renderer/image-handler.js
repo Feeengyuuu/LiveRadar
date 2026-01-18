@@ -95,6 +95,12 @@ export function getSmartImageUrl(baseUrl, platform, isLive) {
 // ====================================================================
 
 /**
+ * Track image configs for recovery when page visibility changes
+ * Maps image elements to their configuration for retry
+ */
+const imageConfigs = new WeakMap();
+
+/**
  * Unified image source setter with lazy loading and fallback support
  * Eliminates code duplication between thumbnail and avatar loading
  *
@@ -133,10 +139,22 @@ export function setImageSource(config) {
         return;
     }
 
-    // Only update if URL actually changed to prevent flickering
+    // Only update if URL actually changed AND image is successfully loaded
+    // This prevents unnecessary reloads while ensuring failed loads are retried
     if (imgElement.src === newSrc) {
-        return;
+        // Check if image actually loaded successfully
+        // complete === true means load/error event fired
+        // naturalHeight > 0 means image data is valid
+        if (imgElement.complete && imgElement.naturalHeight > 0) {
+            // Image successfully loaded, skip reload to prevent flickering
+            return;
+        }
+        // Image failed to load or still loading - continue to retry
+        // This fixes the black screen issue when switching tabs during load
     }
+
+    // Store config for potential recovery after visibility change
+    imageConfigs.set(imgElement, config);
 
     // Prepare for loading
     if (loadedClass) imgElement.classList.remove(loadedClass);
@@ -196,4 +214,62 @@ export function setImageSource(config) {
             delete imgElement.dataset.triedStandard;
         }
     );
+}
+
+// ====================================================================
+// Page Visibility Recovery
+// ====================================================================
+
+/**
+ * Recover failed image loads when page becomes visible again
+ * This fixes black screen issues caused by tab switching during image load
+ *
+ * Call this function when the page visibility changes from hidden to visible
+ */
+export function recoverFailedImages() {
+    // Find all thumbnail and avatar images in the document
+    const images = document.querySelectorAll('.card-thumbnail, .u-avatar');
+
+    images.forEach(img => {
+        // Skip images that loaded successfully
+        if (img.complete && img.naturalHeight > 0) {
+            return;
+        }
+
+        // Skip images without a source
+        if (!img.src || img.src === '') {
+            return;
+        }
+
+        // Retrieve stored config if available
+        const config = imageConfigs.get(img);
+        if (config) {
+            // Force reload by temporarily clearing src
+            const originalSrc = img.src;
+            img.src = '';
+            // Use requestAnimationFrame to ensure browser processes the change
+            requestAnimationFrame(() => {
+                // Restore src to trigger reload with existing handlers
+                img.src = originalSrc;
+            });
+        }
+    });
+}
+
+/**
+ * Initialize page visibility monitoring
+ * Automatically recovers failed images when tab becomes visible
+ */
+export function initVisibilityRecovery() {
+    if (typeof document === 'undefined') return;
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            // Page became visible - recover failed images after a short delay
+            // Delay ensures DOM is fully ready
+            setTimeout(() => {
+                recoverFailedImages();
+            }, 100);
+        }
+    });
 }

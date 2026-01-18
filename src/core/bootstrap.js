@@ -26,6 +26,7 @@ import { initRefreshManager, refreshAll } from './refresh-manager.js';
 import { initRenderer, renderAll } from './renderer.js';
 import { init, initAppDependencies } from './init.js';
 import { fetchStatus } from './status-fetcher.js';
+import { initVisibilityRecovery } from './renderer/image-handler.js';
 
 // Feature modules
 import { initSnow } from '../features/enhancements/snow-effect.js';
@@ -122,6 +123,11 @@ export async function initializeApp(loaderStartTime) {
         });
 
         console.log('[Bootstrap] All features initialized');
+
+        // === Step 4.5: Initialize Page Visibility Recovery ===
+        // Fixes black screen issues when switching tabs during image load
+        initVisibilityRecovery();
+        console.log('[Bootstrap] Page visibility recovery initialized');
 
         // === Step 5: Run Main Init ===
         // This handles:
