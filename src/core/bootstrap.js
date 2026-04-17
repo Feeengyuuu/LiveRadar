@@ -147,6 +147,15 @@ export async function initializeApp(loaderStartTime) {
             flushPendingStorageWrites();
         });
 
+        // === Step 7: CSS Animation Pause on Tab Hidden ===
+        // 标签页后台时给 <html> 打 .tab-hidden，CSS 用它暂停所有 infinite 动画。
+        // 浏览器只会节流 rAF / 降帧率，不保证停 CSS 动画；这层兜底让风扇在后台也安静。
+        const syncTabVisibility = () => {
+            document.documentElement.classList.toggle('tab-hidden', document.hidden);
+        };
+        document.addEventListener('visibilitychange', syncTabVisibility);
+        syncTabVisibility();
+
         console.log('[Bootstrap] ✓ Initialization complete');
 
     } catch (error) {

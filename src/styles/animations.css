@@ -14,11 +14,12 @@
 
 /* ===== Breathing Effects ===== */
 
-/* Golden breathing effect for favorite cards */
+/* Golden breathing effect for favorite cards
+ * Uses filter: drop-shadow instead of box-shadow to stay on the compositor
+ * (box-shadow forces paint every frame, which re-runs any backdrop-filter behind it). */
 @keyframes goldenBreath {
-    0% { box-shadow: 0 0 5px rgba(255, 215, 0, 0.2); }
-    50% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.5); }
-    100% { box-shadow: 0 0 5px rgba(255, 215, 0, 0.2); }
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.3)); }
+    50%      { filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.6)); }
 }
 
 /* Pulse effect for loading/status indicators */
@@ -111,4 +112,27 @@
 
 .animate-slide-down {
     animation: slideDown 0.4s ease-out;
+}
+
+/* ===== Global pause when tab is hidden =====
+ * bootstrap.js 同步 document.hidden → html.tab-hidden，
+ * 这里把所有 CSS 动画按下暂停键，避免后台标签页也吃 GPU/CPU 的情况。
+ * animation-play-state 对没有动画的元素无效果，所以 * 选择器安全。
+ */
+html.tab-hidden *,
+html.tab-hidden *::before,
+html.tab-hidden *::after {
+    animation-play-state: paused !important;
+}
+
+/* ===== Performance-lite: kill all backdrop-filter =====
+ * performance-detector.js 在低端机给 <html> 加 .perf-lite。
+ * backdrop-filter 是 GPU 大户，统一在这里砍掉，未来新组件自动受益。
+ * 元素本身如果已有半透明背景，视觉降级几乎无感。
+ */
+html.perf-lite *,
+html.perf-lite *::before,
+html.perf-lite *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }

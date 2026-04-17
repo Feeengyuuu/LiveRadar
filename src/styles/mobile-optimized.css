@@ -463,8 +463,8 @@
     background-image: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.25) 100%);
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 8px 16px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.08);
-    backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.32s cubic-bezier(0.22, 0.61, 0.36, 1), border-color 0.32s ease, background-color 0.32s ease, filter 0.32s ease;
   }
 
@@ -494,8 +494,6 @@
     padding: 2px 5px !important;
     border-radius: 3px;
     font-weight: 700;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
   }
 
   /* 卡片信息区 - 极致紧凑 */

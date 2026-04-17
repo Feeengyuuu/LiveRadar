@@ -52,6 +52,12 @@ export const PerformanceDetector = {
         APP_CONFIG.BATCH.SIZE_SMALL = 3;
         APP_CONFIG.BATCH.SIZE_LARGE = 6;
 
+        // Flag the document so CSS can drop expensive effects (backdrop-filter, glow).
+        // This is the single biggest GPU saver on low-end devices.
+        if (typeof document !== 'undefined' && document.documentElement) {
+            document.documentElement.classList.add('perf-lite');
+        }
+
         console.log('[性能优化] 已启用性能模式，降低资源消耗');
     }
 };

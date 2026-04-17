@@ -66,6 +66,7 @@
 /* 缩小状态下播放时的外层呼吸灯效果 */
 .music-player.minimized.playing {
     animation: minimizedBreath 2s ease-in-out infinite;
+    will-change: filter;
 }
 
 .music-player.minimized:hover {
@@ -309,6 +310,7 @@
 /* 播放状态 - 呼吸光环 */
 .player-cover.playing {
     animation: orangeBreath 2s ease-in-out infinite;
+    will-change: filter;
 }
 
 /* 缩小状态下播放时旋转 */
@@ -316,42 +318,19 @@
     animation: coverRotate 7.5s linear infinite, orangeBreath 2s ease-in-out infinite;
 }
 
-/* 橙色呼吸光环动画 - 更细腻的边框效果 */
+/* 橙色呼吸光环动画
+ * 静态的 inset 高光与深色投影保留在 .player-cover 的 box-shadow 里（paint 一次即可），
+ * 只把"呼吸"的橙光部分放到 filter: drop-shadow，这样每帧只走合成器，不再触发 paint + backdrop-filter 重算。
+ */
 @keyframes orangeBreath {
-    0%, 100% {
-        box-shadow:
-            inset 0 0 0 1px rgba(255, 255, 255, 0.05),
-            0 0 0 1px rgba(255, 255, 255, 0.08),
-            0 0 0 2px rgba(255, 93, 35, 0.4),
-            0 0 10px 1px rgba(255, 93, 35, 0.3),
-            0 4px 16px rgba(0, 0, 0, 0.6);
-    }
-    50% {
-        box-shadow:
-            inset 0 0 0 1px rgba(255, 255, 255, 0.05),
-            0 0 0 1px rgba(255, 255, 255, 0.08),
-            0 0 0 2px rgba(255, 93, 35, 0.8),
-            0 0 16px 2px rgba(255, 93, 35, 0.6),
-            0 4px 20px rgba(0, 0, 0, 0.6);
-    }
+    0%, 100% { filter: drop-shadow(0 0 6px rgba(255, 93, 35, 0.4)); }
+    50%      { filter: drop-shadow(0 0 14px rgba(255, 93, 35, 0.65)); }
 }
 
-/* 缩小状态外层呼吸灯 - 更明显的效果 */
+/* 缩小状态外层呼吸灯——同样走 filter 路线 */
 @keyframes minimizedBreath {
-    0%, 100% {
-        box-shadow:
-            0 0 0 2px rgba(255, 93, 35, 0.3),
-            0 0 12px 2px rgba(255, 93, 35, 0.4),
-            0 0 20px 4px rgba(255, 93, 35, 0.2),
-            0 8px 32px rgba(0, 0, 0, 0.6);
-    }
-    50% {
-        box-shadow:
-            0 0 0 2px rgba(255, 93, 35, 0.6),
-            0 0 16px 3px rgba(255, 93, 35, 0.7),
-            0 0 28px 6px rgba(255, 93, 35, 0.4),
-            0 8px 32px rgba(0, 0, 0, 0.6);
-    }
+    0%, 100% { filter: drop-shadow(0 0 8px rgba(255, 93, 35, 0.35)); }
+    50%      { filter: drop-shadow(0 0 20px rgba(255, 93, 35, 0.6)); }
 }
 
 /* 旋转动画 - 只旋转内层（封面和橙色圆环），Emoji不旋转 */

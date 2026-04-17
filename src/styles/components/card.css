@@ -1,14 +1,27 @@
 /* Animation definitions moved to animations.css */
 
+/* ===== Performance-lite mode =====
+ * 全局 backdrop-filter 降级在 animations.css 里统一处理。
+ * 这里只管卡片特有的：关掉最爱直播卡片的呼吸动画 + drop-shadow。
+ */
+html.perf-lite .room-card.is-favorite.is-live-card {
+    animation: none !important;
+    filter: none !important;
+}
+
 .room-card {
     background-color: rgba(18, 18, 18, 0.68);
     background-image: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.25) 100%);
     border-radius: 16px; overflow: hidden;
     border: 1px solid rgba(255,255,255,0.12); display: flex; flex-direction: column; position: relative;
     box-shadow: 0 10px 20px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -14px 24px rgba(0,0,0,0.35);
-    backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     transition: transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.35s cubic-bezier(0.22, 0.61, 0.36, 1), border-color 0.35s ease, background-color 0.35s ease, filter 0.35s ease;
     cursor: pointer;
+    /* Off-screen cards skip rendering entirely; 320px is the rough natural height */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 320px;
+    contain: layout paint style;
 }
 
 .room-card::before {
@@ -46,12 +59,13 @@
     border-color: rgba(255, 215, 0, 0.6); /* 常驻金边 */
     border-width: 1px;
 }
-/* 最爱且在线：呼吸光环 */
+/* 最爱且在线：呼吸光环（通过 filter: drop-shadow 在合成器上驱动，不会触发 paint） */
 .room-card.is-favorite.is-live-card {
     animation: goldenBreath 3s infinite ease-in-out;
     border-color: rgba(255, 215, 0, 0.9);
     border-width: 2px;
     z-index: 5;
+    will-change: filter;
 }
 /* 最爱且离线/轮播：静态金边（更明显） */
 .room-card.is-favorite.is-offline-card,
@@ -83,7 +97,7 @@
     transform: scale(1.08);
 }
 
-.status-chip { position: absolute; top: 12px; left: 12px; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 900; backdrop-filter: blur(8px); display: flex; align-items: center; gap: 6px; z-index: 20; }
+.status-chip { position: absolute; top: 12px; left: 12px; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 900; display: flex; align-items: center; gap: 6px; z-index: 20; }
 .chip-live { background: rgba(16, 185, 129, 0.95); color: white; }
 .chip-loop { background: rgba(99, 102, 241, 0.95); color: white; }
 .chip-off { background: rgba(0, 0, 0, 0.7); color: #9ca3af; border: 1px solid rgba(255,255,255,0.1); }
@@ -97,7 +111,7 @@
     background: linear-gradient(180deg, rgba(22,22,22,0.88) 0%, rgba(12,12,12,0.72) 100%);
     border-top: 1px solid rgba(255,255,255,0.08);
     position: relative; overflow: hidden;
-    backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     transition: background 0.35s ease;
 }
 .card-info::before {
@@ -136,7 +150,6 @@
     background-color: rgba(38, 38, 38, 0.7); color: #9ca3af; padding: 4px 10px;
     border-radius: 6px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 5px;
     border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(8px) saturate(140%); -webkit-backdrop-filter: blur(8px) saturate(140%);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .viewer-pill.hot { color: #fb923c; background-color: rgba(251, 146, 60, 0.1); border-color: rgba(251, 146, 60, 0.2); }
@@ -172,7 +185,6 @@
     background: rgba(12,12,12,0.55);
     border: 1px solid rgba(255,255,255,0.12);
     color: #9ca3af;
-    backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
     transition: all 0.22s cubic-bezier(0.22, 0.61, 0.36, 1);
 }

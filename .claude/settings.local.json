@@ -45,7 +45,15 @@
       "Bash(git mv:*)",
       "Bash(timeout /t 5)",
       "Bash(do sed -i \"s|from ''\\\\.\\\\./|from ''\\\\.\\\\./\\\\.\\\\./|g\" \"$file\")",
-      "Bash(npm run test:run:*)"
+      "Bash(npm run test:run:*)",
+      "Bash(timeout /t 3)",
+      "mcp__chrome-devtools__new_page",
+      "Bash(ping:*)",
+      "Bash(powershell -Command \"Start-Sleep -Seconds 5\")",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__drag",
+      "Bash(claude mcp *)",
+      "Bash(git *)"
     ]
   },
   "hooks": {
