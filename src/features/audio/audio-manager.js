@@ -6,6 +6,7 @@
 import { SafeStorage } from '../../utils/safe-storage.js';
 import { APP_CONFIG } from '../../config/constants.js';
 import { getNotificationAudio } from './notification-audio.js';
+import { showToast } from '../../utils/helpers.js';
 
 // State
 let keepAliveEnabled = SafeStorage.getItem('pro_keepalive_enabled', 'false') === 'true';
@@ -74,7 +75,7 @@ export function unlockAllAudio(options = {}) {
                 window.audioContextUnlocked = true;
                 console.log('[Audio Manager] Global audio context unlocked');
                 if (unlockToastEnabled) {
-                    window.showToast?.('音效已激活', 'info');
+                    showToast('音效已激活', 'info');
                 }
 
                 // If keep-alive is enabled, start it immediately
@@ -123,10 +124,10 @@ export function toggleKeepAlive() {
 
     if (keepAliveEnabled) {
         startKeepAlive();
-        window.showToast?.('防休眠模式已开启');
+        showToast('防休眠模式已开启');
     } else {
         stopKeepAlive();
-        window.showToast?.('防休眠模式已关闭');
+        showToast('防休眠模式已关闭');
     }
     updateKeepAliveBtn();
 }
@@ -152,7 +153,7 @@ function startKeepAlive() {
     } else {
         console.log('[Audio Manager] Waiting for user interaction to unlock audio');
         if (!window.hasShownAudioUnlockToast) {
-            window.showToast?.('请点击页面任意处以激活防休眠模式', 'info');
+            showToast('请点击页面任意处以激活防休眠模式', 'info');
             window.hasShownAudioUnlockToast = true;
         }
     }

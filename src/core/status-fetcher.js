@@ -20,6 +20,7 @@ import { fetchQuick } from '../api/proxy-manager.js';
 import { DataDiffer } from '../utils/data-differ.js';
 import { getRoomDataCache, updateRoomCache } from './state.js';
 import { formatHeat, getRoomCacheKey } from '../utils/helpers.js';
+import { emit, Events } from './event-bus.js';
 
 // ====================================================================
 // Cover Timestamp Helpers
@@ -48,6 +49,11 @@ function applyTimestampParam(url, timestamp) {
 // External dependencies (only notification check needs injection)
 let checkAndNotify = null;
 
+// In-flight fetch dedup: multiple callers requesting the same cacheKey share a single promise
+const inFlightFetches = new Map();
+// Pending Douyu avatar fallbacks keyed by cacheKey, so cancelPendingFetches can drop them
+const pendingAvatarFetches = new Map();
+
 /**
  * Initialize status fetcher with external dependencies
  * @param {Object} deps - Dependencies object
@@ -58,15 +64,65 @@ export function initStatusFetcher(deps) {
 }
 
 /**
- * Fetch room status for a single room
+ * Drop any pending work for a room (called when rooms are removed).
+ * In-flight fetches already running cannot truly be aborted without wiring an
+ * AbortController all the way through, but we can at least stop stale writes
+ * from landing in the cache — callers should re-check presence before writing.
+ */
+export function cancelPendingFetches(cacheKey) {
+    pendingAvatarFetches.delete(cacheKey);
+}
+
+/**
+ * Douyu sometimes returns no avatar from the main API. Fire a fallback call
+ * to the open API. Only runs when we know we need a profile update.
+ * Tracked in pendingAvatarFetches so stale writes can be filtered out.
+ */
+function ensureDouyuAvatar(room, cacheKey) {
+    const token = Symbol('douyu-avatar');
+    pendingAvatarFetches.set(cacheKey, token);
+
+    fetchQuick(`https://open.douyucdn.cn/api/RoomApi/room/${room.id}`)
+        .then(o => {
+            if (pendingAvatarFetches.get(cacheKey) !== token) return; // room removed or superseded
+            const cache = getRoomDataCache();
+            if (o?.data?.avatar && cache[cacheKey]) {
+                cache[cacheKey].avatar = o.data.avatar;
+                updateRoomCache(cacheKey, cache[cacheKey], true);
+                emit(Events.RENDER_REQUEST);
+            }
+        })
+        .catch(() => { /* fallback is best-effort */ })
+        .finally(() => {
+            if (pendingAvatarFetches.get(cacheKey) === token) {
+                pendingAvatarFetches.delete(cacheKey);
+            }
+        });
+}
+
+/**
+ * Fetch room status for a single room (with in-flight dedup)
  * @param {Object} room - Room object { id, platform, isFav }
  * @param {number} jitter - Random delay in milliseconds (for load distribution)
  * @returns {Promise<void>}
  */
-export async function fetchRoomStatus(room, jitter = 0) {
+export function fetchRoomStatus(room, jitter = 0) {
+    const cacheKey = getRoomCacheKey(room.platform, room.id);
+    const existing = inFlightFetches.get(cacheKey);
+    if (existing) return existing;
+
+    const promise = fetchRoomStatusInner(room, jitter, cacheKey).finally(() => {
+        if (inFlightFetches.get(cacheKey) === promise) {
+            inFlightFetches.delete(cacheKey);
+        }
+    });
+    inFlightFetches.set(cacheKey, promise);
+    return promise;
+}
+
+async function fetchRoomStatusInner(room, jitter, cacheKey) {
     if (jitter > 0) await new Promise(r => setTimeout(r, jitter));
 
-    const cacheKey = getRoomCacheKey(room.platform, room.id);
     const roomDataCache = getRoomDataCache();
     const prevData = roomDataCache[cacheKey];
     const now = Date.now();
@@ -121,17 +177,8 @@ export async function fetchRoomStatus(room, jitter = 0) {
             if (!result.avatar) result.avatar = prevData.avatar;
         }
 
-        // Douyu avatar fallback fetch
         if (room.platform === 'douyu' && !result.avatar && !result.isError && needProfileUpdate) {
-            fetchQuick(`https://open.douyucdn.cn/api/RoomApi/room/${room.id}`)
-                .then(o => {
-                    const cache = getRoomDataCache();
-                    if (o?.data?.avatar && cache[cacheKey]) {
-                        cache[cacheKey].avatar = o.data.avatar;
-                        updateRoomCache(cacheKey, cache[cacheKey], true);
-                        if (window.renderAll) window.renderAll();
-                    }
-                });
+            ensureDouyuAvatar(room, cacheKey);
         }
 
         // Trigger notification check

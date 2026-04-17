@@ -5,6 +5,7 @@
 
 import { SafeStorage } from '../../utils/safe-storage.js';
 import { APP_CONFIG } from '../../config/constants.js';
+import { showToast } from '../../utils/helpers.js';
 
 /**
  * Detect user's region based on IP address
@@ -106,7 +107,7 @@ export function toggleRegionMode() {
     updateRegionBtn();
 
     const regionText = newRegion ? '中国大陆' : '海外地区';
-    window.showToast?.(`地区模式已切换: ${regionText}`);
+    showToast(`地区模式已切换: ${regionText}`);
     console.log(`[地区模式] 手动切换到: ${regionText}`);
 }
 

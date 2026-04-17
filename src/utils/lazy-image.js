@@ -88,18 +88,21 @@ export function initLazyLoading(options = {}) {
     // Check for IntersectionObserver support
     if (!('IntersectionObserver' in window)) {
         log.warn('IntersectionObserver not supported, using fallback');
-        // Fallback: load all images immediately
         document.querySelectorAll('img[data-lazy-src]').forEach(loadImage);
         return;
     }
 
-    // Create observer
+    // Reentry guard: HMR or accidental re-init must not leave an orphan observer.
+    if (observer) {
+        observer.disconnect();
+        observer = null;
+    }
+
     observer = new IntersectionObserver(handleIntersection, {
         rootMargin: config.rootMargin,
         threshold: config.threshold
     });
 
-    // Observe existing lazy images
     observeImages();
 
     log.info('Lazy loading initialized');

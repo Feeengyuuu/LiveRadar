@@ -5,6 +5,8 @@
 
 import { APP_CONFIG } from '../../config/constants.js';
 import { DeviceDetector } from '../../utils/device-detector.js';
+import { isNotificationsEnabled } from '../../core/state.js';
+import { showToast } from '../../utils/helpers.js';
 
 // Notification sound file path
 const NOTIFY_SOUND_PATH = '/yahaha.mp3';
@@ -32,8 +34,7 @@ export function initNotificationAudio() {
  */
 export function playNotificationSound(forcePlay = false, bypassUnlock = false) {
     // Check if notification enabled (bypass if force play)
-    const notificationsEnabled = window.notificationsEnabled || false;
-    if (!notificationsEnabled && !forcePlay) {
+    if (!isNotificationsEnabled() && !forcePlay) {
         return;
     }
 
@@ -59,7 +60,7 @@ export function playNotificationSound(forcePlay = false, bypassUnlock = false) {
 
         // Show hint to user (only once)
         if (!window.hasShownAudioUnlockToast) {
-            window.showToast?.('💡 提示：请点击页面任意处以激活音效', 'info');
+            showToast('💡 提示：请点击页面任意处以激活音效', 'info');
             window.hasShownAudioUnlockToast = true;
         }
         return;

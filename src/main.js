@@ -28,7 +28,7 @@ import './config/signer.js'; // Initialize API signers
 // ============================================================
 // 3. Import Utilities
 // ============================================================
-import { getRandomItem } from './utils/helpers.js';
+import { getRandomItem, showToast } from './utils/helpers.js';
 import { PerformanceDetector } from './utils/performance-detector.js';
 import { LOADING_MESSAGES } from './config/constants.js';
 
@@ -107,10 +107,7 @@ window.addEventListener('unhandledrejection', (event) => {
     console.error('[Unhandled Promise Rejection]', event.reason);
     ErrorHandler.log(event.reason, 'UnhandledPromise');
 
-    // Show user-friendly message
-    if (window.showToast) {
-        window.showToast('操作失败，请重试', 'error');
-    }
+    showToast('操作失败，请重试', 'error');
 
     event.preventDefault();
 });

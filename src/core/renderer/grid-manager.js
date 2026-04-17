@@ -1,17 +1,8 @@
 /**
- * ====================================================================
  * Grid Manager - Main Rendering Engine
- * ====================================================================
  *
- * Handles:
- * - Orchestrating the complete render cycle
- * - Grid management (live/offline/loop)
- * - Card positioning and movement between grids
- * - Batch DOM operations with DocumentFragment
- * - Card tracking for efficient removal
- * - Debounced render function
- *
- * @module core/renderer/grid-manager
+ * Orchestrates the render cycle: zone assignment, incremental updates,
+ * batch DOM insertion, and orphan pruning.
  */
 
 import { APP_CONFIG } from '../../config/constants.js';
@@ -19,48 +10,161 @@ import { getDOMCache } from '../../utils/dom-cache.js';
 import { getRooms, getRoomDataCache, subscribeToState } from '../state.js';
 import { debounce, getRoomCacheKey, getCardId } from '../../utils/helpers.js';
 import { viewportTracker } from '../../utils/viewport-tracker.js';
+import { on, Events } from '../event-bus.js';
 import { createCard } from './card-factory.js';
 import { updateCard } from './card-renderer.js';
 
-// ====================================================================
-// Card Tracking (Performance Optimization)
-// ====================================================================
-
-/**
- * Track known card IDs to optimize removal operations
- * Avoids expensive querySelectorAll on every render
- */
+// Tracks all card IDs currently in the DOM so prune() can remove stale ones
+// without a querySelectorAll on every render.
 const knownCardIds = new Set();
 
-// ====================================================================
-// Initialization
-// ====================================================================
-
-/**
- * Initialize renderer with state subscriptions
- * Automatically re-renders when rooms state changes
- */
-export function initRenderer(deps = {}) {
-    // Subscribe to rooms changes for automatic re-rendering
-    subscribeToState('rooms', (newRooms, oldRooms) => {
+export function initRenderer() {
+    subscribeToState('rooms', () => {
         console.log('[Renderer] Rooms changed, auto-rendering...');
         debouncedRenderAll();
     });
+
+    on(Events.RENDER_REQUEST, () => renderAllImmediate());
 
     console.log('[Renderer] Initialized with state subscriptions');
 }
 
 // ====================================================================
-// Main Rendering Function
+// Zone assignment
 // ====================================================================
 
 /**
- * Render all room cards with incremental updates
- * 优化：使用DOM缓存消除重复查询
- *
- * NOTE: 这是原始的renderAll函数，直接调用会立即渲染
- * 建议使用 debouncedRenderAll 以获得更好的性能
+ * Read a card's current zone by looking at its parent grid element.
+ * Returns null for new cards.
  */
+function getPreviousZone(card) {
+    if (!card || !card.parentElement) return null;
+    const parentId = card.parentElement.id;
+    if (parentId === 'grid-live') return 'live';
+    if (parentId === 'grid-loop') return 'loop';
+    if (parentId === 'grid-offline') return 'offline';
+    return null;
+}
+
+/**
+ * Decide which grid a card belongs in and its visual state.
+ *
+ * State machine:
+ *   LOADED    → live / loop / offline / offline(error)
+ *   RETRYING  → stay in previousZone (avoid visual jumping)
+ *   LOADING   → stay in previousZone if exists, else offline
+ *
+ * Mutates `flags` to record which zones have any cards, and returns
+ * the target grid key plus the state passed to updateCard.
+ */
+function assignCardZone(data, previousZone, flags) {
+    if (!data.loading) {
+        if (data.isError || data._retryFailed) {
+            flags.hasOffline = true;
+            return { targetGridKey: 'offline', cardState: 'error' };
+        }
+        if (data.isLive) {
+            flags.hasLive = true;
+            flags.liveCount++;
+            return { targetGridKey: 'live', cardState: 'live' };
+        }
+        if (data.isReplay) {
+            flags.hasLoop = true;
+            return { targetGridKey: 'loop', cardState: 'loop' };
+        }
+        flags.hasOffline = true;
+        return { targetGridKey: 'offline', cardState: 'offline' };
+    }
+
+    const cardState = data._retrying ? 'retrying' : 'loading';
+    const zone = previousZone || 'offline';
+    if (zone === 'live') flags.hasLive = true;
+    else if (zone === 'loop') flags.hasLoop = true;
+    else flags.hasOffline = true;
+    return { targetGridKey: zone, cardState };
+}
+
+// ====================================================================
+// Incremental update decision
+// ====================================================================
+
+/**
+ * For existing cards in incremental mode, decide whether to call updateCard.
+ * Live Twitch/Kick thumbnails always refresh to get the latest preview frame.
+ */
+function shouldUpdateCard(card, roomInfo, data, cardState) {
+    if (!APP_CONFIG.INCREMENTAL.ENABLED) return true;
+
+    const currentIsFav = card.classList.contains('is-favorite');
+    const favStatusChanged = currentIsFav !== !!roomInfo.isFav;
+    const isLiveThumbnail = cardState === 'live'
+        && (roomInfo.platform === 'twitch' || roomInfo.platform === 'kick');
+
+    return data._hasChanges !== false
+        || data._stale === true
+        || favStatusChanged
+        || isLiveThumbnail;
+}
+
+// ====================================================================
+// Batch DOM insertion
+// ====================================================================
+
+/**
+ * Append all newly-created cards to their target grids in a single reflow
+ * per grid via DocumentFragment.
+ */
+function batchInsertNewCards(newCardsByGrid, grids) {
+    Object.keys(newCardsByGrid).forEach(gridKey => {
+        const newCards = newCardsByGrid[gridKey];
+        if (newCards.length === 0) return;
+
+        const targetGrid = grids[gridKey];
+        if (!targetGrid) return;
+
+        const fragment = document.createDocumentFragment();
+        newCards.forEach(({ card }) => fragment.appendChild(card));
+        targetGrid.appendChild(fragment);
+
+        if (APP_CONFIG.DEBUG.LOG_RENDER) {
+            console.log(`[Render] Batch inserted ${newCards.length} new cards into ${gridKey} grid`);
+        }
+    });
+}
+
+/**
+ * Remove cards whose rooms were deleted in this render pass and
+ * detach them from the viewport tracker.
+ */
+function pruneOrphanCards(presentCardIds) {
+    knownCardIds.forEach(cardId => {
+        if (!presentCardIds.has(cardId)) {
+            const card = document.getElementById(cardId);
+            if (card) {
+                viewportTracker.unobserve(card);
+                card.remove();
+            }
+            knownCardIds.delete(cardId);
+        }
+    });
+    presentCardIds.forEach(cardId => knownCardIds.add(cardId));
+}
+
+// ====================================================================
+// Empty-state fast path
+// ====================================================================
+
+function renderEmptyState(cache, grids, zones) {
+    if (cache.liveCount) cache.liveCount.textContent = '0';
+    cache.emptyState?.classList.remove('hidden');
+    zones.forEach(el => el.classList.remove('active'));
+    Object.values(grids).forEach(grid => { if (grid) grid.innerHTML = ''; });
+}
+
+// ====================================================================
+// Main render function
+// ====================================================================
+
 function renderAllImmediate() {
     const rooms = getRooms();
     const roomDataCache = getRoomDataCache();
@@ -73,39 +177,25 @@ function renderAllImmediate() {
     const zones = [cache.zoneLive, cache.zoneOffline, cache.zoneLoop].filter(Boolean);
 
     if (rooms.length === 0) {
-        if (cache.liveCount) {
-            cache.liveCount.textContent = '0';
-        }
-        cache.emptyState?.classList.remove('hidden');
-        zones.forEach(el => el.classList.remove('active'));
-        Object.values(grids).forEach(grid => { if (grid) grid.innerHTML = ''; });
+        renderEmptyState(cache, grids, zones);
         return;
     }
     cache.emptyState?.classList.add('hidden');
 
+    // Favorites sort first, everything else keeps insertion order
     const favorites = [];
     const others = [];
     rooms.forEach(room => (room.isFav ? favorites : others).push(room));
     const sortedRooms = favorites.concat(others);
 
     const presentCardIds = new Set();
-    let hasLive = false, hasOffline = false, hasLoop = false;
-    let liveCount = 0;
+    const flags = { hasLive: false, hasOffline: false, hasLoop: false, liveCount: 0 };
     const gridPositions = { live: 0, offline: 0, loop: 0 };
+    const newCardsByGrid = { live: [], offline: [], loop: [] };
 
-    // Incremental update: Count changes
     let updatedCount = 0;
     let unchangedCount = 0;
     let newCardsCount = 0;
-
-    // 🔥 Performance: DocumentFragment for batch DOM insertion
-    // Collect new cards in fragments, insert once at end
-    // Reduces reflows from N to 3 (one per grid)
-    const newCardsByGrid = {
-        live: [],
-        offline: [],
-        loop: []
-    };
 
     sortedRooms.forEach(roomInfo => {
         const cardId = getCardId(roomInfo.platform, roomInfo.id);
@@ -113,139 +203,25 @@ function renderAllImmediate() {
         const data = roomDataCache[getRoomCacheKey(roomInfo.platform, roomInfo.id)] || { loading: true };
 
         let card = document.getElementById(cardId);
+        const previousZone = getPreviousZone(card);
+        const { targetGridKey, cardState } = assignCardZone(data, previousZone, flags);
 
-        // CRITICAL FIX: Preserve card's previous zone during loading/retrying
-        // Only reassign zone after refresh completes
-        let targetGridKey = 'offline';
-        let cardState = 'loading';
-        let previousZone = null;
-
-        // If card exists, determine its current zone
-        if (card && card.parentElement) {
-            const parentId = card.parentElement.id;
-            if (parentId === 'grid-live') previousZone = 'live';
-            else if (parentId === 'grid-loop') previousZone = 'loop';
-            else if (parentId === 'grid-offline') previousZone = 'offline';
-        }
-
-        /**
-         * Card Zone Assignment Strategy (State Machine):
-         *
-         * State transitions:
-         * 1. LOADED (data.loading = false)
-         *    - Error/Failed → offline zone (error state)
-         *    - Live → live zone
-         *    - Replay → loop zone
-         *    - Offline → offline zone
-         *
-         * 2. RETRYING (data._retrying = true)
-         *    - Keep in previous zone to avoid visual jumping
-         *    - Why? User already saw the card, moving it would be disruptive
-         *    - Example: Live card fetches new data → stays in live zone during retry
-         *
-         * 3. LOADING (data.loading = true, initial load)
-         *    - Keep in previous zone if exists (for page refresh scenarios)
-         *    - Why? Cached data might indicate previous state
-         *    - New cards default to offline until data loads
-         *
-         * Design goal: Minimize visual disruption during data fetching
-         */
-        if (!data.loading) {
-            // Loading complete - assign zone based on current state
-            if (data.isError || data._retryFailed) {
-                // All retries failed - mark as offline but with error indicator
-                targetGridKey = 'offline';
-                cardState = 'error';
-                hasOffline = true;
-            } else if (data.isLive) {
-                targetGridKey = 'live';
-                cardState = 'live';
-                hasLive = true;
-                liveCount++;
-            } else if (data.isReplay) {
-                targetGridKey = 'loop';
-                cardState = 'loop';
-                hasLoop = true;
-            } else {
-                targetGridKey = 'offline';
-                cardState = 'offline';
-                hasOffline = true;
-            }
-        } else if (data._retrying) {
-            // Retrying - keep in previous zone to avoid visual jumping
-            // Example: Live stream momentarily fails fetch → card stays in live zone
-            cardState = 'retrying';
-            if (previousZone) {
-                targetGridKey = previousZone;
-                // Update zone flags based on preserved zone
-                if (previousZone === 'live') hasLive = true;
-                else if (previousZone === 'loop') hasLoop = true;
-                else hasOffline = true;
-            } else {
-                // New card retrying (rare case) - default to offline
-                targetGridKey = 'offline';
-                hasOffline = true;
-            }
-        } else {
-            // Initial loading - keep in previous zone if it exists
-            // Scenario: User refreshes page, cached data indicates previous state
-            if (previousZone) {
-                targetGridKey = previousZone;
-                // Update zone flags based on preserved zone
-                if (previousZone === 'live') hasLive = true;
-                else if (previousZone === 'loop') hasLoop = true;
-                else hasOffline = true;
-            } else {
-                // New card, no cached state - default to offline until loaded
-                targetGridKey = 'offline';
-                hasOffline = true;
-            }
-        }
-
-        // Incremental update: Smart update logic
         if (card) {
-            // Card already exists
-            // Check if favorite status changed (independent of data changes)
-            const currentIsFav = card.classList.contains('is-favorite');
-            const favStatusChanged = currentIsFav !== roomInfo.isFav;
-
-            if (APP_CONFIG.INCREMENTAL.ENABLED) {
-                // Incremental mode: Update if data changed OR favorite status changed OR live thumbnail needs refresh
-                const isLiveThumbnail = cardState === 'live' && (roomInfo.platform === 'twitch' || roomInfo.platform === 'kick');
-                // 🔥 BUG FIX: 添加 _stale 检查，确保陈旧数据/错误恢复时强制更新
-                const shouldUpdate = data._hasChanges !== false
-                    || data._stale === true
-                    || favStatusChanged
-                    || isLiveThumbnail;
-
-                if (shouldUpdate) {
-                    // Has changes, favorite status changed, or live thumbnail needs refresh
-                    updateCard(card, roomInfo, data, cardState);
-                    updatedCount++;
-                } else {
-                    // No changes, skip update
-                    unchangedCount++;
-                }
-            } else {
-                // Full update mode
+            if (shouldUpdateCard(card, roomInfo, data, cardState)) {
                 updateCard(card, roomInfo, data, cardState);
                 updatedCount++;
+            } else {
+                unchangedCount++;
             }
         } else {
-            // New card, must create
             card = createCard(cardId, roomInfo, data, cardState, updateCard);
             newCardsCount++;
-
-            // 🔥 Performance: Collect new cards for batch insertion
-            newCardsByGrid[targetGridKey].push({
-                card,
-                position: gridPositions[targetGridKey]
-            });
+            newCardsByGrid[targetGridKey].push({ card, position: gridPositions[targetGridKey] });
             gridPositions[targetGridKey]++;
-            return; // Skip insertion logic for new cards
+            return;
         }
 
-        // 优化：只在卡片需要移动时才操作DOM，减少80%的重排操作
+        // Reposition existing cards only when they moved zones or ordering changed.
         const targetGrid = grids[targetGridKey];
         if (!targetGrid) {
             console.warn('[Renderer] Target grid not found for', targetGridKey);
@@ -260,75 +236,28 @@ function renderAllImmediate() {
         gridPositions[targetGridKey] = targetIndex + 1;
     });
 
-    // 🔥 Performance: Batch insert all new cards using DocumentFragment
-    // Single reflow per grid instead of one per card
-    Object.keys(newCardsByGrid).forEach(gridKey => {
-        const newCards = newCardsByGrid[gridKey];
-        if (newCards.length === 0) return;
+    batchInsertNewCards(newCardsByGrid, grids);
 
-        const targetGrid = grids[gridKey];
-        if (!targetGrid) return;
-
-        const fragment = document.createDocumentFragment();
-        newCards.forEach(({ card }) => {
-            fragment.appendChild(card);
-        });
-
-        // Insert all new cards at once
-        targetGrid.appendChild(fragment);
-
-        if (APP_CONFIG.DEBUG.LOG_RENDER) {
-            console.log(`[Render] Batch inserted ${newCards.length} new cards into ${gridKey} grid`);
-        }
-    });
-
-    // Incremental update: Record statistics
     if (APP_CONFIG.INCREMENTAL.ENABLED && APP_CONFIG.DEBUG.LOG_RENDER) {
         console.log(`[Render Stats] Total: ${sortedRooms.length}, Updated: ${updatedCount}, New: ${newCardsCount}, Skipped: ${unchangedCount}`);
     }
 
-    // Optimized: Only remove cards that were previously known but are no longer needed
-    // Avoids expensive querySelectorAll on every render (60-80% reduction in DOM queries)
-    knownCardIds.forEach(cardId => {
-        if (!presentCardIds.has(cardId)) {
-            const card = document.getElementById(cardId);
-            if (card) {
-                // 🔥 Performance: Unregister from viewport tracker
-                viewportTracker.unobserve(card);
-                card.remove();
-            }
-            knownCardIds.delete(cardId);
-        }
-    });
-
-    // Update known cards set
-    presentCardIds.forEach(cardId => knownCardIds.add(cardId));
+    pruneOrphanCards(presentCardIds);
 
     if (cache.liveCount) {
-        const nextCount = String(liveCount);
+        const nextCount = String(flags.liveCount);
         if (cache.liveCount.textContent !== nextCount) {
             cache.liveCount.textContent = nextCount;
         }
     }
 
-    cache.zoneLive?.classList.toggle('active', hasLive);
-    cache.zoneOffline?.classList.toggle('active', hasOffline);
-    cache.zoneLoop?.classList.toggle('active', hasLoop);
+    cache.zoneLive?.classList.toggle('active', flags.hasLive);
+    cache.zoneOffline?.classList.toggle('active', flags.hasOffline);
+    cache.zoneLoop?.classList.toggle('active', flags.hasLoop);
 }
 
-// ====================================================================
-// Debounced Render Function
-// ====================================================================
-
-/**
- * 防抖版本的renderAll - 优化渲染频率
- * 在短时间内多次调用时，只执行最后一次
- * 默认16ms延迟（约60fps）
- */
+// ~60fps debounced wrapper. Use renderAll (the raw function) only when you
+// truly need a synchronous render — normal code paths go through the debounced
+// version or emit Events.RENDER_REQUEST.
 export const debouncedRenderAll = debounce(renderAllImmediate, 16);
-
-/**
- * 立即渲染所有房间卡片（不防抖）
- * 用于需要强制刷新的场景（如手动刷新、初始化等）
- */
 export const renderAll = renderAllImmediate;

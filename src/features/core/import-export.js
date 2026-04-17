@@ -4,7 +4,8 @@
  */
 
 import { getRooms, getRoomDataCache, updateRooms, updateRoomDataCache } from '../../core/state.js';
-import { getRoomCacheKey, normalizeRoomId } from '../../utils/helpers.js';
+import { getRoomCacheKey, normalizeRoomId, showToast } from '../../utils/helpers.js';
+import { emit, Events } from '../../core/event-bus.js';
 
 /**
  * Export rooms to JSON file
@@ -43,11 +44,11 @@ export function exportRooms(rooms) {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        window.showToast?.(`✅ 已导出 ${exportData.rooms.length} 个主播`, 'success');
+        showToast(`✅ 已导出 ${exportData.rooms.length} 个主播`, 'success');
         console.log('[导出] 成功导出主播列表:', exportData);
     } catch (error) {
         console.error('[导出] 导出失败:', error);
-        window.showToast?.('导出失败，请重试', 'error');
+        showToast('导出失败，请重试', 'error');
     }
 }
 
@@ -105,7 +106,7 @@ export function importRooms(event) {
 
         } catch (error) {
             console.error('[导入] 解析失败:', error);
-            window.showToast?.('文件格式错误，请选择有效的备份文件', 'error');
+            showToast('文件格式错误，请选择有效的备份文件', 'error');
         }
 
         // Reset file input to allow selecting the same file again
@@ -113,7 +114,7 @@ export function importRooms(event) {
     };
 
     reader.onerror = function() {
-        window.showToast?.('文件读取失败', 'error');
+        showToast('文件读取失败', 'error');
         event.target.value = '';
     };
 
@@ -176,7 +177,7 @@ window.doImport = function(mode, importRooms) {
             // Replace mode: directly use imported list
             newRooms = importRooms;
             message = `正在加载 ${newRooms.length} 个主播...`;
-            window.showToast?.(message, 'info');
+            showToast(message, 'info');
         } else if (mode === 'merge') {
             // Merge mode: merge after deduplication
             const existingKeys = new Set(rooms.map(r => getRoomCacheKey(r.platform, r.id)));
@@ -184,13 +185,13 @@ window.doImport = function(mode, importRooms) {
             newRooms = [...rooms, ...toAdd];
 
             if (toAdd.length === 0) {
-                window.showToast?.('所有主播都已存在，无需添加', 'info');
+                showToast('所有主播都已存在，无需添加', 'info');
                 closeImportDialog();
                 return;
             }
 
             message = `正在添加 ${toAdd.length} 个新主播...`;
-            window.showToast?.(message, 'info');
+            showToast(message, 'info');
         }
 
         // Update rooms in place to keep references stable
@@ -206,12 +207,12 @@ window.doImport = function(mode, importRooms) {
 
         // Refresh UI (顺序加载，避免导入时同时验证触发平台风控)
         console.log(`[导入] 开始顺序刷新 ${newRooms.length} 个主播（并发：1）`);
-        window.refreshAll?.(true, false, { sequential: true, preserveOrder: true, disableJitter: true });
+        emit(Events.REFRESH_REQUEST, true, false, { sequential: true, preserveOrder: true, disableJitter: true });
 
         console.log('[导入] 成功导入，新列表长度:', newRooms.length);
     } catch (error) {
         console.error('[导入] 导入失败:', error);
-        window.showToast?.('导入失败，请重试', 'error');
+        showToast('导入失败，请重试', 'error');
     }
 };
 

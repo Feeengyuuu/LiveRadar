@@ -9,7 +9,9 @@ import { DeviceDetector } from '../../utils/device-detector.js';
 import { PLACEHOLDERS } from '../../config/ui-strings.js';
 import { APP_CONFIG } from '../../config/constants.js';
 import { getRooms, getRoomDataCache, updateRoomDataCache, addRoom as addRoomToState, removeRoom as removeRoomFromState, toggleRoomFavorite } from '../../core/state.js';
-import { getRoomCacheKey, normalizeRoomId } from '../../utils/helpers.js';
+import { getRoomCacheKey, normalizeRoomId, showToast } from '../../utils/helpers.js';
+import { fetchRoomStatus, cancelPendingFetches } from '../../core/status-fetcher.js';
+import { emit, Events } from '../../core/event-bus.js';
 
 // State
 let searchHistory = SafeStorage.getJSON('pro_search_history', []);
@@ -150,7 +152,7 @@ export function handleAddInput() {
 
     if (!value) return;
     saveSearchHistory(value);
-    window.addRoom?.(value, platform);
+    addRoom(value, platform);
     input.value = '';
     input.focus();
     showHistory();
@@ -161,28 +163,33 @@ export function handleAddInput() {
  * @param {string} id - Room ID
  * @param {string} platform - Platform (twitch/douyu/bilibili)
  */
-window.addRoom = async function(id, platform) {
+export async function addRoom(id, platform) {
     if (!id) return;
 
     const rooms = getRooms();
     const roomId = normalizeRoomId(platform, id);
     if (!roomId) {
-        window.showToast?.('无效ID', 'error');
+        showToast('无效ID', 'error');
         return;
     }
 
     if (rooms.some(r => r.id === roomId && r.platform === platform)) {
-        window.showToast?.('已存在', 'error');
+        showToast('已存在', 'error');
         return;
     }
 
     const newRoom = { id: roomId, platform: platform, isFav: false };
     addRoomToState(newRoom);
-    window.renderAll?.();
+    emit(Events.RENDER_REQUEST);
 
-    await window.fetchStatus?.(newRoom, 0);
-    window.renderAll?.();
-};
+    await fetchRoomStatus(newRoom, 0);
+    emit(Events.RENDER_REQUEST);
+}
+
+// Legacy global for inline HTML handlers / dev console access
+if (typeof window !== 'undefined') {
+    window.addRoom = addRoom;
+}
 
 /**
  * Remove a room from monitored list
@@ -190,15 +197,16 @@ window.addRoom = async function(id, platform) {
  * @param {string} platform - Platform
  */
 export function removeRoom(id, platform) {
-    // Remove from state
+    const cacheKey = getRoomCacheKey(platform, id);
+    cancelPendingFetches(cacheKey);
+
     removeRoomFromState(id, platform);
 
-    // Remove from cache
     const roomDataCache = getRoomDataCache();
-    delete roomDataCache[getRoomCacheKey(platform, id)];
+    delete roomDataCache[cacheKey];
     updateRoomDataCache(roomDataCache, true);
 
-    window.renderAll?.();
+    emit(Events.RENDER_REQUEST);
 }
 
 /**
@@ -208,7 +216,7 @@ export function removeRoom(id, platform) {
  */
 export function toggleFavorite(id, platform) {
     toggleRoomFavorite(id, platform);
-    window.renderAll?.();
+    emit(Events.RENDER_REQUEST);
 }
 
 /**

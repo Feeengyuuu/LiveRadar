@@ -14,6 +14,7 @@
  */
 
 import { SafeStorage } from '../utils/safe-storage.js';
+import { showToast } from '../utils/helpers.js';
 
 // ====================================================================
 // File Protocol Detection
@@ -82,9 +83,7 @@ export function dismissFileWarningPermanently() {
         warningBanner.classList.add('hidden');
     }
 
-    if (window.showToast) {
-        window.showToast('✓ 已保存设置，不再显示此提示', 'info');
-    }
+    showToast('✓ 已保存设置，不再显示此提示', 'info');
 }
 
 // ====================================================================

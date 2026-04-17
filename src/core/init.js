@@ -22,7 +22,10 @@ import { PLACEHOLDERS } from '../config/ui-strings.js';
 import { updateRoomDataCache, isNotificationsEnabled } from './state.js';
 import { unlockAllAudio as unlockAllAudioManager } from '../features/audio/audio-manager.js';
 import { playNotificationSound as playNotificationSoundManager } from '../features/audio/notification-audio.js';
-import { getRoomCacheKey } from '../utils/helpers.js';
+import { getRoomCacheKey, showToast } from '../utils/helpers.js';
+import { emit, Events } from './event-bus.js';
+import { updateNotifyBtn } from '../features/core/notifications.js';
+import { updateSnowBtn } from '../features/enhancements/snow-effect.js';
 
 // External dependencies (injected)
 let rooms = [];
@@ -67,15 +70,15 @@ function initNetworkMonitor() {
 
     ResourceManager.addEventListener(window, 'online', () => {
         if (wasOffline) {
-            if (window.showToast) window.showToast('网络已恢复，正在刷新...', 'info');
-            if (window.refreshAll) window.refreshAll();
+            showToast('网络已恢复，正在刷新...', 'info');
+            emit(Events.REFRESH_REQUEST);
         }
         wasOffline = false;
     });
 
     ResourceManager.addEventListener(window, 'offline', () => {
         wasOffline = true;
-        if (window.showToast) window.showToast('网络连接已断开', 'error');
+        showToast('网络连接已断开', 'error');
     });
 
     console.log('[Network] Network monitor initialized');
@@ -174,12 +177,11 @@ function setupSecretAudioButton() {
             // Play immediately within user gesture, then unlock in background
             playNotificationSoundManager(true, true); // force play and bypass unlock check
             Promise.resolve(unlockAllAudioManager({ silent: true }));
-            if (window.showToast) window.showToast('🎵 Yahaha~', 'info');
         } else {
             // Already unlocked, play directly
             playNotificationSoundManager(true, true); // force play and bypass unlock check
-            if (window.showToast) window.showToast('🎵 Yahaha~', 'info');
         }
+        showToast('🎵 Yahaha~', 'info');
 
         console.log(`[Secret Button] 🔴 Yahaha sound triggered! Audio status: ${window.audioContextUnlocked ? 'Unlocked' : 'Locked'}`);
     });
@@ -216,8 +218,8 @@ export function init() {
     if (window.updatePlaceholder) window.updatePlaceholder();
     else updatePlaceholder();
 
-    if (window.updateNotifyBtn) window.updateNotifyBtn();
-    if (window.updateSnowBtn) window.updateSnowBtn();
+    updateNotifyBtn();
+    updateSnowBtn();
 
     // Setup secret audio test button
     setupSecretAudioButton();
@@ -233,11 +235,11 @@ export function init() {
 
     // If cache exists, render immediately
     if (hasCache) {
-        if (window.renderAll) window.renderAll();
+        emit(Events.RENDER_REQUEST);
     }
 
     // Start initial refresh (silent if no cache)
-    if (window.refreshAll) window.refreshAll(!hasCache);
+    emit(Events.REFRESH_REQUEST, !hasCache);
 
     // Note: initAutoRefresh(), initAudioManager(), and initRegionDetection()
     // are now called in main.js before init() to ensure proper initialization

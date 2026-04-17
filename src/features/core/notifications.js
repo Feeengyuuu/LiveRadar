@@ -7,11 +7,12 @@ import { isNotificationsEnabled, updateNotificationsEnabled } from '../../core/s
 import { getElement } from '../../utils/dom-cache.js';
 import { DeviceDetector } from '../../utils/device-detector.js';
 import { playNotificationSound } from '../audio/notification-audio.js';
+import { showToast } from '../../utils/helpers.js';
 
 /**
  * Update notification button UI
  */
-function updateNotifyBtn() {
+export function updateNotifyBtn() {
     const btn = getElement('notify-btn');
     if (!btn) return;
 
@@ -30,7 +31,7 @@ function updateNotifyBtn() {
 export function toggleNotifications() {
     // iOS Safari doesn't support Notification API
     if (!("Notification" in window) || DeviceDetector.isiOS()) {
-        window.showToast?.(DeviceDetector.isiOS() ? "iOS暂不支持通知功能" : "浏览器不支持通知", "error");
+        showToast(DeviceDetector.isiOS() ? "iOS暂不支持通知功能" : "浏览器不支持通知", "error");
         return;
     }
 
@@ -38,7 +39,7 @@ export function toggleNotifications() {
     if (isNotificationsEnabled()) {
         updateNotificationsEnabled(false);
         updateNotifyBtn();
-        window.showToast?.("推送通知已关闭");
+        showToast("推送通知已关闭");
     } else {
         Notification.requestPermission().then(permission => {
             if (permission === "granted") {
@@ -50,14 +51,14 @@ export function toggleNotifications() {
                     playNotificationSound();
                 }
 
-                window.showToast?.("推送通知已开启");
+                showToast("推送通知已开启");
                 new Notification("LiveRadar", { body: "系统通知已连接" });
             } else {
-                window.showToast?.("请允许通知权限", "error");
+                showToast("请允许通知权限", "error");
             }
         }).catch(error => {
             console.error("[通知] 请求失败", error);
-            window.showToast?.("通知权限请求失败", "error");
+            showToast("通知权限请求失败", "error");
         });
     }
 }
@@ -122,9 +123,6 @@ export function checkNotifications(room, data) {
  */
 export function initNotifications() {
     updateNotifyBtn();
-
-    // Expose updateNotifyBtn for init.js (toggleNotifications handled by globals.js)
-    window.updateNotifyBtn = updateNotifyBtn;
 
     return {
         enabled: isNotificationsEnabled(),

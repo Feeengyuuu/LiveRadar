@@ -27,7 +27,8 @@ import {
     handleAddInput,
     applyHistory,
     deleteHistory,
-    removeRoom
+    removeRoom,
+    toggleFavorite
 } from '../features/core/room-management.js';
 import { toggleNotifications } from '../features/core/notifications.js';
 import { toggleAutoRefresh } from '../features/core/auto-refresh.js';
@@ -67,7 +68,7 @@ const actionHandlers = {
         event.preventDefault();
         event.stopPropagation();
         const { id, platform } = element.dataset;
-        window.toggleFavorite?.(id, platform);
+        toggleFavorite(id, platform);
     },
 
     // Search history
