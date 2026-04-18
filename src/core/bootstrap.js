@@ -22,10 +22,9 @@ import { initDOMCache } from '../utils/dom-cache.js';
 import { initState, getState, getRooms, getRoomDataCache, flushPendingStorageWrites } from './state.js';
 import { initSniffers } from '../api/platform-sniffers.js';
 import { initStatusFetcher } from './status-fetcher.js';
-import { initRefreshManager, refreshAll } from './refresh-manager.js';
-import { initRenderer, renderAll } from './renderer.js';
+import { initRefreshManager } from './refresh-manager.js';
+import { initRenderer } from './renderer.js';
 import { init, initAppDependencies } from './init.js';
-import { fetchStatus } from './status-fetcher.js';
 import { initVisibilityRecovery } from './renderer/image-handler.js';
 
 // Feature modules
@@ -39,7 +38,7 @@ import { initAudioManager } from '../features/audio/audio-manager.js';
 import { initMusicPlayer } from '../features/enhancements/music-player.js';
 
 // Globals exposure
-import { exposeGlobals, exposeCoreDependencies } from './globals.js';
+import { exposeGlobals } from './globals.js';
 
 // Event delegation
 import { initEventRouter } from './event-router.js';
@@ -68,19 +67,8 @@ export async function initializeApp(loaderStartTime) {
         // === Step 2: Initialize Event Delegation Router ===
         initEventRouter();
 
-        // === Step 2.5: Expose Global Functions (temporary, for transition period) ===
+        // === Step 2.5: Expose Global Functions (for inline onclick handlers) ===
         exposeGlobals();
-
-        // Expose core dependencies (for features to access)
-        exposeCoreDependencies({
-            rooms,
-            roomDataCache,
-            previousLiveStatus: state.previousLiveStatus,
-            renderAll,
-            fetchStatus,
-            refreshAll,
-            notificationsEnabled: state.notificationsEnabled
-        });
 
         // === Step 3: Wire Up Module Dependencies (Simplified) ===
         // Most dependencies now come directly from state.js

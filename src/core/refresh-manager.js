@@ -20,17 +20,8 @@ import { fetchRoomStatus } from './status-fetcher.js';
 import { getState, getRooms, getRoomDataCache, updateRefreshStatus, updateRefreshStats } from './state.js';
 import { getDOMCache } from '../utils/dom-cache.js';
 import { viewportTracker } from '../utils/viewport-tracker.js';
-import { getCardId } from '../utils/helpers.js';
-
-// ====================================================================
-// Constants
-// ====================================================================
-
-/**
- * Number of completed tasks before triggering a render update
- * Prevents excessive re-rendering during bulk refresh operations
- */
-const RENDER_BATCH_SIZE = 3;
+import { getCardId, showToast } from '../utils/helpers.js';
+import { on, emit, Events } from './event-bus.js';
 
 // External dependencies (only callbacks need injection)
 let detectStatusChanges = null;
@@ -41,62 +32,70 @@ let detectStatusChanges = null;
  */
 export function initRefreshManager(deps = {}) {
     if (deps.detectStatusChanges) detectStatusChanges = deps.detectStatusChanges;
+
+    // Cross-module refresh requests flow through the event bus
+    on(Events.REFRESH_REQUEST, (silent = false, isAuto = false, options = {}) => {
+        refreshAll(silent, isAuto, options);
+    });
 }
 
 // ====================================================================
-// Smart Concurrent Pool
+// Concurrency Pool
 // ====================================================================
 
 /**
- * Execute tasks with controlled concurrency
- * @param {Array} items - Items to process
- * @param {number} concurrentLimit - Maximum concurrent tasks
- * @param {Function} taskFn - Task function (item, jitter) => Promise
- * @param {number} notifyBatchSize - Batch size for rendering updates
- * @param {boolean} isInitial - Whether this is initial load (applies jitter)
- * @returns {Promise<void>}
+ * Run taskFn over items with at most `concurrentLimit` in flight at once.
+ * onProgress(finishedCount, total) fires after each task settles.
+ *
+ * Kept deliberately small — no render/scheduler concerns here.
  */
-async function promisePool(items, concurrentLimit, taskFn, notifyBatchSize = RENDER_BATCH_SIZE, isInitial = false) {
+async function promisePool(items, concurrentLimit, taskFn, onProgress) {
     const pool = new Set();
     let finishedCount = 0;
-    const state = getState();
-    let renderScheduled = false; // Flag to prevent duplicate render schedules
-
-    // Smart render scheduler: Use requestAnimationFrame for smoother updates
-    const scheduleRender = () => {
-        if (!renderScheduled) {
-            renderScheduled = true;
-            requestAnimationFrame(() => {
-                if (window.renderAll) window.renderAll();
-                renderScheduled = false;
-            });
-        }
-    };
+    const total = items.length;
 
     for (const item of items) {
         if (pool.size >= concurrentLimit) await Promise.race(pool);
 
-        const jitter = isInitial ? Math.floor(Math.random() * APP_CONFIG.AUTO_REFRESH.JITTER_MAX_INITIAL) : 0;
-        const task = taskFn(item, jitter)
+        const task = Promise.resolve(taskFn(item))
             .catch(error => {
                 console.error(`[promisePool] Task execution failed:`, error);
             })
             .finally(() => {
                 pool.delete(task);
                 finishedCount++;
-
-                // Update progress
-                updateRefreshStats({ completed: finishedCount });
-                updateRefreshStatsDisplay();
-
-                // Batch rendering with requestAnimationFrame for smoother updates
-                if (finishedCount % notifyBatchSize === 0 || finishedCount === items.length) {
-                    scheduleRender();
-                }
+                if (onProgress) onProgress(finishedCount, total);
             });
         pool.add(task);
     }
     await Promise.allSettled(pool);
+}
+
+// ====================================================================
+// Render scheduler
+// ====================================================================
+
+/**
+ * Coalesce render requests to at most one per frame.
+ * Falls back to setTimeout when the tab is hidden (rAF is paused there and
+ * would otherwise queue indefinitely), so we still render once when the
+ * tab comes back and progress data is available.
+ */
+function createRenderScheduler() {
+    let scheduled = false;
+    return () => {
+        if (scheduled) return;
+        scheduled = true;
+        const flush = () => {
+            scheduled = false;
+            emit(Events.RENDER_REQUEST);
+        };
+        if (document.hidden) {
+            setTimeout(flush, 0);
+        } else {
+            requestAnimationFrame(flush);
+        }
+    };
 }
 
 /**
@@ -195,18 +194,13 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
 
     // Debounce: Prevent duplicate refresh
     if (!sl && state.isRefreshing) {
-        if (window.showToast) window.showToast("目前正在刷新", "info");
+        showToast("目前正在刷新", "info");
         return;
     }
 
     // Manual refresh resets auto-refresh countdown
     if (!isAutoRefresh && state.autoRefreshEnabled) {
-        if (window.resetAutoRefreshCountdown) {
-            window.resetAutoRefreshCountdown();
-        } else {
-            state.autoRefreshCountdown = APP_CONFIG.AUTO_REFRESH.INTERVAL;
-            if (window.updateAutoRefreshBtn) window.updateAutoRefreshBtn();
-        }
+        emit(Events.AUTO_REFRESH_RESET);
     }
 
     updateRefreshStatus(true);
@@ -215,8 +209,8 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
     if (cache.globalRefreshBtn) cache.globalRefreshBtn.classList.add('animate-spin');
 
     // Show refresh start toast (silent mode skips toast)
-    if (!sl && window.showToast) {
-        window.showToast('开始刷新...', 'info');
+    if (!sl) {
+        showToast('开始刷新...', 'info');
     }
 
     // 🔥 Performance: Use IntersectionObserver-based viewport tracking
@@ -278,7 +272,24 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
 
     try {
         const applyInitialJitter = sl === true && options.disableJitter !== true;
-        await promisePool(sortedRooms, concurrency, fetchRoomStatus, batchSize, applyInitialJitter);
+        const scheduleRender = createRenderScheduler();
+
+        const taskFn = (room) => {
+            const jitter = applyInitialJitter
+                ? Math.floor(Math.random() * APP_CONFIG.AUTO_REFRESH.JITTER_MAX_INITIAL)
+                : 0;
+            return fetchRoomStatus(room, jitter);
+        };
+
+        const onProgress = (finished, total) => {
+            updateRefreshStats({ completed: finished });
+            updateRefreshStatsDisplay();
+            if (finished % batchSize === 0 || finished === total) {
+                scheduleRender();
+            }
+        };
+
+        await promisePool(sortedRooms, concurrency, taskFn, onProgress);
 
         // Incremental update: Count data changes
         const roomDataCache = getRoomDataCache();
@@ -295,18 +306,18 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
         }
 
         // Show refresh complete toast (silent mode skips toast)
-        if (!sl && window.showToast) {
+        if (!sl) {
             const changeInfo = APP_CONFIG.INCREMENTAL.ENABLED
                 ? ` (${changedCount} 项更新)`
                 : '';
-            window.showToast(`刷新完成${changeInfo} - ${elapsed}s`, 'success');
+            showToast(`刷新完成${changeInfo} - ${elapsed}s`, 'success');
         }
 
         // Detect status changes and show notifications
         if (detectStatusChanges) detectStatusChanges();
     } catch (error) {
         console.error('[LiveRadar] Refresh error:', error);
-        if (window.showToast) window.showToast('刷新出错，请检查网络连接', 'error');
+        showToast('刷新出错，请检查网络连接', 'error');
     } finally {
         // Cleanup work - execute regardless of success or failure
         updateRefreshStatus(false);

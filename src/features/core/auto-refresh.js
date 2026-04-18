@@ -11,6 +11,8 @@ import { APP_CONFIG } from '../../config/constants.js';
 import { getElement } from '../../utils/dom-cache.js';
 import { ResourceManager } from '../../utils/resource-manager.js';
 import { updateAutoRefreshEnabled } from '../../core/state.js';
+import { on, emit, Events } from '../../core/event-bus.js';
+import { showToast } from '../../utils/helpers.js';
 
 // State
 let autoRefreshEnabled = SafeStorage.getItem('pro_auto_refresh', 'false') === 'true';
@@ -72,7 +74,7 @@ export function startAutoRefresh() {
         if (autoRefreshCountdown <= 0) {
             console.log('[自动刷新] 触发刷新');
             autoRefreshCountdown = APP_CONFIG.AUTO_REFRESH.INTERVAL;
-            window.refreshAll?.(false, true); // Second parameter indicates auto-refresh
+            emit(Events.REFRESH_REQUEST, false, true); // isAuto=true
         }
     }, 1000);
 
@@ -101,10 +103,10 @@ export function toggleAutoRefresh() {
 
     if (autoRefreshEnabled) {
         startAutoRefresh();
-        window.showToast?.("自动刷新已开启 (每10分钟)");
+        showToast("自动刷新已开启 (每10分钟)");
     } else {
         stopAutoRefresh();
-        window.showToast?.("自动刷新已关闭");
+        showToast("自动刷新已关闭");
     }
     updateAutoRefreshBtn();
 }
@@ -117,8 +119,8 @@ export function initAutoRefresh() {
         startAutoRefresh();
     }
     updateAutoRefreshBtn();
-}
 
-// Make globally accessible for cross-module usage
-window.updateAutoRefreshBtn = updateAutoRefreshBtn;
-window.resetAutoRefreshCountdown = resetAutoRefreshCountdown;
+    // Cross-module requests from refresh-manager flow through the event bus
+    on(Events.AUTO_REFRESH_RESET, resetAutoRefreshCountdown);
+    on(Events.AUTO_REFRESH_UPDATE_BTN, updateAutoRefreshBtn);
+}

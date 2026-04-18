@@ -89,7 +89,7 @@ function promiseAny(promises) {
         const errors = [];
         let pending = promises.length;
         if (pending === 0) {
-            const error = new Error('All promises were rejected');
+            const error = new Error('promiseAny: no promises were provided');
             error.errors = errors;
             reject(error);
             return;

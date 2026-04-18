@@ -22,6 +22,7 @@ import { fetchWithProxy, fetchQuick } from './proxy-manager.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { getRoomDataCache, updateRoomCache } from '../core/state.js';
 import { parseHeatValue } from '../utils/helpers.js';
+import { emit, Events } from '../core/event-bus.js';
 
 /**
  * Initialize sniffer module (no longer needs dependencies)
@@ -325,7 +326,7 @@ async function fetchTwitchAvatarAsync(id) {
                 roomDataCache[cacheKey].avatar = av;
                 roomDataCache[cacheKey].lastAvatarUpdate = Date.now();
                 updateRoomCache(cacheKey, roomDataCache[cacheKey], true);
-                if (window.renderAll) window.renderAll();
+                emit(Events.RENDER_REQUEST);
             }
         }
     } catch(e) {

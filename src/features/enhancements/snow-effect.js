@@ -5,6 +5,7 @@
 
 import { SafeStorage } from '../../utils/safe-storage.js';
 import { ResourceManager } from '../../utils/resource-manager.js';
+import { showToast } from '../../utils/helpers.js';
 
 // ========================================
 // Configuration (aligned with original file)
@@ -609,7 +610,7 @@ export function toggleSnow() {
                 loop();
             }
         }
-        window.showToast?.("❄️ 下雪特效已开启");
+        showToast("❄️ 下雪特效已开启");
     } else {
         // 关闭时清理 MutationObserver，防止内存泄漏
         if (domObserver) {
@@ -620,7 +621,7 @@ export function toggleSnow() {
         if (ctx && canvas) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
-        window.showToast?.("下雪特效已关闭");
+        showToast("下雪特效已关闭");
     }
 }
 
@@ -657,5 +658,3 @@ export function destroySnow() {
 
     console.log('[Snow] Effect destroyed and resources cleaned up');
 }
-
-window.updateSnowBtn = updateSnowBtn;

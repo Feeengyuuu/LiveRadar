@@ -31,80 +31,40 @@ import { debounce, getRoomCacheKey, normalizeRoomId } from '../utils/helpers.js'
 // ============================================================
 
 /**
- * Debounced storage writes using unified debounce function
- * Reduces write frequency by 90% during rapid state updates
+ * Debounced JSON storage writes — reduces write frequency by ~90% during bursts.
+ * Each key has its own debounced writer created lazily.
  */
 const STORAGE_DEBOUNCE_DELAY = APP_CONFIG.CACHE?.DEBOUNCE_DELAY || 500;
 
-/**
- * Cache for debounced write functions (one per storage key)
- * @type {Map<string, Function>}
- */
+/** @type {Map<string, Function>} */
 const debouncedWriters = new Map();
 
-/**
- * Get or create a debounced writer for a specific storage key
- * @param {string} key - Storage key
- * @param {boolean} isJSON - Whether to use setJSON or setItem
- * @returns {Function} Debounced write function
- */
-function getOrCreateDebouncedWriter(key, isJSON = true) {
-    const cacheKey = `${key}:${isJSON ? 'json' : 'item'}`;
-
-    if (!debouncedWriters.has(cacheKey)) {
-        const writer = debounce(
-            (value) => {
-                if (isJSON) {
-                    SafeStorage.setJSON(key, value);
-                } else {
-                    SafeStorage.setItem(key, value);
-                }
-            },
+function getOrCreateDebouncedWriter(key) {
+    let writer = debouncedWriters.get(key);
+    if (!writer) {
+        writer = debounce(
+            (value) => SafeStorage.setJSON(key, value),
             STORAGE_DEBOUNCE_DELAY,
             { trailing: true }
         );
-        debouncedWriters.set(cacheKey, writer);
+        debouncedWriters.set(key, writer);
     }
-
-    return debouncedWriters.get(cacheKey);
+    return writer;
 }
 
 /**
- * Debounced localStorage write (JSON)
+ * Debounced localStorage write (JSON).
  * @param {string} key - Storage key
  * @param {*} value - Value to store
- * @param {boolean} immediate - Skip debounce and write immediately
+ * @param {boolean} [immediate=false] - Skip debounce; also cancels any pending write for this key
  */
 function debouncedStorageWrite(key, value, immediate = false) {
     if (immediate) {
         SafeStorage.setJSON(key, value);
-        // Cancel any pending debounced write for this key
-        const writer = debouncedWriters.get(`${key}:json`);
-        if (writer?.cancel) writer.cancel();
+        debouncedWriters.get(key)?.cancel?.();
         return;
     }
-
-    const writer = getOrCreateDebouncedWriter(key, true);
-    writer(value);
-}
-
-/**
- * Debounced storage write for simple key-value
- * @param {string} key - Storage key
- * @param {string} value - Value to store
- * @param {boolean} immediate - Skip debounce and write immediately
- */
-function debouncedStorageSet(key, value, immediate = false) {
-    if (immediate) {
-        SafeStorage.setItem(key, value);
-        // Cancel any pending debounced write for this key
-        const writer = debouncedWriters.get(`${key}:item`);
-        if (writer?.cancel) writer.cancel();
-        return;
-    }
-
-    const writer = getOrCreateDebouncedWriter(key, false);
-    writer(value);
+    getOrCreateDebouncedWriter(key)(value);
 }
 
 /**
@@ -238,21 +198,26 @@ export const state = {
     tickerTimer: null // Scroll timer
 };
 
-// Remove deprecated YouTube entries from persisted data
-const filteredRooms = state.rooms.filter(room => room.platform !== 'youtube');
-if (filteredRooms.length !== state.rooms.length) {
-    state.rooms.length = 0;
-    state.rooms.push(...filteredRooms);
-    SafeStorage.setJSON('pro_monitored_rooms', state.rooms);
-}
+// One-time cleanup of deprecated YouTube entries. Skipped after the first run
+// via a localStorage flag so we don't filter + rewrite on every page load.
+if (!SafeStorage.getItem('pro_youtube_cleaned')) {
+    const filteredRooms = state.rooms.filter(room => room.platform !== 'youtube');
+    if (filteredRooms.length !== state.rooms.length) {
+        state.rooms.length = 0;
+        state.rooms.push(...filteredRooms);
+        SafeStorage.setJSON('pro_monitored_rooms', state.rooms);
+    }
 
-const cacheKeys = Object.keys(state.roomDataCache || {});
-const hasYouTubeCache = cacheKeys.some(key => key.startsWith('youtube-'));
-if (hasYouTubeCache) {
-    cacheKeys.forEach(key => {
-        if (key.startsWith('youtube-')) delete state.roomDataCache[key];
-    });
-    SafeStorage.setJSON('pro_room_cache', state.roomDataCache);
+    const cacheKeys = Object.keys(state.roomDataCache || {});
+    const hasYouTubeCache = cacheKeys.some(key => key.startsWith('youtube-'));
+    if (hasYouTubeCache) {
+        cacheKeys.forEach(key => {
+            if (key.startsWith('youtube-')) delete state.roomDataCache[key];
+        });
+        SafeStorage.setJSON('pro_room_cache', state.roomDataCache);
+    }
+
+    SafeStorage.setItem('pro_youtube_cleaned', '1');
 }
 
 // Initialize did if not already saved
@@ -300,11 +265,7 @@ export function updateNotificationsEnabled(enabled) {
     const oldValue = state.notificationsEnabled;
     state.notificationsEnabled = enabled;
     SafeStorage.setItem('pro_notify_enabled', enabled);
-    if (typeof window !== 'undefined') {
-        window.notificationsEnabled = enabled;
-    }
 
-    // Notify listeners
     notifyListeners('notificationsEnabled', enabled, oldValue);
 }
 
@@ -463,24 +424,6 @@ export function toggleRoomFavorite(id, platform) {
     }
 }
 
-/**
- * Save current configuration to storage
- * Legacy function for backward compatibility
- */
-export function saveConfig() {
-    SafeStorage.setJSON('pro_monitored_rooms', state.rooms);
-    SafeStorage.setJSON('pro_search_history', state.searchHistory);
-    SafeStorage.setItem('pro_notify_enabled', state.notificationsEnabled);
-}
-
-/**
- * Save cache to storage
- * Legacy function for backward compatibility
- */
-export function saveCache() {
-    SafeStorage.setJSON('pro_room_cache', state.roomDataCache);
-}
-
 // ============================================================
 // GETTERS - Read-only access to state
 // ============================================================
@@ -601,19 +544,6 @@ export function initState() {
  */
 export function getState() {
     return state;
-}
-
-/**
- * Set state values (generic setter)
- * @param {string} key - State key
- * @param {*} value - New value
- */
-export function setState(key, value) {
-    if (key in state) {
-        state[key] = value;
-    } else {
-        console.warn(`[State] Unknown state key: ${key}`);
-    }
 }
 
 /**
