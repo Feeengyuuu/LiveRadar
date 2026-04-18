@@ -39,15 +39,15 @@ const STORAGE_DEBOUNCE_DELAY = APP_CONFIG.CACHE?.DEBOUNCE_DELAY || 500;
 /** @type {Map<string, Function>} */
 const debouncedWriters = new Map();
 
-function getOrCreateDebouncedWriter(key) {
-    let writer = debouncedWriters.get(key);
+function getOrCreateDebouncedWriter(key, mode) {
+    const cacheKey = `${mode}:${key}`;
+    let writer = debouncedWriters.get(cacheKey);
     if (!writer) {
-        writer = debounce(
-            (value) => SafeStorage.setJSON(key, value),
-            STORAGE_DEBOUNCE_DELAY,
-            { trailing: true }
-        );
-        debouncedWriters.set(key, writer);
+        const setter = mode === 'json'
+            ? (value) => SafeStorage.setJSON(key, value)
+            : (value) => SafeStorage.setItem(key, value);
+        writer = debounce(setter, STORAGE_DEBOUNCE_DELAY, { trailing: true });
+        debouncedWriters.set(cacheKey, writer);
     }
     return writer;
 }
@@ -61,10 +61,25 @@ function getOrCreateDebouncedWriter(key) {
 function debouncedStorageWrite(key, value, immediate = false) {
     if (immediate) {
         SafeStorage.setJSON(key, value);
-        debouncedWriters.get(key)?.cancel?.();
+        debouncedWriters.get(`json:${key}`)?.cancel?.();
         return;
     }
-    getOrCreateDebouncedWriter(key)(value);
+    getOrCreateDebouncedWriter(key, 'json')(value);
+}
+
+/**
+ * Debounced localStorage write (raw string via setItem).
+ * @param {string} key - Storage key
+ * @param {*} value - Value to store (coerced to string by SafeStorage)
+ * @param {boolean} [immediate=false] - Skip debounce; also cancels any pending write for this key
+ */
+function debouncedStorageSet(key, value, immediate = false) {
+    if (immediate) {
+        SafeStorage.setItem(key, value);
+        debouncedWriters.get(`item:${key}`)?.cancel?.();
+        return;
+    }
+    getOrCreateDebouncedWriter(key, 'item')(value);
 }
 
 /**
@@ -254,7 +269,7 @@ export function updateRooms(newRooms, immediate = false) {
  */
 export function updateSearchHistory(newHistory) {
     state.searchHistory = newHistory;
-    SafeStorage.setJSON('pro_search_history', newHistory);
+    debouncedStorageWrite('pro_search_history', newHistory);
 }
 
 /**
@@ -264,7 +279,7 @@ export function updateSearchHistory(newHistory) {
 export function updateNotificationsEnabled(enabled) {
     const oldValue = state.notificationsEnabled;
     state.notificationsEnabled = enabled;
-    SafeStorage.setItem('pro_notify_enabled', enabled);
+    debouncedStorageSet('pro_notify_enabled', enabled);
 
     notifyListeners('notificationsEnabled', enabled, oldValue);
 }
@@ -298,7 +313,7 @@ export function updateRoomCache(key, data, immediate = false) {
  */
 export function updateProxyStats(newStats) {
     state.proxyStats = newStats;
-    SafeStorage.setJSON('pro_proxy_stats', newStats);
+    debouncedStorageWrite('pro_proxy_stats', newStats);
 }
 
 /**
@@ -307,7 +322,7 @@ export function updateProxyStats(newStats) {
  */
 export function updateAutoRefreshEnabled(enabled) {
     state.autoRefreshEnabled = enabled;
-    SafeStorage.setItem('pro_auto_refresh', enabled);
+    debouncedStorageSet('pro_auto_refresh', enabled);
 }
 
 /**
@@ -316,7 +331,7 @@ export function updateAutoRefreshEnabled(enabled) {
  */
 export function updateKeepAliveEnabled(enabled) {
     state.keepAliveEnabled = enabled;
-    SafeStorage.setItem('pro_keepalive_enabled', enabled);
+    debouncedStorageSet('pro_keepalive_enabled', enabled);
 }
 
 /**
@@ -325,7 +340,7 @@ export function updateKeepAliveEnabled(enabled) {
  */
 export function updateSnowEnabled(enabled) {
     state.snowEnabled = enabled;
-    SafeStorage.setItem('pro_snow_enabled', enabled);
+    debouncedStorageSet('pro_snow_enabled', enabled);
 }
 
 /**

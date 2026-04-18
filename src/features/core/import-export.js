@@ -122,6 +122,21 @@ export function importRooms(event) {
 }
 
 /**
+ * Build an import-dialog button via DOM APIs (no innerHTML with untrusted data).
+ * @param {string} label
+ * @param {string} background
+ * @param {() => void} onClick
+ */
+function buildDialogButton(label, background, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = label;
+    btn.style.cssText = `padding: 12px 20px; background: ${background}; color: ${background.includes('rgba') ? '#9ca3af' : 'white'}; border: ${background.includes('rgba') ? '1px solid #333' : 'none'}; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s;`;
+    btn.addEventListener('click', onClick);
+    return btn;
+}
+
+/**
  * Show import options dialog
  * @param {Array} importRooms - Rooms to import
  * @param {string} version - Version from import file
@@ -129,37 +144,51 @@ export function importRooms(event) {
 function showImportDialog(importRooms, version) {
     const rooms = getRooms();
 
-    // Create dialog HTML
-    const dialogHTML = `
-        <div id="import-dialog" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center;">
-            <div style="background: #1a1a1a; border-radius: 16px; padding: 32px; max-width: 480px; width: 90%; border: 1px solid #333;">
-                <h3 style="color: #fff; font-size: 20px; font-weight: bold; margin: 0 0 16px 0;">导入主播列表</h3>
-                <p style="color: #9ca3af; margin: 0 0 24px 0;">
-                    检测到 <strong style="color: #60a5fa;">${importRooms.length}</strong> 个主播<br>
-                    当前列表有 <strong style="color: #60a5fa;">${rooms.length}</strong> 个主播
-                </p>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <button onclick="window.doImport('replace', ${JSON.stringify(importRooms).replace(/"/g, '&quot;')})"
-                            style="padding: 12px 20px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-                        🔄 替换当前列表
-                    </button>
-                    <button onclick="window.doImport('merge', ${JSON.stringify(importRooms).replace(/"/g, '&quot;')})"
-                            style="padding: 12px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-                        ➕ 合并到当前列表（去重）
-                    </button>
-                    <button onclick="window.closeImportDialog()"
-                            style="padding: 12px 20px; background: rgba(255,255,255,0.1); color: #9ca3af; border: 1px solid #333; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-                        取消
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
+    const overlay = document.createElement('div');
+    overlay.id = 'import-dialog';
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center;';
 
-    // Add to page
-    const dialogContainer = document.createElement('div');
-    dialogContainer.innerHTML = dialogHTML;
-    document.body.appendChild(dialogContainer.firstElementChild);
+    const panel = document.createElement('div');
+    panel.style.cssText = 'background: #1a1a1a; border-radius: 16px; padding: 32px; max-width: 480px; width: 90%; border: 1px solid #333;';
+
+    const heading = document.createElement('h3');
+    heading.textContent = '导入主播列表';
+    heading.style.cssText = 'color: #fff; font-size: 20px; font-weight: bold; margin: 0 0 16px 0;';
+
+    const summary = document.createElement('p');
+    summary.style.cssText = 'color: #9ca3af; margin: 0 0 24px 0;';
+    const detectedStrong = document.createElement('strong');
+    detectedStrong.textContent = String(importRooms.length);
+    detectedStrong.style.color = '#60a5fa';
+    const currentStrong = document.createElement('strong');
+    currentStrong.textContent = String(rooms.length);
+    currentStrong.style.color = '#60a5fa';
+    summary.append('检测到 ', detectedStrong, ' 个主播');
+    summary.appendChild(document.createElement('br'));
+    summary.append('当前列表有 ', currentStrong, ' 个主播');
+
+    const btnGroup = document.createElement('div');
+    btnGroup.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+
+    btnGroup.appendChild(buildDialogButton(
+        '🔄 替换当前列表',
+        'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+        () => doImport('replace', importRooms)
+    ));
+    btnGroup.appendChild(buildDialogButton(
+        '➕ 合并到当前列表（去重）',
+        'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+        () => doImport('merge', importRooms)
+    ));
+    btnGroup.appendChild(buildDialogButton(
+        '取消',
+        'rgba(255,255,255,0.1)',
+        closeImportDialog
+    ));
+
+    panel.append(heading, summary, btnGroup);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
 }
 
 /**
@@ -167,19 +196,17 @@ function showImportDialog(importRooms, version) {
  * @param {string} mode - 'replace' or 'merge'
  * @param {Array} importRooms - Rooms to import
  */
-window.doImport = function(mode, importRooms) {
+function doImport(mode, importRooms) {
     try {
         const rooms = getRooms();
         let newRooms = [];
         let message = '';
 
         if (mode === 'replace') {
-            // Replace mode: directly use imported list
             newRooms = importRooms;
             message = `正在加载 ${newRooms.length} 个主播...`;
             showToast(message, 'info');
         } else if (mode === 'merge') {
-            // Merge mode: merge after deduplication
             const existingKeys = new Set(rooms.map(r => getRoomCacheKey(r.platform, r.id)));
             const toAdd = importRooms.filter(r => !existingKeys.has(getRoomCacheKey(r.platform, r.id)));
             newRooms = [...rooms, ...toAdd];
@@ -194,18 +221,14 @@ window.doImport = function(mode, importRooms) {
             showToast(message, 'info');
         }
 
-        // Update rooms in place to keep references stable
         updateRooms(newRooms, true);
 
-        // Clear cache (force re-fetch)
         const roomDataCache = getRoomDataCache();
         Object.keys(roomDataCache).forEach(key => delete roomDataCache[key]);
         updateRoomDataCache(roomDataCache, true);
 
-        // Close dialog
         closeImportDialog();
 
-        // Refresh UI (顺序加载，避免导入时同时验证触发平台风控)
         console.log(`[导入] 开始顺序刷新 ${newRooms.length} 个主播（并发：1）`);
         emit(Events.REFRESH_REQUEST, true, false, { sequential: true, preserveOrder: true, disableJitter: true });
 
@@ -214,14 +237,14 @@ window.doImport = function(mode, importRooms) {
         console.error('[导入] 导入失败:', error);
         showToast('导入失败，请重试', 'error');
     }
-};
+}
 
 /**
  * Close import dialog
  */
-window.closeImportDialog = function() {
+function closeImportDialog() {
     const dialog = document.getElementById('import-dialog');
     if (dialog) {
         dialog.remove();
     }
-};
+}

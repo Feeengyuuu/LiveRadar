@@ -25,11 +25,6 @@ export default defineConfig({
         manualChunks(id) {
           // Vendor dependencies (node_modules)
           if (id.includes('node_modules')) {
-            // Separate crypto-js as it's only used for Bilibili
-            if (id.includes('crypto-js')) {
-              return 'vendor-crypto';
-            }
-            // All other vendor code in main vendor chunk
             return 'vendor';
           }
 
