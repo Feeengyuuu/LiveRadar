@@ -15,7 +15,7 @@
  * ==================================================================== */
 
 import { debounce, formatHeat } from '../utils/helpers.js';
-import { APP_CONFIG, MIN_LOADER_DISPLAY_TIME } from '../config/constants.js';
+import { APP_CONFIG } from '../config/constants.js';
 import { initDOMCache } from '../utils/dom-cache.js';
 
 // Core modules
@@ -45,10 +45,9 @@ import { initEventRouter } from './event-router.js';
 
 /**
  * Main application initialization function
- * @param {number} loaderStartTime - Timestamp when loader was shown
  * @returns {Promise<void>}
  */
-export async function initializeApp(loaderStartTime) {
+export async function initializeApp() {
     console.log('[Bootstrap] Starting application initialization...');
 
     try {
@@ -156,30 +155,14 @@ export async function initializeApp(loaderStartTime) {
 }
 
 /**
- * Hide loader with minimum display time enforcement
- * Ensures loader is visible for at least MIN_LOADER_DISPLAY_TIME
- *
- * @param {number} loaderStartTime - Timestamp when loader was shown
+ * Hide loader and show main content immediately.
  */
-export function hideLoader(loaderStartTime) {
+export function hideLoader() {
     const loader = document.getElementById('initial-loader');
     if (!loader) return;
 
-    const elapsed = Date.now() - loaderStartTime;
-    const remaining = Math.max(0, MIN_LOADER_DISPLAY_TIME - elapsed);
-
-    console.log(`[Bootstrap] Hiding loader (elapsed: ${elapsed}ms, waiting: ${remaining}ms)`);
-
-    setTimeout(() => {
-        loader.style.opacity = '0';
-
-        // 重要：移除 body 上的 loading class 以显示主内容
-        document.body.classList.remove('loading');
-        document.body.style.overflow = '';
-
-        setTimeout(() => {
-            loader.remove();
-            console.log('[Bootstrap] ✓ Loader removed');
-        }, 300); // Wait for fade-out transition
-    }, remaining);
+    document.body.classList.remove('loading');
+    document.body.style.overflow = '';
+    loader.remove();
+    console.log('[Bootstrap] ✓ Loader removed');
 }

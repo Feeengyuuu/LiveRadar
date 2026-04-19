@@ -31,11 +31,6 @@ export const LOADING_MESSAGES = [
   '老头正在假装没看见忘记带门禁卡的你...',
 ];
 
-/**
- * Minimum loader display time
- */
-export const MIN_LOADER_DISPLAY_TIME = 1500; // milliseconds
-
 // ====================================================================
 // Platform API Endpoints
 // ====================================================================

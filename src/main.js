@@ -120,9 +120,6 @@ console.log('[LiveRadar] ✓ Global error boundary initialized');
 
 console.log('[LiveRadar] Starting application...');
 
-// Record loader start time for minimum display duration
-const loaderStartTime = Date.now();
-
 // Set random loader text
 const loaderTextEl = document.getElementById('loader-text');
 if (loaderTextEl) {
@@ -145,7 +142,7 @@ checkFileProtocolAndWarn();
  */
 async function startApp() {
     try {
-        await initializeApp(loaderStartTime);
+        await initializeApp();
         console.log('[LiveRadar] ✓ Application started successfully');
     } catch (error) {
         console.error('[LiveRadar] ✗ Application startup failed:', error);
@@ -154,7 +151,7 @@ async function startApp() {
         showErrorPage(error, 'AppInitialization');
     } finally {
         // 确保 loader 始终被移除，即使初始化失败
-        hideLoader(loaderStartTime);
+        hideLoader();
     }
 }
 
