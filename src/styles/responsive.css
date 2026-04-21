@@ -1,196 +1,4 @@
 /* ========================================
-   【移动端优化】Mobile-First Enhancements
-   ======================================== */
-
-/* iOS安全区域适配 */
-@media (max-width: 768px) {
-    body {
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
-        padding-left: env(safe-area-inset-left);
-        padding-right: env(safe-area-inset-right);
-    }
-
-    /* 优化移动端字体大小 */
-    body { padding: 1rem !important; }
-    .zone-title { font-size: 14px; }
-    .zone-sub { font-size: 10px; }
-    .room-title { font-size: 14px; }
-    .room-owner { font-size: 12px; }
-
-    /* 优化触摸目标大小(最小44x44px) */
-    .action-btn { width: 44px; height: 44px; }
-    button, .notify-btn, .auto-refresh-btn {
-        min-height: 44px;
-        padding: 10px 14px;
-    }
-
-    /* 优化卡片间距 */
-    .zone-container { margin-bottom: 2rem; }
-    .card-info { padding: 12px; }
-
-    /* Toast移动端位置 */
-    #toast-container {
-        bottom: 1rem;
-        right: 1rem;
-        left: 1rem;
-    }
-    .toast {
-        width: 100%;
-        text-align: center;
-    }
-
-    /* 移除hover效果，优化触摸体验 */
-    .room-card:hover {
-        transform: none;
-        box-shadow: 0 5px 8px -1px rgba(0,0,0,0.3);
-    }
-    .room-card:active {
-        transform: scale(0.98);
-    }
-}
-
-/* iPhone SE等小屏设备 */
-@media (max-width: 375px) {
-    .monitor-grid {
-        grid-template-columns: 1fr;
-        gap: 0.75rem;
-    }
-    .zone-header { gap: 8px; }
-}
-
-/* ========================================
-   【移动端】头部工具栏优化
-   ======================================== */
-@media (max-width: 768px) {
-    header {
-        padding: 1rem !important;
-        gap: 1rem !important;
-        margin-bottom: 1.5rem !important;
-        flex-direction: column !important;
-    }
-
-    header > div:first-child {
-        border-right: none !important;
-        padding: 0 !important;
-        width: 100%;
-        justify-content: center;
-    }
-
-    header h1 {
-        font-size: 1.25rem !important; /* 20px */
-        text-align: center;
-    }
-
-    header h1 span {
-        display: block;
-        font-size: 0.75rem !important; /* 12px */
-        margin-top: 0.25rem;
-        margin-left: 0 !important;
-    }
-
-    /* 输入区域 */
-    header > div:nth-child(2) {
-        flex-direction: column;
-        gap: 0.5rem !important;
-        padding: 0.75rem !important;
-    }
-
-    #custom-selector-container {
-        width: 100% !important;
-    }
-
-    #room-id-input {
-        width: 100%;
-        padding: 0.75rem !important;
-    }
-
-    header button {
-        width: 100%;
-        justify-content: center;
-    }
-
-    /* 工具按钮区 */
-    header > div:last-child {
-        width: 100%;
-        padding: 0 !important;
-        justify-content: space-between;
-        flex-wrap: wrap;
-    }
-
-    .auto-refresh-btn,
-    .notify-btn,
-    .keepalive-btn {
-        flex: 1;
-        min-width: 120px;
-    }
-
-    #global-refresh-btn {
-        flex: 0 0 auto;
-    }
-}
-
-/* ========================================
-   【移动端】卡片和交互优化
-   ======================================== */
-@media (max-width: 768px) {
-    /* 优化卡片内边距 */
-    .u-avatar {
-        width: 48px !important;
-        height: 48px !important;
-    }
-
-    .viewer-pill {
-        font-size: 11px !important;
-        padding: 3px 8px !important;
-    }
-
-    /* 优化状态芯片 */
-    .status-chip {
-        font-size: 11px !important;
-        padding: 4px 10px !important;
-    }
-
-    /* 优化卡片按钮 */
-    .card-actions {
-        opacity: 1 !important; /* 移动端始终显示 */
-    }
-
-    /* 优化下拉菜单 */
-    #selector-menu {
-        position: fixed !important;
-        left: 0.5rem !important;
-        right: 0.5rem !important;
-        width: auto !important;
-        max-width: none !important;
-    }
-
-    #history-dropdown {
-        position: fixed !important;
-        left: 0.5rem !important;
-        right: 0.5rem !important;
-        top: auto !important;
-        bottom: 5rem !important;
-    }
-
-    /* 优化区域标题 */
-    .zone-header {
-        padding-left: 0.5rem !important;
-    }
-
-    /* 触摸滚动优化 */
-    body {
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior-y: contain;
-    }
-
-    /* 防止iOS双击缩放 */
-    * {
-        touch-action: manipulation;
-    }
-}
-
-/* ========================================
    【平板端】优化 - 舒适布局
    ======================================== */
 @media (min-width: 768px) and (max-width: 1024px) {
@@ -251,11 +59,6 @@
 
     header h1 {
         font-size: 2rem;
-    }
-
-    /* 桌面端允许雪花特效（由JS控制开关，移除!important让JS可以控制） */
-    #snow-canvas {
-        /* display由JS控制，不强制设置 */
     }
 }
 
@@ -324,38 +127,35 @@
 /* ========================================
    【窄卡片】优化 - 当卡片宽度 < 320px
    ======================================== */
-@media (min-width: 768px) {
-    /* 使用容器查询的备选方案：通过视口宽度估算卡片宽度 */
-    @media (max-width: 1200px) {
-        .viewer-pill {
-            font-size: 10.5px !important;
-            padding: 3px 7px !important;
-            gap: 3px;
-        }
-
-        .viewer-pill .viewer-icon {
-            font-size: 11px;
-        }
-
-        .live-duration {
-            font-size: 10.5px !important;
-            padding: 3px 6px !important;
-        }
+@media (min-width: 768px) and (max-width: 1200px) {
+    .viewer-pill {
+        font-size: 10.5px !important;
+        padding: 3px 7px !important;
+        gap: 3px;
     }
 
-    /* 极窄卡片 - 底栏元素堆叠 */
-    @media (max-width: 900px) {
-        .card-bottom-bar {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 6px;
-            height: auto;
-        }
+    .viewer-pill .viewer-icon {
+        font-size: 11px;
+    }
 
-        .viewer-pill,
-        .live-duration {
-            font-size: 11px !important;
-        }
+    .live-duration {
+        font-size: 10.5px !important;
+        padding: 3px 6px !important;
+    }
+}
+
+/* 极窄卡片 - 底栏元素堆叠 */
+@media (min-width: 768px) and (max-width: 900px) {
+    .card-bottom-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        height: auto;
+    }
+
+    .viewer-pill,
+    .live-duration {
+        font-size: 11px !important;
     }
 }
 
@@ -443,14 +243,14 @@
         background-color: #050505;
         color: #e5e7eb;
     }
+}
 
-    /* 进一步降低对比度缓解眼睛疲劳 */
-    @media (prefers-reduced-motion: reduce) {
-        * {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-        }
+/* 进一步降低对比度缓解眼睛疲劳 */
+@media (prefers-color-scheme: dark) and (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
     }
 }
 
@@ -522,6 +322,18 @@
 
     .room-card:hover .card-actions {
         opacity: 1;
+    }
+}
+
+@media (max-width: 768px) and (hover: none) and (pointer: coarse) {
+    .room-card:hover {
+        box-shadow: 0 5px 8px -1px rgba(0,0,0,0.3);
+    }
+}
+
+@media (max-width: 768px) and (hover: hover) and (pointer: fine) {
+    .room-card:hover {
+        box-shadow: 0 5px 8px -1px rgba(0,0,0,0.3);
     }
 }
 

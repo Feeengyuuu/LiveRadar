@@ -102,7 +102,7 @@ export function importRooms(event) {
             }
 
             // Show import options dialog
-            showImportDialog(uniqueRooms, importData.version);
+            showImportDialog(uniqueRooms);
 
         } catch (error) {
             console.error('[导入] 解析失败:', error);
@@ -139,9 +139,8 @@ function buildDialogButton(label, background, onClick) {
 /**
  * Show import options dialog
  * @param {Array} importRooms - Rooms to import
- * @param {string} version - Version from import file
  */
-function showImportDialog(importRooms, version) {
+function showImportDialog(importRooms) {
     const rooms = getRooms();
 
     const overlay = document.createElement('div');

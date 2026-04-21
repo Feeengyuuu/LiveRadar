@@ -17,9 +17,9 @@
  */
 
 import { ResourceManager } from '../utils/resource-manager.js';
-import { getDOMCache, getElement } from '../utils/dom-cache.js';
+import { getDOMCache } from '../utils/dom-cache.js';
 import { PLACEHOLDERS } from '../config/ui-strings.js';
-import { updateRoomDataCache, isNotificationsEnabled } from './state.js';
+import { updateRoomDataCache } from './state.js';
 import { unlockAllAudio as unlockAllAudioManager } from '../features/audio/audio-manager.js';
 import { playNotificationSound as playNotificationSoundManager } from '../features/audio/notification-audio.js';
 import { getRoomCacheKey, showToast } from '../utils/helpers.js';
@@ -215,8 +215,7 @@ export function init() {
     // Region detection is handled by initRegionDetection during bootstrap
 
     // Update UI states
-    if (window.updatePlaceholder) window.updatePlaceholder();
-    else updatePlaceholder();
+    updatePlaceholder();
 
     updateNotifyBtn();
     updateSnowBtn();

@@ -16,9 +16,8 @@
  */
 
 import { Logger } from '../utils/logger.js';
-import { ErrorHandler, retry, isRetryableError } from '../utils/error-handler.js';
-import { fetchWithProxy, fetchQuick } from './proxy-manager.js';
-import { APP_CONFIG } from '../config/constants.js';
+import { ErrorHandler, isRetryableError } from '../utils/error-handler.js';
+import { fetchWithProxy } from './proxy-manager.js';
 import { getDouyuStatus, getBilibiliStatus, getTwitchStatus, getKickStatus } from './platform-sniffers.js';
 
 const log = Logger.create('PlatformAdapter');
@@ -103,7 +102,7 @@ export class BasePlatformAdapter {
      * @param {Object} [prevData] - Previous cached data
      * @returns {Promise<RoomStatus|null>} Status or null on error
      */
-    async getStatus(id, options = {}, prevData = null) {
+    async getStatus(id, _options = {}, _prevData = null) {
         throw new Error('getStatus must be implemented by subclass');
     }
 

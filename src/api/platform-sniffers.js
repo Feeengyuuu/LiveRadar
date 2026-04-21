@@ -28,7 +28,7 @@ import { emit, Events } from '../core/event-bus.js';
  * Initialize sniffer module (no longer needs dependencies)
  * Kept for backward compatibility
  */
-export function initSniffers(deps) {
+export function initSniffers(_deps) {
     // No longer needs dependency injection
     console.log('[Sniffers] Initialized (no dependencies required)');
 }

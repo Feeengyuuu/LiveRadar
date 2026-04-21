@@ -14,8 +14,6 @@
  * 5. Hide loader
  * ==================================================================== */
 
-import { debounce, formatHeat } from '../utils/helpers.js';
-import { APP_CONFIG } from '../config/constants.js';
 import { initDOMCache } from '../utils/dom-cache.js';
 
 // Core modules
@@ -37,7 +35,7 @@ import { initNotificationAudio } from '../features/audio/notification-audio.js';
 import { initAudioManager } from '../features/audio/audio-manager.js';
 import { initMusicPlayer } from '../features/enhancements/music-player.js';
 
-// Globals exposure
+// Debug globals
 import { exposeGlobals } from './globals.js';
 
 // Event delegation
@@ -66,7 +64,7 @@ export async function initializeApp() {
         // === Step 2: Initialize Event Delegation Router ===
         initEventRouter();
 
-        // === Step 2.5: Expose Global Functions (for inline onclick handlers) ===
+        // === Step 2.5: Expose Debug Namespace ===
         exposeGlobals();
 
         // === Step 3: Wire Up Module Dependencies (Simplified) ===
@@ -93,7 +91,7 @@ export async function initializeApp() {
         console.log('[Bootstrap] All core modules initialized');
 
         // === Step 4: Initialize Feature Modules ===
-        const notifyAudio = initNotificationAudio();
+        initNotificationAudio();
         initNotifications();
         initSnow();
         initStatusTicker();

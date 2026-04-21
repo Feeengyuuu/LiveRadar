@@ -186,11 +186,6 @@ export async function addRoom(id, platform) {
     emit(Events.RENDER_REQUEST);
 }
 
-// Legacy global for inline HTML handlers / dev console access
-if (typeof window !== 'undefined') {
-    window.addRoom = addRoom;
-}
-
 /**
  * Remove a room from monitored list
  * @param {string} id - Room ID
@@ -301,10 +296,7 @@ function updateHistoryDropdownPosition() {
     if (!input) return;
 
     // 找到添加按钮
-    let addButton = historyEl.nextElementSibling;
-    if (!addButton || addButton.tagName !== 'BUTTON') {
-        addButton = historyEl.parentElement?.querySelector('button[onclick*="handleAddInput"]');
-    }
+    const addButton = historyEl.parentElement?.querySelector('[data-action="add-room"]');
     if (!addButton) return;
 
     try {

@@ -185,7 +185,7 @@ export function setImageSource(config) {
             applyLoadedState();
         },
         // onError - Try fallbacks or show skeleton
-        (e) => {
+        () => {
             const { hd, standard } = fallbacks;
 
             // Try HD fallback first

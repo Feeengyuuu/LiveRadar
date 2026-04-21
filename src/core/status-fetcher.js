@@ -270,7 +270,9 @@ async function fetchRoomStatusInner(room, jitter, cacheKey) {
         // 原因：继承旧数据的 _hasChanges: false 会导致增量更新跳过渲染
         const errorData = prevData
             ? (() => {
-                const { _hasChanges, _changes, ...rest } = prevData;
+                const rest = { ...prevData };
+                delete rest._hasChanges;
+                delete rest._changes;
                 return {
                     ...rest,
                     isError: false,

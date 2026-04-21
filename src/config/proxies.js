@@ -34,15 +34,6 @@ export const PROXIES = [
         tier: 'premium'
     },
 
-    // === New Proxies (Tier 1): To be verified ===
-    {
-        name: "AllOrigins-ML",
-        url: u => `https://api.allorigins.ml/get?url=${encodeURIComponent(u)}`,
-        wrap: true,
-        weight: 25,
-        region: 'overseas',
-        tier: 'premium'
-    },
     {
         name: "HTMLDriven",
         url: u => `https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(u)}`,
@@ -76,44 +67,7 @@ export const PROXIES = [
         weight: 10,
         region: 'overseas',
         tier: 'standard'
-    },
-    {
-        name: "CORS-EU",
-        url: u => `https://cors.eu.org/?${encodeURIComponent(u)}`,
-        wrap: false,
-        weight: 8,
-        region: 'overseas',
-        tier: 'standard'
-    },
-
-    // === Fallback Tier (Tier 3): Last resort ===
-    {
-        name: "ThingProxy",
-        url: u => `https://thingproxy.freeboard.io/fetch/${u}`,
-        wrap: false,
-        weight: 5,
-        region: 'overseas',
-        tier: 'fallback'
-    },
-    {
-        name: "Proxy.CORS",
-        url: u => `https://proxy.cors.sh/${u}`,
-        wrap: false,
-        weight: 3,
-        region: 'overseas',
-        tier: 'fallback'
-    },
-    {
-        name: "CORS-Anywhere",
-        url: u => `https://cors-anywhere.herokuapp.com/${u}`,
-        wrap: false,
-        weight: 2,
-        region: 'overseas',
-        tier: 'fallback'
     }
-
-    // TODO: Add mainland China proxies if discovered:
-    // { name: "国内代理1", url: u => `...`, wrap: false, weight: 60, region: 'mainland', tier: 'premium' },
 ];
 
 /**

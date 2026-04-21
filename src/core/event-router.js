@@ -50,7 +50,7 @@ const actionHandlers = {
 
     // Platform selector
     'toggle-dropdown': (element, event) => toggleDropdown(event),
-    'close-dropdown': (element, event) => closeDropdown(),
+    'close-dropdown': () => closeDropdown(),
     'select-platform': (element) => {
         const { platform, color, label } = element.dataset;
         selectPlatform(platform, color, label);
@@ -103,7 +103,7 @@ const actionHandlers = {
     'show-deployment-guide': () => showDeploymentGuide(),
 
     // Audio
-    'unlock-audio': (element, event) => unlockAllAudio(),
+    'unlock-audio': () => unlockAllAudio(),
     'play-notification-sound': () => playNotificationSound(true, true)
 };
 

@@ -166,7 +166,7 @@ function getStorageUsage() {
     let used = 0;
     try {
         for (const key in localStorage) {
-            if (localStorage.hasOwnProperty(key)) {
+            if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
                 used += (localStorage[key].length + key.length) * 2;
             }
         }
@@ -182,15 +182,6 @@ function getStorageUsage() {
 }
 
 /**
- * Check if storage is near capacity
- * @returns {boolean} True if above warning threshold
- */
-function isStorageNearFull() {
-    const usage = getStorageUsage();
-    return usage.percentage >= CONFIG.WARNING_THRESHOLD;
-}
-
-/**
  * Clean up storage to make room for new data
  * @param {number} [bytesNeeded=0] - Minimum bytes to free
  * @returns {number} Bytes freed
@@ -201,7 +192,6 @@ function cleanupStorage(bytesNeeded = 0) {
     // First, try to clear clearable keys
     for (const key of CONFIG.CLEARABLE_KEYS) {
         try {
-            const storage = usingMemoryFallback ? memoryCache : localStorage;
             const value = usingMemoryFallback ? memoryCache.get(key) : localStorage.getItem(key);
 
             if (value) {

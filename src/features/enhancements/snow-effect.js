@@ -4,7 +4,6 @@
  */
 
 import { SafeStorage } from '../../utils/safe-storage.js';
-import { ResourceManager } from '../../utils/resource-manager.js';
 import { showToast } from '../../utils/helpers.js';
 
 // ========================================
@@ -99,6 +98,8 @@ const spatialPartition = new SpatialPartition(150); // Spatial index for O(1) qu
 let lastPositionUpdate = 0;
 let animationId = null;
 let domObserver = null;  // MutationObserver for DOM changes
+let runtimeInitialized = false;
+let runtimeListenersBound = false;
 let cardsCache = [];
 let cardsCacheDirty = true;
 let pendingPositionUpdate = false;
@@ -110,6 +111,29 @@ const VIEWPORT_MARGIN = 120;
 // Performance monitoring
 let frameCount = 0;
 let lastFpsCheck = Date.now();
+
+const runtimeHandlers = {
+    resize: () => resize(),
+    scroll: () => schedulePositionUpdate(true),
+    hoverIn: (event) => {
+        const card = event.target.closest('.room-card');
+        if (card) hoveredCard = card;
+    },
+    hoverOut: (event) => {
+        const card = event.target.closest('.room-card');
+        if (!card) return;
+        const related = event.relatedTarget;
+        if (related && card.contains(related)) return;
+        if (hoveredCard === card) hoveredCard = null;
+    },
+    visibilityChange: () => {
+        if (document.hidden) {
+            stopAnimation();
+        } else if (snowEnabled) {
+            startAnimation();
+        }
+    }
+};
 
 // ========================================
 // Card Position Cache (Performance Optimization)
@@ -132,6 +156,112 @@ function schedulePositionUpdate(forceUpdate = false) {
         pendingPositionUpdate = false;
         updateCardPositions(forceUpdate);
     });
+}
+
+function createSnowflakes() {
+    snowflakes = [];
+    for (let i = 0; i < CONFIG.COUNT; i++) {
+        snowflakes.push(new Snowflake());
+    }
+}
+
+function startDomObserver() {
+    if (domObserver) return;
+
+    domObserver = new MutationObserver(() => {
+        cardsCacheDirty = true;
+        schedulePositionUpdate(true);
+    });
+
+    const mainContent = document.getElementById('main-content');
+    if (mainContent) {
+        domObserver.observe(mainContent, {
+            childList: true,
+            subtree: true
+        });
+    }
+}
+
+function stopDomObserver() {
+    if (!domObserver) return;
+    domObserver.disconnect();
+    domObserver = null;
+}
+
+function bindRuntimeListeners() {
+    if (runtimeListenersBound) return;
+
+    window.addEventListener('resize', runtimeHandlers.resize);
+    window.addEventListener('scroll', runtimeHandlers.scroll, { passive: true });
+    document.addEventListener('mouseover', runtimeHandlers.hoverIn, true);
+    document.addEventListener('mouseout', runtimeHandlers.hoverOut, true);
+    document.addEventListener('visibilitychange', runtimeHandlers.visibilityChange);
+
+    runtimeListenersBound = true;
+}
+
+function unbindRuntimeListeners() {
+    if (!runtimeListenersBound) return;
+
+    window.removeEventListener('resize', runtimeHandlers.resize);
+    window.removeEventListener('scroll', runtimeHandlers.scroll);
+    document.removeEventListener('mouseover', runtimeHandlers.hoverIn, true);
+    document.removeEventListener('mouseout', runtimeHandlers.hoverOut, true);
+    document.removeEventListener('visibilitychange', runtimeHandlers.visibilityChange);
+
+    runtimeListenersBound = false;
+}
+
+function startAnimation() {
+    if (!snowEnabled || !ctx || animationId) return;
+    loop();
+}
+
+function stopAnimation() {
+    if (!animationId) return;
+    cancelAnimationFrame(animationId);
+    animationId = null;
+}
+
+function resetRuntimeState() {
+    stopAnimation();
+    snowflakes = [];
+    cardPositionsCache = [];
+    cardsCache = [];
+    cardsCacheDirty = true;
+    pendingPositionUpdate = false;
+    hoveredCard = null;
+    frameCount = 0;
+    lastFpsCheck = Date.now();
+    spatialPartition.clear();
+    accumulatedCountMap.clear();
+    cardDataMap.clear();
+
+    if (ctx && canvas) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
+function ensureRuntime() {
+    if (runtimeInitialized) {
+        updateCardPositions(true);
+        return;
+    }
+
+    resize();
+    createSnowflakes();
+    updateCardPositions(true);
+    startDomObserver();
+    bindRuntimeListeners();
+
+    runtimeInitialized = true;
+}
+
+function teardownRuntime() {
+    stopDomObserver();
+    unbindRuntimeListeners();
+    resetRuntimeState();
+    runtimeInitialized = false;
 }
 
 function incrementAccumulated(card) {
@@ -438,12 +568,7 @@ function checkPerformance() {
  */
 function loop() {
     if (!snowEnabled) {
-        ctx.clearRect(0, 0, width, height);
-        // 确保动画停止
-        if (animationId) {
-            cancelAnimationFrame(animationId);
-            animationId = null;
-        }
+        resetRuntimeState();
         return;
     }
 
@@ -470,9 +595,6 @@ function loop() {
  * Initialize snow effect
  */
 export function initSnow() {
-    // 移动端也支持下雪，只是减少雪花数量
-    console.log('[Snow] Initializing (mobile-friendly)');
-
     canvas = document.getElementById('snow-canvas');
     if (!canvas) {
         console.warn('[Snow] Canvas element not found');
@@ -485,74 +607,12 @@ export function initSnow() {
         return;
     }
 
-    // Setup canvas
-    resize();
-    ResourceManager.addEventListener(window, 'resize', resize);
-
-    // Scroll handler: force update card positions
-    const scrollHandler = () => schedulePositionUpdate(true);
-    ResourceManager.addEventListener(window, 'scroll', scrollHandler, { passive: true });
-
-    // Create snowflakes
-    snowflakes = [];
-    for (let i = 0; i < CONFIG.COUNT; i++) {
-        snowflakes.push(new Snowflake());
-    }
-
-    // Initialize card positions
-    updateCardPositions(true);
-
-    // Watch for DOM changes (new/removed cards)
-    domObserver = new MutationObserver(() => {
-        cardsCacheDirty = true;
-        schedulePositionUpdate(true);
-    });
-
-    const mainContent = document.getElementById('main-content');
-    if (mainContent) {
-        domObserver.observe(mainContent, {
-            childList: true,
-            subtree: true
-        });
-    }
-
-    const handleHoverIn = (event) => {
-        const card = event.target.closest('.room-card');
-        if (card) hoveredCard = card;
-    };
-    const handleHoverOut = (event) => {
-        const card = event.target.closest('.room-card');
-        if (!card) return;
-        const related = event.relatedTarget;
-        if (related && card.contains(related)) return;
-        if (hoveredCard === card) hoveredCard = null;
-    };
-
-    ResourceManager.addEventListener(document, 'mouseover', handleHoverIn, true);
-    ResourceManager.addEventListener(document, 'mouseout', handleHoverOut, true);
-    ResourceManager.addEventListener(document, 'visibilitychange', () => {
-        if (document.hidden) {
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
-            }
-        } else if (snowEnabled && !animationId) {
-            loop();
-        }
-    });
-
-    // Start animation if enabled
-    if (snowEnabled) {
-        // 确保之前的动画已停止
-        if (animationId) {
-            cancelAnimationFrame(animationId);
-            animationId = null;
-        }
-        loop();
-    }
-
-    // Update button state
     updateSnowBtn();
+
+    if (snowEnabled) {
+        ensureRuntime();
+        startAnimation();
+    }
 
     console.log('[Snow] Initialization complete, enabled:', snowEnabled);
 }
@@ -581,46 +641,15 @@ export function updateSnowBtn() {
 export function toggleSnow() {
     snowEnabled = !snowEnabled;
     SafeStorage.setItem('pro_snow_enabled', snowEnabled);
-    updateSnowBtn();
-
-    // 先停止现有的动画循环
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-    }
 
     if (snowEnabled) {
-        // 重新创建 MutationObserver（如果不存在）
-        if (!domObserver) {
-            domObserver = new MutationObserver(() => {
-                updateCardPositions(true);
-            });
-            const mainContent = document.getElementById('main-content');
-            if (mainContent) {
-                domObserver.observe(mainContent, {
-                    childList: true,
-                    subtree: true
-                });
-            }
-        }
-
-        if (canvas && ctx) {
-            // 确保只启动一个循环
-            if (!animationId) {
-                loop();
-            }
-        }
+        ensureRuntime();
+        startAnimation();
+        updateSnowBtn();
         showToast("❄️ 下雪特效已开启");
     } else {
-        // 关闭时清理 MutationObserver，防止内存泄漏
-        if (domObserver) {
-            domObserver.disconnect();
-            domObserver = null;
-        }
-
-        if (ctx && canvas) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
+        teardownRuntime();
+        updateSnowBtn();
         showToast("下雪特效已关闭");
     }
 }
@@ -630,31 +659,9 @@ export function toggleSnow() {
  * Prevents memory leaks by removing event listeners and observers
  */
 export function destroySnow() {
-    // Disable snow
     snowEnabled = false;
-
-    // Stop animation
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-    }
-
-    // Clear snowflakes
-    snowflakes = [];
-
-    // Disconnect MutationObserver
-    if (domObserver) {
-        domObserver.disconnect();
-        domObserver = null;
-    }
-
-    // Clear canvas
-    if (ctx && canvas) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-
-    // ResourceManager will automatically clean up event listeners
-    // when ResourceManager.cleanup() is called
+    teardownRuntime();
+    updateSnowBtn();
 
     console.log('[Snow] Effect destroyed and resources cleaned up');
 }

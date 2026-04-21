@@ -98,7 +98,6 @@ export function updateCard(card, roomInfo, data, cardState) {
             chipText: card.querySelector('.status-text'),
             titleEl: card.querySelector('.room-title'),
             ownerEl: card.querySelector('.room-owner'),
-            viewerPill: card.querySelector('.viewer-pill'),
             viewerIcon: card.querySelector('.viewer-icon'),
             viewerNum: card.querySelector('.viewer-num'),
             avatar: card.querySelector('.u-avatar'),
@@ -108,7 +107,7 @@ export function updateCard(card, roomInfo, data, cardState) {
         };
     }
 
-    const { thumb, chip, chipText, titleEl, ownerEl, viewerPill, viewerIcon, viewerNum, avatar: avt, favBtn, loader, durationEl } = refs;
+    const { thumb, chip, chipText, titleEl, ownerEl, viewerIcon, viewerNum, avatar: avt, favBtn, loader, durationEl } = refs;
 
     const cols = { douyu: '#ff5d23', bilibili: '#fb7299', twitch: '#9146ff', kick: '#53fc18' };
     card.style.setProperty('--brand-color', cols[roomInfo.platform]);
@@ -149,6 +148,7 @@ export function updateCard(card, roomInfo, data, cardState) {
 
     switch (cardState) {
         case 'live':
+        {
             chip.className = 'status-chip chip-live';
             if (chipText.textContent !== '直播中') chipText.textContent = '直播中';
             if (titleEl.textContent !== displayTitle) titleEl.textContent = displayTitle;
@@ -167,6 +167,7 @@ export function updateCard(card, roomInfo, data, cardState) {
                 durationEl.classList.toggle('hidden', true);
             }
             break;
+        }
 
         case 'loop':
             chip.className = 'status-chip chip-loop';
@@ -199,6 +200,7 @@ export function updateCard(card, roomInfo, data, cardState) {
             break;
 
         case 'retrying':
+        {
             chip.className = 'status-chip chip-loading';
             const retryText = `重试中${data._retryCount ? ` (${data._retryCount}/2)` : ''}`;
             if (chipText.textContent !== retryText) chipText.textContent = retryText;
@@ -207,6 +209,7 @@ export function updateCard(card, roomInfo, data, cardState) {
             if (viewerNum.textContent !== '请稍候') viewerNum.textContent = '请稍候';
             durationEl.classList.toggle('hidden', true);
             break;
+        }
 
         case 'loading':
         default:

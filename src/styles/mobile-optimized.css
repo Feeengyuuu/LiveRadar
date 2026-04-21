@@ -30,11 +30,28 @@
 
   body {
     padding: 0; /* No !important needed - base.css already sets this */
+    padding-top: env(safe-area-inset-top) !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+    padding-left: env(safe-area-inset-left) !important;
+    padding-right: env(safe-area-inset-right) !important;
     background-color: #050505;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
   }
 
   /* 移动端也支持下雪特效，更浪漫✨ */
   /* #snow-canvas 由JS控制，不强制隐藏 */
+
+  button,
+  .notify-btn,
+  .auto-refresh-btn {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+
+  * {
+    touch-action: manipulation;
+  }
 
   /* 加载界面文字缩小50% */
   #loader-text {
@@ -46,6 +63,9 @@
      ==================================== */
 
   header {
+    display: block !important;
+    flex-direction: column !important;
+    gap: 0 !important;
     position: sticky;
     top: 0;
     z-index: 100;
@@ -57,13 +77,6 @@
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-  }
-
-  /* 移除原有的flex布局，改为垂直堆叠 */
-  header {
-    display: block !important;
-    flex-direction: column !important;
-    gap: 0 !important;
   }
 
   /* ====================================
@@ -124,19 +137,15 @@
      ==================================== */
 
   header > div:nth-child(2) {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    align-items: stretch !important;
     padding: 6px 16px !important; /* 上下padding减半：12px→6px */
     background: transparent !important;
     border: none !important;
     border-radius: 0 !important;
     margin-bottom: 4px; /* 底部间距减半：8px→4px */
-  }
-
-  /* 重新设计搜索容器 */
-  header > div:nth-child(2) {
-    display: flex !important;
-    flex-direction: row !important;
-    gap: 8px !important;
-    align-items: stretch !important;
   }
 
   /* 平台选择器 - 压缩设计 */
@@ -616,6 +625,8 @@
   }
 
   .toast {
+    width: 100%;
+    text-align: center;
     border-radius: 14px;
     padding: 14px 18px;
     font-size: 14px;
@@ -675,15 +686,6 @@
     border-radius: 12px !important;
     padding: 14px 16px !important;
     font-size: 15px !important;
-  }
-
-  /* ====================================
-     安全区域适配
-     ==================================== */
-
-  body {
-    padding-top: env(safe-area-inset-top) !important;
-    padding-bottom: env(safe-area-inset-bottom) !important;
   }
 
   /* ====================================
@@ -758,6 +760,15 @@
    ======================================== */
 
 @media (max-width: 375px) {
+  .monitor-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .zone-header {
+    gap: 8px;
+  }
+
   header > div:nth-child(2) {
     padding: 10px 12px !important;
   }

@@ -99,21 +99,14 @@ function getModuleColor(module) {
 /**
  * Format log prefix with module name
  * @param {string} module - Module name
- * @param {string} level - Log level name
  * @returns {Array} Console formatting arguments
  */
-function formatPrefix(module, level) {
+function formatPrefix(module) {
     if (!LoggerConfig.enableModuleColors) {
         return [`[${module}]`];
     }
 
     const color = getModuleColor(module);
-    const levelColors = {
-        DEBUG: '#9E9E9E',
-        INFO: '#2196F3',
-        WARN: '#FF9800',
-        ERROR: '#F44336'
-    };
 
     return [
         `%c[${module}]`,
@@ -173,7 +166,7 @@ export const Logger = {
              */
             debug(message, ...args) {
                 if (!shouldLog(LogLevel.DEBUG, moduleName)) return;
-                const prefix = formatPrefix(moduleName, 'DEBUG');
+                const prefix = formatPrefix(moduleName);
                 console.log(...prefix, message, ...args);
                 addToHistory('DEBUG', moduleName, message, args.length ? args : undefined);
             },
@@ -185,7 +178,7 @@ export const Logger = {
              */
             info(message, ...args) {
                 if (!shouldLog(LogLevel.INFO, moduleName)) return;
-                const prefix = formatPrefix(moduleName, 'INFO');
+                const prefix = formatPrefix(moduleName);
                 console.log(...prefix, message, ...args);
                 addToHistory('INFO', moduleName, message, args.length ? args : undefined);
             },
@@ -197,7 +190,7 @@ export const Logger = {
              */
             warn(message, ...args) {
                 if (!shouldLog(LogLevel.WARN, moduleName)) return;
-                const prefix = formatPrefix(moduleName, 'WARN');
+                const prefix = formatPrefix(moduleName);
                 console.warn(...prefix, message, ...args);
                 addToHistory('WARN', moduleName, message, args.length ? args : undefined);
             },
@@ -209,7 +202,7 @@ export const Logger = {
              */
             error(message, ...args) {
                 if (!shouldLog(LogLevel.ERROR, moduleName)) return;
-                const prefix = formatPrefix(moduleName, 'ERROR');
+                const prefix = formatPrefix(moduleName);
                 console.error(...prefix, message, ...args);
                 addToHistory('ERROR', moduleName, message, args.length ? args : undefined);
             },
@@ -241,7 +234,7 @@ export const Logger = {
                 timings.delete(key);
 
                 if (shouldLog(LogLevel.DEBUG, moduleName)) {
-                    const prefix = formatPrefix(moduleName, 'DEBUG');
+                    const prefix = formatPrefix(moduleName);
                     console.log(...prefix, `${label}: ${duration.toFixed(2)}ms`);
                 }
 
@@ -259,7 +252,7 @@ export const Logger = {
                     return;
                 }
 
-                const prefix = formatPrefix(moduleName, 'DEBUG');
+                const prefix = formatPrefix(moduleName);
                 console.groupCollapsed(...prefix, label);
                 try {
                     fn();
@@ -276,7 +269,7 @@ export const Logger = {
             table(data, label) {
                 if (!shouldLog(LogLevel.DEBUG, moduleName)) return;
                 if (label) {
-                    const prefix = formatPrefix(moduleName, 'DEBUG');
+                    const prefix = formatPrefix(moduleName);
                     console.log(...prefix, label);
                 }
                 console.table(data);

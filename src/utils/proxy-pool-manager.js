@@ -41,12 +41,6 @@ const proxyConnections = new Map();
  */
 const proxyQueues = new Map();
 
-/**
- * Track proxy health status
- * Structure: Map<proxyName, {healthy: boolean, lastCheck: timestamp}>
- */
-const proxyHealth = new Map();
-
 // ====================================================================
 // Core Functions
 // ====================================================================

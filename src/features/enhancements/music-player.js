@@ -54,6 +54,7 @@ let isMinimized = SafeStorage.getItem(CONFIG.SAVE_MINIMIZED_KEY, 'false') === 't
 let currentTrackIndex = parseInt(SafeStorage.getItem(CONFIG.SAVE_CURRENT_TRACK_KEY, '0'), 10);
 let hasEverPlayed = false; // 标记是否曾经播放过，用于控制封面显示
 let isAnimating = false;
+let dragListenersBound = false;
 
 const ANIMATION_DURATION_MS = 300;
 
@@ -248,15 +249,9 @@ function bindEvents() {
     elements.volumeSlider.addEventListener('mousedown', eventHandlers.volumeSliderMouseDown);
     elements.volumeSlider.addEventListener('click', eventHandlers.volumeSliderClick);
 
-    // 全局鼠标事件（用于拖动）
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
     // 触摸事件支持
     elements.progressBar.addEventListener('touchstart', eventHandlers.progressBarTouchStart);
     elements.volumeSlider.addEventListener('touchstart', eventHandlers.volumeSliderTouchStart);
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleMouseUp);
 
     // 最小化/展开
     elements.toggleBtn.addEventListener('click', eventHandlers.toggleBtnClick);
@@ -337,6 +332,7 @@ function updateProgress() {
 }
 
 function startDraggingProgress(e) {
+    bindDragListeners();
     isDraggingProgress = true;
     seekProgress(e);
 }
@@ -357,6 +353,7 @@ function seekProgress(e) {
 // ====================================================================
 
 function startDraggingVolume(e) {
+    bindDragListeners();
     isDraggingVolume = true;
     adjustVolume(e);
 }
@@ -398,6 +395,31 @@ function handleTouchMove(e) {
 function handleMouseUp() {
     isDraggingProgress = false;
     isDraggingVolume = false;
+    unbindDragListeners();
+}
+
+function bindDragListeners() {
+    if (dragListenersBound) return;
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleMouseUp);
+    document.addEventListener('touchcancel', handleMouseUp);
+
+    dragListenersBound = true;
+}
+
+function unbindDragListeners() {
+    if (!dragListenersBound) return;
+
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+    document.removeEventListener('touchmove', handleTouchMove);
+    document.removeEventListener('touchend', handleMouseUp);
+    document.removeEventListener('touchcancel', handleMouseUp);
+
+    dragListenersBound = false;
 }
 
 // ====================================================================
@@ -742,10 +764,7 @@ export function destroyMusicPlayer() {
     }
 
     // 移除全局事件监听器
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-    document.removeEventListener('touchmove', handleTouchMove);
-    document.removeEventListener('touchend', handleMouseUp);
+    unbindDragListeners();
 
     // 移除播放器相关事件
     if (elements.toggleBtn) {
