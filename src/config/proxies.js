@@ -8,11 +8,6 @@
  * - 'standard': Standard tier (second choice)
  * - 'fallback': Fallback tier (last resort)
  *
- * Regions:
- * - 'overseas': Overseas proxy
- * - 'mainland': Mainland China proxy
- * - 'global': Global availability
- *
  * Notes:
  * - wrap: true indicates data needs to be extracted from response.contents
  * - Under file:// protocol, only CodeTabs is available
@@ -30,7 +25,6 @@ export const PROXIES = [
         url: u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
         wrap: false,
         weight: 50,
-        region: 'overseas',
         tier: 'premium'
     },
 
@@ -39,7 +33,6 @@ export const PROXIES = [
         url: u => `https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(u)}`,
         wrap: false,
         weight: 20,
-        region: 'overseas',
         tier: 'premium'
     },
     {
@@ -47,7 +40,6 @@ export const PROXIES = [
         url: u => `https://whateverorigin.herokuapp.com/get?url=${encodeURIComponent(u)}`,
         wrap: true,
         weight: 15,
-        region: 'overseas',
         tier: 'premium'
     },
 
@@ -57,7 +49,6 @@ export const PROXIES = [
         url: u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
         wrap: false,
         weight: 12,
-        region: 'overseas',
         tier: 'standard'
     },
     {
@@ -65,7 +56,6 @@ export const PROXIES = [
         url: u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
         wrap: true,
         weight: 10,
-        region: 'overseas',
         tier: 'standard'
     }
 ];

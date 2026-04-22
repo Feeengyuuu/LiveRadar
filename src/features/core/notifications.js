@@ -9,6 +9,40 @@ import { DeviceDetector } from '../../utils/device-detector.js';
 import { playNotificationSound } from '../audio/notification-audio.js';
 import { showToast } from '../../utils/helpers.js';
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function createNotifyIconPath(enabled) {
+    const path = document.createElementNS(SVG_NS, 'path');
+    if (enabled) {
+        path.setAttribute('d', 'M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z');
+        path.setAttribute('fill', 'currentColor');
+    } else {
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('d', 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9');
+    }
+    return path;
+}
+
+function ensureNotifyButtonParts(btn) {
+    let icon = btn.querySelector('svg');
+    if (!icon) {
+        icon = document.createElementNS(SVG_NS, 'svg');
+        icon.setAttribute('xmlns', SVG_NS);
+        icon.setAttribute('class', 'h-4 w-4');
+        btn.prepend(icon);
+    }
+
+    let label = btn.querySelector('span');
+    if (!label) {
+        label = document.createElement('span');
+        btn.appendChild(label);
+    }
+
+    return { icon, label };
+}
+
 /**
  * Update notification button UI
  */
@@ -16,13 +50,23 @@ export function updateNotifyBtn() {
     const btn = getElement('notify-btn');
     if (!btn) return;
 
-    if (isNotificationsEnabled()) {
+    const enabled = isNotificationsEnabled();
+    const { icon, label } = ensureNotifyButtonParts(btn);
+
+    if (enabled) {
         btn.classList.remove('off');
-        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" /></svg><span>推送: 开</span>`;
+        icon.setAttribute('viewBox', '0 0 20 20');
+        icon.setAttribute('fill', 'currentColor');
+        icon.removeAttribute('stroke');
     } else {
         btn.classList.add('off');
-        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg><span>推送: 关</span>`;
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
     }
+
+    icon.replaceChildren(createNotifyIconPath(enabled));
+    label.textContent = enabled ? '推送: 开' : '推送: 关';
 }
 
 /**

@@ -9,8 +9,6 @@
  * @module config/constants
  */
 
-import SafeStorage from '../utils/safe-storage.js';
-
 // ====================================================================
 // Loading Messages
 // ====================================================================
@@ -231,8 +229,7 @@ export const APP_CONFIG = {
   SNOW: {
     ENABLED:
       typeof window !== 'undefined' &&
-      window.innerWidth >= 768 &&
-      SafeStorage.getItem('pro_snow_enabled', 'false') === 'true',
+      window.innerWidth >= 768,
     COUNT: 500,
     MAX_SIZE: 3.5,
     MIN_SIZE: 1,
@@ -274,15 +271,6 @@ export const APP_CONFIG = {
     NOTIFICATION_VOLUME: 1.0,
     ENABLE_ON_IOS: false,
     AUTO_UNLOCK: true,
-  },
-
-  // Region detection
-  REGION: {
-    AUTO_DETECT: true,
-    IS_MAINLAND_CHINA: null,
-    DETECTION_TIMEOUT: 5000,
-    MAINLAND_PROXY_STRATEGY: 'direct',
-    DISABLE_TWITCH_IN_MAINLAND: true,
   },
 
   // Debug

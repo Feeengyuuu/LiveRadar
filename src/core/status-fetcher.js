@@ -18,7 +18,7 @@ import { APP_CONFIG } from '../config/constants.js';
 import { registerDefaultAdapters, fetchPlatformStatus } from '../api/platform-adapter.js';
 import { fetchQuick } from '../api/proxy-manager.js';
 import { DataDiffer } from '../utils/data-differ.js';
-import { getRoomDataCache, updateRoomCache } from './state.js';
+import { getRoomDataCache, getRooms, updateRoomCache } from './state.js';
 import { formatHeat, getRoomCacheKey } from '../utils/helpers.js';
 import { emit, Events } from './event-bus.js';
 
@@ -54,6 +54,11 @@ const inFlightFetches = new Map();
 // Pending Douyu avatar fallbacks keyed by cacheKey, so cancelPendingFetches can drop them
 const pendingAvatarFetches = new Map();
 
+function isRoomStillTracked(room) {
+    const rooms = getRooms();
+    return rooms.some(item => item.platform === room.platform && String(item.id) === String(room.id));
+}
+
 /**
  * Initialize status fetcher with external dependencies
  * @param {Object} deps - Dependencies object
@@ -70,6 +75,7 @@ export function initStatusFetcher(deps) {
  * from landing in the cache — callers should re-check presence before writing.
  */
 export function cancelPendingFetches(cacheKey) {
+    inFlightFetches.delete(cacheKey);
     pendingAvatarFetches.delete(cacheKey);
 }
 
@@ -146,6 +152,11 @@ async function fetchRoomStatusInner(room, jitter, cacheKey) {
     } catch (error) {
         console.error(`[fetchStatus] ${room.platform}-${room.id} fetch failed:`, error.message);
         result = null;
+    }
+
+    if (!isRoomStillTracked(room)) {
+        cancelPendingFetches(cacheKey);
+        return;
     }
 
     if (result) {

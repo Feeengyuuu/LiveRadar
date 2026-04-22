@@ -31,10 +31,6 @@ const domCache = {
     snowToggleBtn: null,
     autoRefreshBtn: null,
     autoRefreshLabel: null,
-    keepAliveBtn: null,
-    keepAliveLabel: null,
-    regionBtn: null,
-    regionLabel: null,
     globalRefreshBtn: null,
     refreshStats: null,
 
@@ -84,10 +80,6 @@ export function initDOMCache() {
     domCache.snowToggleBtn = document.getElementById('snow-toggle-btn');
     domCache.autoRefreshBtn = document.getElementById('auto-refresh-btn');
     domCache.autoRefreshLabel = document.getElementById('auto-refresh-label');
-    domCache.keepAliveBtn = document.getElementById('keepalive-btn');
-    domCache.keepAliveLabel = document.getElementById('keepalive-label');
-    domCache.regionBtn = document.getElementById('region-btn');
-    domCache.regionLabel = document.getElementById('region-label');
     domCache.globalRefreshBtn = document.getElementById('global-refresh-btn');
     domCache.refreshStats = document.getElementById('refresh-stats');
 

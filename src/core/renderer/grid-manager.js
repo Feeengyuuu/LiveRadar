@@ -158,7 +158,16 @@ function renderEmptyState(cache, grids, zones) {
     if (cache.liveCount) cache.liveCount.textContent = '0';
     cache.emptyState?.classList.remove('hidden');
     zones.forEach(el => el.classList.remove('active'));
-    Object.values(grids).forEach(grid => { if (grid) grid.innerHTML = ''; });
+    Object.values(grids).forEach(grid => {
+        if (!grid) return;
+        Array.from(grid.children).forEach(card => {
+            if (card instanceof HTMLElement && card.classList.contains('room-card')) {
+                viewportTracker.unobserve(card);
+            }
+        });
+        grid.innerHTML = '';
+    });
+    knownCardIds.clear();
 }
 
 // ====================================================================

@@ -20,7 +20,7 @@
                style-src 'self' 'unsafe-inline';
                img-src 'self' data: https: blob:;
                media-src 'self' data: blob:;
-               connect-src 'self' https://www.douyu.com https://m.douyu.com https://live.bilibili.com https://api.bilibili.com https://api.live.bilibili.com https://api.twitch.tv https://gql.twitch.tv https://kick.com https://decapi.me https://static-cdn.jtvnw.net https://api.codetabs.com https://api.allorigins.win https://cors-proxy.htmldriven.com https://corsproxy.io https://whateverorigin.herokuapp.com https://ipapi.co https://ip-api.com https://ipinfo.io;
+               connect-src 'self' https://www.douyu.com https://m.douyu.com https://live.bilibili.com https://api.bilibili.com https://api.live.bilibili.com https://api.twitch.tv https://gql.twitch.tv https://kick.com https://decapi.me https://static-cdn.jtvnw.net https://api.codetabs.com https://api.allorigins.win https://cors-proxy.htmldriven.com https://corsproxy.io https://whateverorigin.herokuapp.com;
                font-src 'self' data:;
                object-src 'none';
                base-uri 'self';
@@ -265,45 +265,6 @@
         <button id="notify-btn" data-action="toggle-notifications" class="notify-btn off">
           <span>推送: 关</span>
         </button>
-        <button id="keepalive-btn" data-action="toggle-keep-alive" class="keepalive-btn off">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-          <span id="keepalive-label">防休眠: 关</span>
-        </button>
-        <button
-          id="region-btn"
-          data-action="toggle-region-mode"
-          class="region-btn"
-          title="切换地区模式"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span id="region-label">地区: 自动</span>
-        </button>
         <button data-action="export-rooms" class="import-export-btn" title="导出主播列表">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
@@ -402,14 +363,6 @@
 
     <!-- Toast Container -->
     <div id="toast-container"></div>
-
-    <!-- Keep-Alive Audio -->
-    <audio id="bg-keepalive" loop style="display: none">
-      <source
-        src="data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAADhAC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7v////////////////////////////////////////////////////////////////////////////////////////////////MQXQwAAAAAtgAAAAAAAANEAAAAAOGluZwAAAAPAAAAAgAAA4QAu7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7v////////////////////////////////////////////////////////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uQxAAADwAABpAAAACAAADSAAAAETEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ=="
-        type="audio/mp3"
-      />
-    </audio>
 
     <!-- Back to Top Button -->
     <button

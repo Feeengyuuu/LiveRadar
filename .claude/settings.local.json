@@ -53,7 +53,23 @@
       "mcp__chrome-devtools__list_pages",
       "mcp__chrome-devtools__drag",
       "Bash(claude mcp *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(cmd /c \"npx -y chrome-devtools-mcp@latest --help\")",
+      "Bash(npx -y chrome-devtools-mcp@latest --help)",
+      "Bash(where npx *)",
+      "Bash(where npx.cmd)",
+      "Bash(where node *)",
+      "Bash(npx --version)",
+      "mcp__chrome-devtools__close_page",
+      "Bash(kill b2q9y9eea *)",
+      "WebFetch(domain:dev.twitch.tv)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(exit 0)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(cmd //c \"taskkill /F /IM node.exe /T 2>nul\")",
+      "Bash(/c/Windows/System32/taskkill.exe //F //IM node.exe //T)"
     ]
   },
   "hooks": {

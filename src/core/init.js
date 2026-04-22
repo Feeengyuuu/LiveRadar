@@ -5,7 +5,6 @@
  *
  * Handles complete application initialization sequence:
  * - File protocol warning check
- * - Region detection (handled during bootstrap)
  * - UI state initialization
  * - Cache cleanup and data migration
  * - Audio system setup
@@ -212,8 +211,6 @@ function initializeStatusSnapshot() {
  * Main application initialization function
  */
 export function init() {
-    // Region detection is handled by initRegionDetection during bootstrap
-
     // Update UI states
     updatePlaceholder();
 
@@ -240,8 +237,7 @@ export function init() {
     // Start initial refresh (silent if no cache)
     emit(Events.REFRESH_REQUEST, !hasCache);
 
-    // Note: initAutoRefresh(), initAudioManager(), and initRegionDetection()
-    // are now called in main.js before init() to ensure proper initialization
+    // Feature initialization runs during bootstrap before init()
 
     // Network status monitoring
     initNetworkMonitor();

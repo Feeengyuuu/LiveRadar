@@ -80,9 +80,6 @@
  * @property {boolean} autoRefreshEnabled - Auto-refresh enabled
  * @property {number|null} autoRefreshTimer - Auto-refresh timer ID
  * @property {number} autoRefreshCountdown - Auto-refresh countdown
- * @property {boolean} keepAliveEnabled - Keep-alive mode enabled
- * @property {HTMLAudioElement|null} keepAliveAudio - Keep-alive audio element
- * @property {boolean} keepAliveUnlocked - Whether audio is unlocked
  * @property {boolean} snowEnabled - Snow effect enabled
  * @property {Object<string, boolean>} previousLiveStatus - Previous live status map
  * @property {StatusChange[]} statusChangeQueue - Status change queue

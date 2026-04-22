@@ -3,14 +3,14 @@
  * Features: Physics-based accumulation, card collision, hover-triggered falling
  */
 
-import { SafeStorage } from '../../utils/safe-storage.js';
+import { isSnowEnabled, updateSnowEnabled } from '../../core/state.js';
 import { showToast } from '../../utils/helpers.js';
 
 // ========================================
 // Configuration (aligned with original file)
 // ========================================
 const CONFIG = {
-    ENABLED: SafeStorage.getItem('pro_snow_enabled', 'false') === 'true',  // 默认关闭，所有设备都支持
+    ENABLED: isSnowEnabled(),        // 默认关闭，状态统一由 state.js 恢复
     COUNT: window.innerWidth < 768 ? 80 : 500,  // 优化：移动端80个，桌面端500个
     MAX_SIZE: 3.5,                  // Maximum size (pixels)
     MIN_SIZE: 1,                    // Minimum size (pixels)
@@ -640,7 +640,7 @@ export function updateSnowBtn() {
  */
 export function toggleSnow() {
     snowEnabled = !snowEnabled;
-    SafeStorage.setItem('pro_snow_enabled', snowEnabled);
+    updateSnowEnabled(snowEnabled);
 
     if (snowEnabled) {
         ensureRuntime();

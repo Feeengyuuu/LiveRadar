@@ -29,7 +29,6 @@ import { initVisibilityRecovery } from './renderer/image-handler.js';
 import { initSnow } from '../features/enhancements/snow-effect.js';
 import { initAutoRefresh } from '../features/core/auto-refresh.js';
 import { initNotifications, checkNotifications } from '../features/core/notifications.js';
-import { initRegionDetection } from '../features/enhancements/region-detector.js';
 import { initStatusTicker, updateTicker } from '../features/core/status-ticker.js';
 import { initNotificationAudio } from '../features/audio/notification-audio.js';
 import { initAudioManager } from '../features/audio/audio-manager.js';
@@ -98,7 +97,6 @@ export async function initializeApp() {
         initMusicPlayer();
         initAudioManager();
         initAutoRefresh();
-        initRegionDetection();
 
         // Pass notifyAudio to init dependencies (must be called after initNotificationAudio)
         initAppDependencies({

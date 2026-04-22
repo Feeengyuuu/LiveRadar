@@ -6,16 +6,14 @@
  * to prevent memory leaks.
  */
 
-import { SafeStorage } from '../../utils/safe-storage.js';
 import { APP_CONFIG } from '../../config/constants.js';
 import { getElement } from '../../utils/dom-cache.js';
 import { ResourceManager } from '../../utils/resource-manager.js';
-import { updateAutoRefreshEnabled } from '../../core/state.js';
+import { isAutoRefreshEnabled, updateAutoRefreshEnabled } from '../../core/state.js';
 import { on, emit, Events } from '../../core/event-bus.js';
 import { showToast } from '../../utils/helpers.js';
 
 // State
-let autoRefreshEnabled = SafeStorage.getItem('pro_auto_refresh', 'false') === 'true';
 let autoRefreshTimer = null;
 let autoRefreshCountdown = APP_CONFIG.AUTO_REFRESH.INTERVAL;
 
@@ -38,7 +36,7 @@ function updateAutoRefreshBtn() {
     const label = getElement('auto-refresh-label');
     if (!btn || !label) return;
 
-    if (autoRefreshEnabled) {
+    if (isAutoRefreshEnabled()) {
         btn.classList.remove('off');
         label.textContent = `自动: ${formatCountdown(autoRefreshCountdown)}`;
     } else {
@@ -98,10 +96,10 @@ export function stopAutoRefresh() {
  * Toggle auto-refresh on/off
  */
 export function toggleAutoRefresh() {
-    autoRefreshEnabled = !autoRefreshEnabled;
-    updateAutoRefreshEnabled(autoRefreshEnabled);
+    const nextEnabled = !isAutoRefreshEnabled();
+    updateAutoRefreshEnabled(nextEnabled);
 
-    if (autoRefreshEnabled) {
+    if (nextEnabled) {
         startAutoRefresh();
         showToast("自动刷新已开启 (每10分钟)");
     } else {
@@ -115,7 +113,7 @@ export function toggleAutoRefresh() {
  * Initialize auto-refresh on page load
  */
 export function initAutoRefresh() {
-    if (autoRefreshEnabled) {
+    if (isAutoRefreshEnabled()) {
         startAutoRefresh();
     }
     updateAutoRefreshBtn();

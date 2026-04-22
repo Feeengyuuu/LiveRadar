@@ -197,13 +197,8 @@ export const state = {
     autoRefreshTimer: null,
     autoRefreshCountdown: APP_CONFIG.AUTO_REFRESH.INTERVAL,
 
-    // Keep-alive mode (prevent browser sleep)
-    keepAliveEnabled: SafeStorage.getItem('pro_keepalive_enabled', 'false') === 'true',
-    keepAliveAudio: null,
-    keepAliveUnlocked: false,
-
     // Visual effects
-    snowEnabled: SafeStorage.getItem('pro_snow_enabled', 'true') === 'true',
+    snowEnabled: SafeStorage.getItem('pro_snow_enabled', 'false') === 'true',
 
     // Status change notifications
     // 🔥 优化：previousLiveStatus 现在从 localStorage 恢复（避免页面刷新后误报）
@@ -240,6 +235,11 @@ if (!SafeStorage.getItem('pro_did')) {
     SafeStorage.setItem('pro_did', state.did);
 }
 
+// Clean up deprecated preference keys on startup.
+['pro_' + ['keep', 'alive_enabled'].join('')].forEach((key) => {
+    SafeStorage.removeItem(key);
+});
+
 // ============================================================
 // STATE UPDATERS - Controlled mutation with persistence
 // ============================================================
@@ -266,10 +266,11 @@ export function updateRooms(newRooms, immediate = false) {
 /**
  * Update search history
  * @param {Array} newHistory - New search history array
+ * @param {boolean} [immediate=false] - Skip debounce and write immediately
  */
-export function updateSearchHistory(newHistory) {
+export function updateSearchHistory(newHistory, immediate = false) {
     state.searchHistory = newHistory;
-    debouncedStorageWrite('pro_search_history', newHistory);
+    debouncedStorageWrite('pro_search_history', newHistory, immediate);
 }
 
 /**
@@ -321,17 +322,10 @@ export function updateProxyStats(newStats) {
  * @param {boolean} enabled - Whether auto-refresh is enabled
  */
 export function updateAutoRefreshEnabled(enabled) {
+    const oldValue = state.autoRefreshEnabled;
     state.autoRefreshEnabled = enabled;
     debouncedStorageSet('pro_auto_refresh', enabled);
-}
-
-/**
- * Update keep-alive enabled status
- * @param {boolean} enabled - Whether keep-alive is enabled
- */
-export function updateKeepAliveEnabled(enabled) {
-    state.keepAliveEnabled = enabled;
-    debouncedStorageSet('pro_keepalive_enabled', enabled);
+    notifyListeners('autoRefreshEnabled', enabled, oldValue);
 }
 
 /**
@@ -339,8 +333,10 @@ export function updateKeepAliveEnabled(enabled) {
  * @param {boolean} enabled - Whether snow effect is enabled
  */
 export function updateSnowEnabled(enabled) {
+    const oldValue = state.snowEnabled;
     state.snowEnabled = enabled;
     debouncedStorageSet('pro_snow_enabled', enabled);
+    notifyListeners('snowEnabled', enabled, oldValue);
 }
 
 /**
@@ -489,6 +485,14 @@ export function isNotificationsEnabled() {
  */
 export function isAutoRefreshEnabled() {
     return state.autoRefreshEnabled;
+}
+
+/**
+ * Check if snow effect is enabled
+ * @returns {boolean} True if snow effect is enabled
+ */
+export function isSnowEnabled() {
+    return state.snowEnabled;
 }
 
 /**

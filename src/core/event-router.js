@@ -32,8 +32,7 @@ import {
 } from '../features/core/room-management.js';
 import { toggleNotifications } from '../features/core/notifications.js';
 import { toggleAutoRefresh } from '../features/core/auto-refresh.js';
-import { toggleKeepAlive, unlockAllAudio } from '../features/audio/audio-manager.js';
-import { toggleRegionMode } from '../features/enhancements/region-detector.js';
+import { unlockAllAudio } from '../features/audio/audio-manager.js';
 import { exportRooms, importRooms } from '../features/core/import-export.js';
 import { refreshAll } from './refresh-manager.js';
 import { dismissFileWarning, dismissFileWarningPermanently, showDeploymentGuide } from './file-protocol-warning.js';
@@ -85,8 +84,6 @@ const actionHandlers = {
     // Settings toggles
     'toggle-notifications': () => toggleNotifications(),
     'toggle-auto-refresh': () => toggleAutoRefresh(),
-    'toggle-keep-alive': () => toggleKeepAlive(),
-    'toggle-region-mode': () => toggleRegionMode(),
 
     // Import/Export
     'export-rooms': () => exportRooms(getRooms()),

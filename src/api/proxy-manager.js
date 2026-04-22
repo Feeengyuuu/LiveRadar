@@ -78,6 +78,14 @@ function createTimeoutController(timeout, externalSignal) {
     };
 }
 
+function getProxyBreaker(proxyName) {
+    return getCircuitBreaker(`proxy-${proxyName}`);
+}
+
+function isProxyAbort(error, abortSignal) {
+    return error?.name === 'AbortError' && abortSignal?.aborted === true;
+}
+
 /**
  * Resolve on first fulfilled promise (Promise.any fallback).
  * @param {Promise[]} promises - Promises to race
@@ -124,10 +132,9 @@ function promiseAny(promises) {
  * - Typical hit rate: 85-95% during normal operation
  */
 export function getSmartProxyOrder(targetUrl = '') {
-    const userIsMainland = APP_CONFIG.REGION.IS_MAINLAND_CHINA === true;
     const isDomesticTarget = targetUrl && (targetUrl.includes('bilibili.com') || targetUrl.includes('douyu.com'));
     const now = Date.now();
-    const cacheKey = `${userIsMainland ? 'CN' : 'INTL'}|${isDomesticTarget ? 'dom' : 'intl'}`;
+    const cacheKey = isDomesticTarget ? 'dom' : 'intl';
 
     // Fast path: Return cached order if valid
     // Skips expensive sorting calculation (141-202 lines of computation)
@@ -182,15 +189,9 @@ export function getSmartProxyOrder(targetUrl = '') {
             ? Math.max(0, 1 - statsB.avgResponseTime / speedThreshold)
             : 0.5;
 
-        // 5. Geographic weight adjustment
-        let geoWeightA = a.weight || 1;
-        let geoWeightB = b.weight || 1;
-
-        // If user is in mainland, prioritize mainland proxies (if available)
-        if (userIsMainland) {
-            if (a.region === 'mainland') geoWeightA *= 3;
-            if (b.region === 'mainland') geoWeightB *= 3;
-        }
+        // 5. Proxy weight adjustment
+        const weightA = a.weight || 1;
+        const weightB = b.weight || 1;
 
         // 6. Tier priority boost
         const tierScoreA = tierPriority[a.tier] || 0;
@@ -203,8 +204,8 @@ export function getSmartProxyOrder(targetUrl = '') {
 
         // 8. Final score = Tier priority + (Quality score * Geographic weight * multiplier)
         // Tier is primary factor, quality score is fine-tuning factor
-        const finalScoreA = tierScoreA + (qualityScoreA * geoWeightA * QUALITY_SCORE_MULTIPLIER);
-        const finalScoreB = tierScoreB + (qualityScoreB * geoWeightB * QUALITY_SCORE_MULTIPLIER);
+        const finalScoreA = tierScoreA + (qualityScoreA * weightA * QUALITY_SCORE_MULTIPLIER);
+        const finalScoreB = tierScoreB + (qualityScoreB * weightB * QUALITY_SCORE_MULTIPLIER);
 
         // Debug logging (optional): Print top 3 proxies' scores
         if (APP_CONFIG.DEBUG.LOG_PERFORMANCE) {
@@ -318,7 +319,8 @@ export async function fetchWithProxy(targetUrl, isBinary = false, timeout = APP_
 
     console.log('[Proxy Strategy] Using smart proxy pool with concurrency control...');
 
-    const smartProxies = getSmartProxyOrder(targetUrl);
+    const smartProxies = getSmartProxyOrder(targetUrl)
+        .filter(proxy => getProxyBreaker(proxy.name).canRequest());
     if (smartProxies.length === 0) return null;
 
     const attemptProxy = (proxy, abortSignal) => executeWithProxyControl(
@@ -328,6 +330,7 @@ export async function fetchWithProxy(targetUrl, isBinary = false, timeout = APP_
             // Find the assigned proxy config
             const assignedProxy = PROXIES.find(p => p.name === assignedProxyName);
             if (!assignedProxy) throw new Error(`Proxy ${assignedProxyName} not found`);
+            const breaker = getProxyBreaker(assignedProxy.name);
 
             const timeoutCtrl = createTimeoutController(timeout, abortSignal);
 
@@ -346,6 +349,7 @@ export async function fetchWithProxy(targetUrl, isBinary = false, timeout = APP_
 
                 if (isBinary) {
                     recordProxyResult(assignedProxy.name, true, responseTime);
+                    breaker.recordSuccess();
                     return await res.blob();
                 }
 
@@ -362,12 +366,16 @@ export async function fetchWithProxy(targetUrl, isBinary = false, timeout = APP_
 
                 if (data) {
                     recordProxyResult(assignedProxy.name, true, responseTime);
+                    breaker.recordSuccess();
                     return data;
                 }
                 recordProxyResult(assignedProxy.name, false, responseTime);
                 throw new Error('Empty data');
             } catch (err) {
                 timeoutCtrl.clear();
+                if (!isProxyAbort(err, abortSignal)) {
+                    breaker.recordFailure();
+                }
                 throw err;
             }
         },
@@ -427,28 +435,17 @@ export async function fetchWithProxy(targetUrl, isBinary = false, timeout = APP_
         }
     }
 
-    // 优化：应用Circuit Breaker模式，跳过已知失败的代理
     for (let i = startIndex; i < smartProxies.length; i++) {
         const proxy = smartProxies[i];
-
-        // 检查Circuit Breaker状态
-        const breaker = getCircuitBreaker(`proxy-${proxy.name}`);
-        if (!breaker.canRequest()) {
-            console.log(`[Proxy Strategy] Skipping ${proxy.name} - circuit breaker open`);
-            continue;
-        }
 
         try {
             const result = await attemptProxy(proxy);
 
             // If we got a result, return it
             if (result) {
-                breaker.recordSuccess(); // 记录成功
                 return result;
             }
         } catch (e) {
-            // 记录失败到Circuit Breaker
-            breaker.recordFailure();
             console.warn(`[Proxy] ${proxy.name} failed:`, e.message);
             continue;
         }
@@ -464,9 +461,10 @@ export async function fetchWithProxy(targetUrl, isBinary = false, timeout = APP_
  */
 export async function fetchQuick(targetUrl, timeout = APP_CONFIG.NETWORK.PROXY_TIMEOUT_QUICK) {
     const finalUrl = buildAuthenticatedUrl(targetUrl);
-    const smartProxies = getSmartProxyOrder(targetUrl);
-    if (smartProxies.length === 0) return null;
-    const bestProxy = smartProxies[0]; // Only use best proxy
+    const bestProxy = getSmartProxyOrder(targetUrl)
+        .find(proxy => getProxyBreaker(proxy.name).canRequest());
+    if (!bestProxy) return null;
+    const breaker = getProxyBreaker(bestProxy.name);
 
     const startTime = Date.now();
     try {
@@ -476,6 +474,7 @@ export async function fetchQuick(targetUrl, timeout = APP_CONFIG.NETWORK.PROXY_T
         const responseTime = Date.now() - startTime;
         if (!res.ok) {
             recordProxyResult(bestProxy.name, false, responseTime);
+            breaker.recordFailure();
             return null;
         }
         let data = null;
@@ -486,17 +485,21 @@ export async function fetchQuick(targetUrl, timeout = APP_CONFIG.NETWORK.PROXY_T
                 : raw;
         } catch (parseError) {
             recordProxyResult(bestProxy.name, false, responseTime);
+            breaker.recordFailure();
             return null;
         }
         if (data) {
             recordProxyResult(bestProxy.name, true, responseTime);
+            breaker.recordSuccess();
             return data;
         }
         recordProxyResult(bestProxy.name, false, responseTime);
+        breaker.recordFailure();
         return null;
     } catch (e) {
         const responseTime = Date.now() - startTime;
         recordProxyResult(bestProxy.name, false, responseTime);
+        breaker.recordFailure();
         return null;
     }
 }
@@ -512,12 +515,17 @@ export async function fetchTextWithProxy(targetUrl, timeout = APP_CONFIG.NETWORK
     const smartProxies = getSmartProxyOrder(targetUrl);
 
     for (const proxy of smartProxies) {
+        if (!getProxyBreaker(proxy.name).canRequest()) {
+            continue;
+        }
+
         try {
             const result = await executeWithProxyControl(
                 async (assignedProxyName) => {
                     const startTime = Date.now();
                     const assignedProxy = PROXIES.find(p => p.name === assignedProxyName);
                     if (!assignedProxy) throw new Error(`Proxy ${assignedProxyName} not found`);
+                    const breaker = getProxyBreaker(assignedProxy.name);
 
                     const timeoutCtrl = createTimeoutController(timeout);
                     try {
@@ -533,12 +541,14 @@ export async function fetchTextWithProxy(targetUrl, timeout = APP_CONFIG.NETWORK
                         const text = await res.text();
                         if (text) {
                             recordProxyResult(assignedProxy.name, true, responseTime);
+                            breaker.recordSuccess();
                             return text;
                         }
                         recordProxyResult(assignedProxy.name, false, responseTime);
                         throw new Error('Empty text');
                     } catch (err) {
                         timeoutCtrl.clear();
+                        breaker.recordFailure();
                         throw err;
                     }
                 },

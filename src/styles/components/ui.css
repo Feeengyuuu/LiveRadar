@@ -120,20 +120,6 @@ button, .btn, [class*="-btn"] {
 .auto-refresh-btn:hover { background: rgba(99, 102, 241, 0.2); }
 .auto-refresh-btn.off:hover { background: rgba(255,255,255,0.1); }
 
-/* 防休眠按钮 */
-.keepalive-btn { background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); color: #eab308; padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-.keepalive-btn.off { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #6b7280; }
-.keepalive-btn:hover { background: rgba(234, 179, 8, 0.2); }
-.keepalive-btn.off:hover { background: rgba(255,255,255,0.1); }
-
-/* 地区模式按钮 */
-.region-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; font-weight: 800; border-radius: 12px; transition: all 0.2s; cursor: pointer; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: white; border: none; white-space: nowrap; }
-.region-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
-.region-btn.mainland { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
-.region-btn.mainland:hover { box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4); }
-.region-btn.overseas { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
-.region-btn.overseas:hover { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); }
-
 /* 导入导出按钮 */
 .import-export-btn {
     display: flex;

@@ -3,18 +3,24 @@
  * Add/remove rooms, platform selector, search history
  */
 
-import { SafeStorage } from '../../utils/safe-storage.js';
 import { getElement } from '../../utils/dom-cache.js';
 import { DeviceDetector } from '../../utils/device-detector.js';
 import { PLACEHOLDERS } from '../../config/ui-strings.js';
 import { APP_CONFIG } from '../../config/constants.js';
-import { getRooms, getRoomDataCache, updateRoomDataCache, addRoom as addRoomToState, removeRoom as removeRoomFromState, toggleRoomFavorite } from '../../core/state.js';
+import {
+    getRooms,
+    getRoomDataCache,
+    getSearchHistory,
+    updateSearchHistory,
+    updateRoomDataCache,
+    addRoom as addRoomToState,
+    removeRoom as removeRoomFromState,
+    toggleRoomFavorite
+} from '../../core/state.js';
 import { getRoomCacheKey, normalizeRoomId, showToast } from '../../utils/helpers.js';
 import { fetchRoomStatus, cancelPendingFetches } from '../../core/status-fetcher.js';
 import { emit, Events } from '../../core/event-bus.js';
 
-// State
-let searchHistory = SafeStorage.getJSON('pro_search_history', []);
 let historyEventsBound = false;
 let historyPositionBound = false;
 
@@ -233,11 +239,11 @@ export function applyHistory(value) {
  */
 export function deleteHistory(e, value) {
     e.stopPropagation();
-    searchHistory = searchHistory.filter(item => item !== value);
-    SafeStorage.setJSON('pro_search_history', searchHistory);
+    const nextHistory = getSearchHistory().filter(item => item !== value);
+    updateSearchHistory(nextHistory, true);
     renderHistory();
 
-    const input = document.getElementById('room-id-input');
+    const input = getElement('room-id-input');
     if (input) input.focus();
 }
 
@@ -248,13 +254,13 @@ export function deleteHistory(e, value) {
 export function saveSearchHistory(value) {
     if (!value) return;
 
-    searchHistory = searchHistory.filter(item => item !== value);
-    searchHistory.unshift(value);
+    const nextHistory = getSearchHistory().filter(item => item !== value);
+    nextHistory.unshift(value);
     const MAX_HISTORY_ITEMS = APP_CONFIG.HISTORY.MAX_ITEMS;
-    if (searchHistory.length > MAX_HISTORY_ITEMS) {
-        searchHistory = searchHistory.slice(0, MAX_HISTORY_ITEMS);
+    if (nextHistory.length > MAX_HISTORY_ITEMS) {
+        nextHistory.length = MAX_HISTORY_ITEMS;
     }
-    SafeStorage.setJSON('pro_search_history', searchHistory);
+    updateSearchHistory(nextHistory, true);
 }
 
 /**
@@ -349,6 +355,7 @@ export function renderHistory(query = '') {
     historyEl.textContent = '';
 
     const q = query.trim().toLowerCase();
+    const searchHistory = getSearchHistory();
     const items = q ? searchHistory.filter(item => item.toLowerCase().includes(q)) : searchHistory.slice();
 
     if (items.length === 0) {

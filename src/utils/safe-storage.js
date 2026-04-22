@@ -36,7 +36,6 @@ const CONFIG = {
         'pro_monitored_rooms',   // User's room list - most important
         'pro_notify_enabled',    // User preferences
         'pro_auto_refresh',
-        'pro_keepalive_enabled',
         'pro_snow_enabled',
         'pro_did'                // Device ID
     ],

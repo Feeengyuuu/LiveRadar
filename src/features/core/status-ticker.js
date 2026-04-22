@@ -14,6 +14,8 @@ let currentTickerIndex = 0; // Current displayed message index
 let tickerTimer = null; // Scroll timer
 let currentTickerItem = null; // Reusable ticker item element (performance optimization)
 let hideTimer = null; // Hide delay timer
+let messageSwapTimer = null;
+let messageActivateTimer = null;
 
 function getTickerEl() {
     return getElement('status-ticker');
@@ -24,6 +26,17 @@ function getPreviousLiveStatusRef() {
         previousLiveStatus = getState().previousLiveStatus || {};
     }
     return previousLiveStatus;
+}
+
+function clearMessageTimers() {
+    if (messageSwapTimer) {
+        clearTimeout(messageSwapTimer);
+        messageSwapTimer = null;
+    }
+    if (messageActivateTimer) {
+        clearTimeout(messageActivateTimer);
+        messageActivateTimer = null;
+    }
 }
 
 /**
@@ -91,6 +104,7 @@ export function startStatusTicker() {
         clearTimeout(hideTimer);
         hideTimer = null;
     }
+    clearMessageTimers();
 
     const ticker = getTickerEl();
     if (!ticker || statusChangeQueue.length === 0) return;
@@ -141,6 +155,7 @@ export function stopStatusTicker() {
         clearTimeout(hideTimer);
         hideTimer = null;
     }
+    clearMessageTimers();
 
     const ticker = getTickerEl();
     if (ticker) {
@@ -183,6 +198,9 @@ function showTickerMessage(index) {
         text.appendChild(action);
         currentTickerItem.appendChild(icon);
         currentTickerItem.appendChild(text);
+    }
+
+    if (currentTickerItem.parentElement !== ticker) {
         ticker.appendChild(currentTickerItem);
     }
 
@@ -195,7 +213,9 @@ function showTickerMessage(index) {
     currentTickerItem.classList.remove('active');
 
     // Update content after brief delay for smooth transition
-    setTimeout(() => {
+    clearMessageTimers();
+    messageSwapTimer = setTimeout(() => {
+        messageSwapTimer = null;
         // Update icon
         icon.className = `ticker-icon ${message.type}`;
         icon.textContent = message.type === 'online' ? '●' : '○';
@@ -205,7 +225,10 @@ function showTickerMessage(index) {
         action.textContent = message.type === 'online' ? ' 开播了' : ' 下播了';
 
         // Trigger enter animation
-        setTimeout(() => currentTickerItem.classList.add('active'), 10);
+        messageActivateTimer = setTimeout(() => {
+            messageActivateTimer = null;
+            currentTickerItem?.classList.add('active');
+        }, 10);
     }, 100);
 }
 
@@ -229,6 +252,8 @@ export function initStatusTicker() {
     currentTickerIndex = 0;
     tickerTimer = null;
     hideTimer = null;
+    currentTickerItem = null;
+    clearMessageTimers();
 
     console.log('[Status Ticker] Initialized');
 }
@@ -250,10 +275,12 @@ export function clearTickerState() {
         clearTimeout(hideTimer);
         hideTimer = null;
     }
+    clearMessageTimers();
 
     const ticker = getTickerEl();
     if (ticker) {
         ticker.style.display = 'none';
         ticker.innerHTML = '';
     }
+    currentTickerItem = null;
 }
