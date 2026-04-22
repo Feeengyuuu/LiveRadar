@@ -69,7 +69,22 @@
       "Bash(taskkill //F //IM node.exe)",
       "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force\")",
       "Bash(cmd //c \"taskkill /F /IM node.exe /T 2>nul\")",
-      "Bash(/c/Windows/System32/taskkill.exe //F //IM node.exe //T)"
+      "Bash(/c/Windows/System32/taskkill.exe //F //IM node.exe //T)",
+      "Bash(npx skills *)",
+      "Skill(claude-to-im)",
+      "Bash(npx tsc *)",
+      "Bash(export PATH=\"/c/Users/super/AppData/Local/Microsoft/WindowsApps:$PATH\")",
+      "Bash(bash ~/.claude/skills/claude-to-im/scripts/daemon.sh stop)",
+      "Bash(bash ~/.claude/skills/claude-to-im/scripts/daemon.sh start)",
+      "Skill(update-config)",
+      "Bash(bash -c 'PATH=\"/c/Users/super/AppData/Local/Microsoft/WindowsApps:$PATH\" bash ~/.claude/skills/claude-to-im/scripts/daemon.sh start 2>&1 | tail -3 || true')",
+      "Bash(python *)",
+      "Bash(/c/Users/super/AppData/Roaming/npm/codex.cmd --version)",
+      "Bash(env)",
+      "Bash(MSYS_NO_PATHCONV=1 \"/c/Users/super/.agents/skills/claude-to-im/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/codex/codex.exe\" --version)",
+      "Read(//g/PersonalProjects/AIWriter/.codex/**)",
+      "Bash(MSYS_NO_PATHCONV=1 /c/Users/super/AppData/Local/Microsoft/WindowsApps/pwsh.exe *)",
+      "Bash(MSYS_NO_PATHCONV=1 /c/Windows/System32/taskkill.exe /PID 37816 /F /T)"
     ]
   },
   "hooks": {

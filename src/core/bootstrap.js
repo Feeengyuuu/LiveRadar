@@ -27,15 +27,12 @@ import { initVisibilityRecovery } from './renderer/image-handler.js';
 
 // Feature modules
 import { initSnow } from '../features/enhancements/snow-effect.js';
+import { scheduleMusicPlayerInit } from '../features/enhancements/music-player-loader.js';
 import { initAutoRefresh } from '../features/core/auto-refresh.js';
 import { initNotifications, checkNotifications } from '../features/core/notifications.js';
 import { initStatusTicker, updateTicker } from '../features/core/status-ticker.js';
 import { initNotificationAudio } from '../features/audio/notification-audio.js';
 import { initAudioManager } from '../features/audio/audio-manager.js';
-import { initMusicPlayer } from '../features/enhancements/music-player.js';
-
-// Debug globals
-import { exposeGlobals } from './globals.js';
 
 // Event delegation
 import { initEventRouter } from './event-router.js';
@@ -62,9 +59,6 @@ export async function initializeApp() {
 
         // === Step 2: Initialize Event Delegation Router ===
         initEventRouter();
-
-        // === Step 2.5: Expose Debug Namespace ===
-        exposeGlobals();
 
         // === Step 3: Wire Up Module Dependencies (Simplified) ===
         // Most dependencies now come directly from state.js
@@ -94,7 +88,6 @@ export async function initializeApp() {
         initNotifications();
         initSnow();
         initStatusTicker();
-        initMusicPlayer();
         initAudioManager();
         initAutoRefresh();
 
@@ -122,6 +115,9 @@ export async function initializeApp() {
         // - Audio setup
         // - Network monitoring
         await init();
+
+        // Load non-critical UI widgets after the main monitoring flow is ready.
+        scheduleMusicPlayerInit();
 
         // === Step 6: Setup Page Unload Protection ===
         // 优化：确保所有防抖的localStorage写入在页面关闭前完成

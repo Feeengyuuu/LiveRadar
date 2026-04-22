@@ -55,6 +55,7 @@ let currentTrackIndex = parseInt(SafeStorage.getItem(CONFIG.SAVE_CURRENT_TRACK_K
 let hasEverPlayed = false; // 标记是否曾经播放过，用于控制封面显示
 let isAnimating = false;
 let dragListenersBound = false;
+let isInitialized = false;
 
 const ANIMATION_DURATION_MS = 300;
 
@@ -92,6 +93,8 @@ const playlistItemHandlers = new WeakMap();
 // ====================================================================
 
 export function initMusicPlayer() {
+    if (isInitialized) return;
+
     // 获取DOM元素
     elements.player = document.getElementById('music-player');
     elements.playBtn = document.getElementById('music-play-btn');
@@ -153,6 +156,8 @@ export function initMusicPlayer() {
 
     // 加载当前曲目信息
     loadTrackInfo();
+
+    isInitialized = true;
 
     console.log('[MusicPlayer] Initialized successfully');
     console.log('[MusicPlayer] Playlist:', PLAYLIST);
@@ -518,7 +523,7 @@ function createPlaylist() {
     }
 
     // 清空容器
-    elements.playlistContainer.innerHTML = '';
+    elements.playlistContainer.textContent = '';
 
     // 为每首歌创建列表项
     PLAYLIST.forEach((track, index) => {
@@ -529,23 +534,34 @@ function createPlaylist() {
         }
         item.dataset.index = index;
 
-        item.innerHTML = `
-            <div class="playlist-item-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
-                    ${index === currentTrackIndex
-                        ? '<path d="M9.5 16.5v-9l7 4.5z"/>' // 播放图标
-                        : '<circle cx="12" cy="12" r="2"/>' // 圆点
-                    }
-                </svg>
-            </div>
-            <div class="playlist-item-info">
-                <div class="playlist-item-title">${track.title}</div>
-                <div class="playlist-item-artist">${track.artist}</div>
-            </div>
-            <div class="playlist-item-cover">
-                <img src="${track.cover}" alt="${track.title}" loading="lazy">
-            </div>
-        `;
+        const iconWrap = document.createElement('div');
+        iconWrap.className = 'playlist-item-icon';
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        icon.setAttribute('fill', 'currentColor');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        setPlaylistItemIcon(icon, index === currentTrackIndex);
+        iconWrap.appendChild(icon);
+
+        const info = document.createElement('div');
+        info.className = 'playlist-item-info';
+        const title = document.createElement('div');
+        title.className = 'playlist-item-title';
+        title.textContent = track.title;
+        const artist = document.createElement('div');
+        artist.className = 'playlist-item-artist';
+        artist.textContent = track.artist;
+        info.append(title, artist);
+
+        const cover = document.createElement('div');
+        cover.className = 'playlist-item-cover';
+        const image = document.createElement('img');
+        image.src = track.cover;
+        image.alt = track.title;
+        image.loading = 'lazy';
+        cover.appendChild(image);
+
+        item.append(iconWrap, info, cover);
 
         // 点击切换歌曲 - 存储处理函数引用以便后续移除
         const clickHandler = () => switchTrack(index);
@@ -556,6 +572,25 @@ function createPlaylist() {
     });
 
     console.log('[MusicPlayer] Playlist UI created');
+}
+
+function setPlaylistItemIcon(icon, isActive) {
+    icon.replaceChildren();
+
+    const node = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        isActive ? 'path' : 'circle'
+    );
+
+    if (isActive) {
+        node.setAttribute('d', 'M9.5 16.5v-9l7 4.5z');
+    } else {
+        node.setAttribute('cx', '12');
+        node.setAttribute('cy', '12');
+        node.setAttribute('r', '2');
+    }
+
+    icon.appendChild(node);
 }
 
 function switchTrack(index) {
@@ -626,12 +661,12 @@ function updatePlaylistUI() {
         if (index === currentTrackIndex) {
             item.classList.add('active');
             if (icon) {
-                icon.innerHTML = '<path d="M9.5 16.5v-9l7 4.5z"/>';
+                setPlaylistItemIcon(icon, true);
             }
         } else {
             item.classList.remove('active');
             if (icon) {
-                icon.innerHTML = '<circle cx="12" cy="12" r="2"/>';
+                setPlaylistItemIcon(icon, false);
             }
         }
     });
@@ -689,34 +724,6 @@ function formatTime(seconds) {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
-
-// ====================================================================
-// 全局API（用于调试）
-// ====================================================================
-
-if (typeof window !== 'undefined') {
-    window.musicPlayer = {
-        play: () => audio?.play(),
-        pause: () => audio?.pause(),
-        setVolume: (v) => {
-            if (audio) audio.volume = Math.max(0, Math.min(1, v));
-            updateVolumeUI(audio.volume);
-        },
-        seek: (time) => { if (audio) audio.currentTime = time; },
-        toggle: toggleMinimize,
-        getStatus: () => ({
-            playing: isPlaying,
-            currentTime: audio?.currentTime,
-            duration: audio?.duration,
-            volume: audio?.volume,
-            minimized: isMinimized
-        })
-    };
-}
-
-// ====================================================================
-// 清理和销毁
-// ====================================================================
 
 /**
  * 清理音乐播放器资源，移除所有事件监听器
@@ -798,8 +805,13 @@ export function destroyMusicPlayer() {
     isDraggingVolume = false;
     hasEverPlayed = false;
     isAnimating = false;
+    isInitialized = false;
 
     console.log('[MusicPlayer] Resources cleaned up and destroyed');
+}
+
+export function toggleMusicPlayer() {
+    toggleMinimize();
 }
 
 // ====================================================================

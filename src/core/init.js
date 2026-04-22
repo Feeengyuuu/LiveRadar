@@ -91,7 +91,7 @@ function initNetworkMonitor() {
  * Initialize back-to-top button with scroll tracking
  */
 function initBackToTopButton() {
-    const btn = document.getElementById('back-to-top');
+    const btn = getDOMCache().backToTop || document.getElementById('back-to-top');
     if (!btn) return;
 
     // Performance optimization: Use requestAnimationFrame to throttle scroll events
@@ -111,7 +111,7 @@ function initBackToTopButton() {
     ResourceManager.addEventListener(window, 'scroll', handleScroll, { passive: true });
 
     // Click handler
-    btn.addEventListener('click', () => {
+    ResourceManager.addEventListener(btn, 'click', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
@@ -161,7 +161,7 @@ function setupSecretAudioButton() {
     const secretButton = document.getElementById('secret-audio-button');
     if (!secretButton) return;
 
-    secretButton.addEventListener('click', (e) => {
+    ResourceManager.addEventListener(secretButton, 'click', (e) => {
         e.stopPropagation(); // Prevent event bubbling
 
         // Visual feedback: scale animation

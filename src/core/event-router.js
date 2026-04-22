@@ -30,12 +30,12 @@ import {
     removeRoom,
     toggleFavorite
 } from '../features/core/room-management.js';
+import { getElement } from '../utils/dom-cache.js';
 import { toggleNotifications } from '../features/core/notifications.js';
 import { toggleAutoRefresh } from '../features/core/auto-refresh.js';
 import { unlockAllAudio } from '../features/audio/audio-manager.js';
 import { exportRooms, importRooms } from '../features/core/import-export.js';
 import { refreshAll } from './refresh-manager.js';
-import { dismissFileWarning, dismissFileWarningPermanently, showDeploymentGuide } from './file-protocol-warning.js';
 import { playNotificationSound } from '../features/audio/notification-audio.js';
 import { getRooms } from './state.js';
 
@@ -88,16 +88,11 @@ const actionHandlers = {
     // Import/Export
     'export-rooms': () => exportRooms(getRooms()),
     'import-rooms': () => {
-        document.getElementById('import-file-input')?.click();
+        getElement('import-file-input')?.click();
     },
 
     // Refresh
     'refresh-all': () => refreshAll(),
-
-    // File protocol warning
-    'dismiss-file-warning': () => dismissFileWarning(),
-    'dismiss-file-warning-permanently': () => dismissFileWarningPermanently(),
-    'show-deployment-guide': () => showDeploymentGuide(),
 
     // Audio
     'unlock-audio': () => unlockAllAudio(),

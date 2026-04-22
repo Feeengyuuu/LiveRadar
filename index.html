@@ -16,7 +16,7 @@
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self';
-               script-src 'self' 'unsafe-inline';
+               script-src 'self';
                style-src 'self' 'unsafe-inline';
                img-src 'self' data: https: blob:;
                media-src 'self' data: blob:;
@@ -540,74 +540,6 @@
       </div>
     </footer>
 
-    <!-- Vite Entry Point -->
-    <script>
-      (() => {
-        const favicon = document.getElementById("favicon");
-        if (!favicon) return;
-
-        const color = "#ef4444";
-        const makeUrl = (coreRadius, coreOpacity, glowRadius, glowOpacity) => {
-          const svg =
-            `<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'>` +
-            `<circle cx='8' cy='8' r='${glowRadius}' fill='${color}' fill-opacity='${glowOpacity}'/>` +
-            `<circle cx='8' cy='8' r='${coreRadius}' fill='${color}' fill-opacity='${coreOpacity}'/>` +
-            `</svg>`;
-          return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-        };
-
-        const frames = [
-          makeUrl(2.2, 0.5, 4.8, 0.08),
-          makeUrl(2.6, 0.7, 5.4, 0.16),
-          makeUrl(3.0, 0.9, 6.0, 0.28),
-          makeUrl(3.4, 1.0, 6.8, 0.38),
-        ];
-        let index = 0;
-        let direction = 1;
-        let animationTimer = null;
-
-        const tick = () => {
-          favicon.href = frames[index];
-          if (index === frames.length - 1) direction = -1;
-          if (index === 0) direction = 1;
-          index += direction;
-        };
-
-        // 启动动画
-        const startAnimation = () => {
-          if (!animationTimer) {
-            tick(); // 立即执行一次
-            animationTimer = setInterval(tick, 260);
-            console.log('[Favicon] Animation started');
-          }
-        };
-
-        // 停止动画
-        const stopAnimation = () => {
-          if (animationTimer) {
-            clearInterval(animationTimer);
-            animationTimer = null;
-            console.log('[Favicon] Animation paused');
-          }
-        };
-
-        // 监听页面可见性变化
-        document.addEventListener('visibilitychange', () => {
-          if (document.hidden) {
-            // 页面不可见时暂停动画
-            stopAnimation();
-          } else {
-            // 页面可见时恢复动画
-            startAnimation();
-          }
-        });
-
-        // 初始化：如果页面可见，启动动画
-        if (!document.hidden) {
-          startAnimation();
-        }
-      })();
-    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

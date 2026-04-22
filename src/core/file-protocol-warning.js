@@ -3,12 +3,8 @@
  * File Protocol Warning - CORS Detection and User Guidance
  * ====================================================================
  *
- * Features:
- * - Detect file:// protocol usage
- * - Display warning banner for CORS limitations
- * - Persistent dismiss state management
- * - Deployment guide display
- * - localStorage fallback for restricted environments
+ * Renders an in-page warning banner when the app is opened via file://
+ * and keeps all interactions module-local.
  *
  * @module core/file-protocol-warning
  */
@@ -16,50 +12,105 @@
 import { SafeStorage } from '../utils/safe-storage.js';
 import { showToast } from '../utils/helpers.js';
 
-// ====================================================================
-// File Protocol Detection
-// ====================================================================
+let memoryDismissed = false;
+
+function getWarningBanner() {
+    return document.getElementById('file-protocol-warning');
+}
+
+function createElement(tag, className, textContent) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (textContent != null) element.textContent = textContent;
+    return element;
+}
+
+function createButton(label, className, onClick) {
+    const button = createElement('button', className, label);
+    button.type = 'button';
+    button.addEventListener('click', onClick);
+    return button;
+}
+
+function createSolutionCard(title, code, hint) {
+    const card = createElement('div', 'solution-card');
+    const heading = createElement('div', 'solution-title', title);
+    const codeBlock = createElement('div', 'solution-code', code);
+    const hintText = createElement('div', 'solution-hint', hint);
+    card.append(heading, codeBlock, hintText);
+    return card;
+}
+
+export function renderFileProtocolWarning() {
+    const warningBanner = getWarningBanner();
+    if (!warningBanner || warningBanner.dataset.rendered === 'true') return warningBanner;
+
+    const header = createElement('div', 'warning-header');
+    const icon = createElement('span', 'warning-icon', '⚠️');
+    const title = createElement('div', 'warning-title', '当前通过 file:// 打开，网络请求会被浏览器限制');
+    const closeBtn = createButton('×', 'warning-close', dismissFileWarning);
+    closeBtn.setAttribute('aria-label', '关闭提示');
+    header.append(icon, title, closeBtn);
+
+    const message = createElement(
+        'div',
+        'warning-message',
+        'LiveRadar 需要访问直播平台接口。直接双击 HTML 文件时，浏览器会阻止部分请求，建议改用本地 HTTP 服务器打开。'
+    );
+
+    const solutions = createElement('div', 'warning-solutions');
+    solutions.append(
+        createSolutionCard('Python', 'python -m http.server 8000', '进入项目目录后执行，浏览器访问 http://localhost:8000'),
+        createSolutionCard('Node.js', 'npx http-server -p 8000', '适合已有 Node 环境的本地预览'),
+        createSolutionCard('VS Code', 'Live Server', '右键 index.html 并选择 “Open with Live Server”')
+    );
+
+    const actions = createElement('div', 'warning-actions');
+    actions.append(
+        createButton('查看部署指南', 'warning-btn warning-btn-primary', showDeploymentGuide),
+        createButton('不再提示', 'warning-btn warning-btn-secondary', dismissFileWarningPermanently),
+        createButton('本次关闭', 'warning-btn warning-btn-secondary', dismissFileWarning)
+    );
+
+    warningBanner.append(header, message, solutions, actions);
+    warningBanner.dataset.rendered = 'true';
+    return warningBanner;
+}
+
+function isPermanentlyDismissed() {
+    try {
+        return SafeStorage.getItem('hide_file_protocol_warning') === 'true';
+    } catch (error) {
+        console.warn('[File Warning] localStorage read failed, using memory mode:', error.message);
+        return memoryDismissed;
+    }
+}
 
 /**
  * Check if running under file:// protocol and show warning if needed
  */
-export function checkFileProtocol() {
-    // Only show warning under file:// protocol
-    if (window.location.protocol !== 'file:') {
+export function checkFileProtocol(protocol = window.location.protocol) {
+    if (protocol !== 'file:') {
         return;
     }
 
-    // Check if user has permanently dismissed the warning
-    let permanentlyDismissed = false;
-    try {
-        permanentlyDismissed = SafeStorage.getItem('hide_file_protocol_warning') === 'true';
-    } catch (e) {
-        console.warn('[File Warning] localStorage read failed, using memory mode:', e.message);
-        permanentlyDismissed = window._fileWarningDismissed || false;
-    }
-
-    if (permanentlyDismissed) {
+    if (isPermanentlyDismissed()) {
         console.log('[File Warning] User chose not to show again');
         return;
     }
 
-    // Show warning banner
-    const warningBanner = document.getElementById('file-protocol-warning');
+    const warningBanner = renderFileProtocolWarning();
     if (warningBanner) {
         warningBanner.classList.remove('hidden');
         console.log('[File Warning] Displayed file:// protocol warning banner');
     }
 }
 
-// ====================================================================
-// Warning Dismissal Functions
-// ====================================================================
-
 /**
  * Temporarily close warning banner (current session only)
  */
 export function dismissFileWarning() {
-    const warningBanner = document.getElementById('file-protocol-warning');
+    const warningBanner = getWarningBanner();
     if (warningBanner) {
         warningBanner.classList.add('hidden');
         console.log('[File Warning] User temporarily dismissed warning');
@@ -71,27 +122,24 @@ export function dismissFileWarning() {
  */
 export function dismissFileWarningPermanently() {
     try {
-        SafeStorage.setItem('hide_file_protocol_warning', 'true');
-        console.log('[File Warning] User chose not to show again, saved to localStorage');
-    } catch (e) {
-        console.warn('[File Warning] localStorage save failed, using memory mode:', e.message);
-        window._fileWarningDismissed = true;
+        const saved = SafeStorage.setItem('hide_file_protocol_warning', 'true');
+        if (!saved) {
+            memoryDismissed = true;
+            console.warn('[File Warning] localStorage save failed, using memory mode');
+        } else {
+            console.log('[File Warning] User chose not to show again, saved to localStorage');
+        }
+    } catch (error) {
+        console.warn('[File Warning] localStorage save failed, using memory mode:', error.message);
+        memoryDismissed = true;
     }
 
-    const warningBanner = document.getElementById('file-protocol-warning');
-    if (warningBanner) {
-        warningBanner.classList.add('hidden');
-    }
-
+    dismissFileWarning();
     showToast('✓ 已保存设置，不再显示此提示', 'info');
 }
 
-// ====================================================================
-// Deployment Guide
-// ====================================================================
-
 /**
- * Show detailed deployment guide (simplified version, shows toast notification)
+ * Show detailed deployment guide
  */
 export function showDeploymentGuide() {
     const guide = `
@@ -104,52 +152,29 @@ export function showDeploymentGuide() {
 4. 浏览器访问：http://localhost:8000
 
 【Node.js方案】（需要先安装Node.js）
-1. 全局安装：npm install -g http-server
-2. cd 到HTML文件所在目录
-3. 运行：http-server -p 8000
-4. 浏览器访问：http://localhost:8000
+1. 运行：npx http-server -p 8000
+2. 浏览器访问：http://localhost:8000
 
 【VS Code方案】（最简单，适合开发者）
 1. 安装 "Live Server" 扩展
 2. 右键HTML文件 → "Open with Live Server"
 3. 自动在浏览器中打开
-
-详细文档请查看项目 docs/guides/ 目录
     `.trim();
 
-    // Use alert to display (can be optimized to modal later)
     alert(guide);
     console.log('[File Warning] Displayed deployment guide');
 }
-
-// ====================================================================
-// Window API Exposure (for HTML onclick handlers)
-// ====================================================================
-
-/**
- * Initialize file protocol warning module and expose global functions
- */
-export function initFileProtocolWarning() {
-    // Expose functions to window for HTML onclick handlers
-    window.dismissFileWarning = dismissFileWarning;
-    window.dismissFileWarningPermanently = dismissFileWarningPermanently;
-    window.showDeploymentGuide = showDeploymentGuide;
-
-    // Run initial check
-    checkFileProtocol();
-}
-
-// ====================================================================
-// Exports
-// ====================================================================
 
 export default {
     checkFileProtocol,
     dismissFileWarning,
     dismissFileWarningPermanently,
     showDeploymentGuide,
-    init: initFileProtocolWarning
+    render: renderFileProtocolWarning,
 };
 
-// Alias for main.js compatibility
 export { checkFileProtocol as checkFileProtocolAndWarn };
+
+export function resetFileProtocolWarningForTests() {
+    memoryDismissed = false;
+}

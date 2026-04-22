@@ -31,6 +31,8 @@ import './config/signer.js'; // Initialize API signers
 import { getRandomItem, showToast } from './utils/helpers.js';
 import { PerformanceDetector } from './utils/performance-detector.js';
 import { LOADING_MESSAGES } from './config/constants.js';
+import { renderErrorScreen } from './core/error-screen.js';
+import { initFaviconAnimation } from './core/favicon-animation.js';
 
 // ============================================================
 // 4. Import Bootstrap Module
@@ -43,6 +45,8 @@ import { checkFileProtocolAndWarn } from './core/file-protocol-warning.js';
 // ============================================================
 
 import { ErrorHandler } from './utils/error-handler.js';
+
+let errorPageShown = false;
 
 /**
  * Show user-friendly error page
@@ -62,22 +66,17 @@ function showErrorPage(error, context) {
 
     const mainContent = document.getElementById('main-content');
     if (mainContent) {
-        mainContent.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 50vh; text-align: center; padding: 2rem;">
-                <div style="font-size: 4rem; margin-bottom: 1rem;">⚠️</div>
-                <h2 style="color: #ef4444; font-size: 1.5rem; margin-bottom: 1rem;">应用初始化失败</h2>
-                <p style="color: #9ca3af; margin-bottom: 2rem; max-width: 500px;">${errorMessage}</p>
-                <div style="display: flex; gap: 1rem;">
-                    <button onclick="location.reload()" style="background: #ef4444; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; border: none; cursor: pointer; font-weight: 600;">
-                        刷新页面
-                    </button>
-                    <button onclick="localStorage.clear(); location.reload()" style="background: #6b7280; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; border: none; cursor: pointer; font-weight: 600;">
-                        清除缓存并刷新
-                    </button>
-                </div>
-                ${import.meta.env?.DEV ? `<details style="margin-top: 2rem; text-align: left; max-width: 600px;"><summary style="cursor: pointer; color: #9ca3af;">技术详情</summary><pre style="background: #1f1f1f; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin-top: 1rem; color: #ef4444; font-size: 0.875rem;">${error.stack || error.message}</pre></details>` : ''}
-            </div>
-        `;
+        renderErrorScreen({
+            container: mainContent,
+            errorMessage,
+            errorStack: error?.stack || error?.message || '',
+            isDev: Boolean(import.meta.env?.DEV),
+            onReload: () => window.location.reload(),
+            onClearCache: () => {
+                localStorage.clear();
+                window.location.reload();
+            }
+        });
     }
 
     // Log to error handler
@@ -92,8 +91,8 @@ window.addEventListener('error', (event) => {
     ErrorHandler.log(event.error, 'UncaughtError');
 
     // Prevent multiple error pages
-    if (!window._errorPageShown) {
-        window._errorPageShown = true;
+    if (!errorPageShown) {
+        errorPageShown = true;
         showErrorPage(event.error, 'UncaughtError');
     }
 
@@ -128,6 +127,9 @@ if (loaderTextEl) {
 
 // Run performance detection (immediate)
 PerformanceDetector.detect();
+
+// Start favicon animation after the basic shell exists.
+initFaviconAnimation();
 
 // Check for file:// protocol and show warning if needed
 checkFileProtocolAndWarn();
