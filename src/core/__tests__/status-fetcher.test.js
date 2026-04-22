@@ -49,7 +49,11 @@ vi.mock('../event-bus.js', () => ({
     }
 }));
 
-const { fetchRoomStatus, initStatusFetcher } = await import('../status-fetcher.js');
+const {
+    cancelPendingFetches,
+    fetchRoomStatus,
+    initStatusFetcher
+} = await import('../status-fetcher.js');
 
 describe('status-fetcher', () => {
     beforeEach(() => {
@@ -99,6 +103,43 @@ describe('status-fetcher', () => {
         });
 
         await fetchRoomStatus({ id: '100', platform: 'douyu', isFav: false });
+
+        expect(mocks.updateRoomCache).toHaveBeenCalledTimes(1);
+        expect(mocks.updateRoomCache.mock.calls[0][0]).toBe('douyu-100');
+    });
+
+    it('keeps the original in-flight request deduped when a room is re-added', async () => {
+        let resolveFetch;
+        const room = { id: '100', platform: 'douyu', isFav: false };
+
+        mocks.fetchPlatformStatus.mockImplementation(() => new Promise(resolve => {
+            resolveFetch = resolve;
+        }));
+
+        const first = fetchRoomStatus(room);
+
+        mocks.mockState.rooms = [];
+        cancelPendingFetches('douyu-100');
+        mocks.mockState.rooms = [room];
+
+        const second = fetchRoomStatus(room);
+
+        expect(second).toBe(first);
+        expect(mocks.fetchPlatformStatus).toHaveBeenCalledTimes(1);
+
+        resolveFetch({
+            isLive: true,
+            isReplay: false,
+            title: 're-added room',
+            owner: 'streamer',
+            cover: 'https://example.com/cover.jpg',
+            avatar: 'https://example.com/avatar.jpg',
+            heatValue: 1234,
+            isError: false,
+            startTime: null
+        });
+
+        await second;
 
         expect(mocks.updateRoomCache).toHaveBeenCalledTimes(1);
         expect(mocks.updateRoomCache.mock.calls[0][0]).toBe('douyu-100');

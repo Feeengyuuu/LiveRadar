@@ -70,12 +70,11 @@ export function initStatusFetcher(deps) {
 
 /**
  * Drop any pending work for a room (called when rooms are removed).
- * In-flight fetches already running cannot truly be aborted without wiring an
- * AbortController all the way through, but we can at least stop stale writes
- * from landing in the cache — callers should re-check presence before writing.
+ * Keep the in-flight status request registered until it settles so callers
+ * still dedupe against it if the room is re-added before completion.
+ * Only best-effort avatar fallback work can be cancelled immediately here.
  */
 export function cancelPendingFetches(cacheKey) {
-    inFlightFetches.delete(cacheKey);
     pendingAvatarFetches.delete(cacheKey);
 }
 

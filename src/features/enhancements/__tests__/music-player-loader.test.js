@@ -10,6 +10,7 @@ const {
 
 describe('music-player-loader', () => {
     beforeEach(() => {
+        document.body.innerHTML = '<div id="music-player" hidden inert></div>';
         resetMusicPlayerLoaderForTests();
     });
 
@@ -24,6 +25,7 @@ describe('music-player-loader', () => {
 
         expect(importer).toHaveBeenCalledTimes(1);
         expect(initMusicPlayer).toHaveBeenCalledTimes(1);
+        expect(document.getElementById('music-player').hidden).toBe(false);
     });
 
     it('deduplicates scheduled initialization requests', async () => {
@@ -39,11 +41,13 @@ describe('music-player-loader', () => {
 
         expect(scheduler).toHaveBeenCalledTimes(1);
         expect(scheduledCallbacks).toHaveLength(1);
+        expect(document.getElementById('music-player').hidden).toBe(true);
 
         scheduledCallbacks[0]();
         await Promise.resolve();
 
         expect(importer).toHaveBeenCalledTimes(1);
         expect(initMusicPlayer).toHaveBeenCalledTimes(1);
+        expect(document.getElementById('music-player').hidden).toBe(false);
     });
 });
