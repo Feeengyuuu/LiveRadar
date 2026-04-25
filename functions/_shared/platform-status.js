@@ -552,7 +552,7 @@ async function getBilibiliBatchStatuses(rooms) {
 
     const ids = rooms.map(room => String(room.id));
     const baseData = await fetchBilibiliRoomBaseInfo(ids);
-    if (!baseData) return rooms.map(() => null);
+    if (!baseData) return fetchBilibiliStatusesIndividually(rooms);
 
     const byRoomIds = baseData?.data?.by_room_ids ?? {};
     const statuses = rooms.map(room => {
@@ -584,7 +584,24 @@ async function getBilibiliBatchStatuses(rooms) {
     statuses.forEach(status => {
         if (status) delete status._uid;
     });
+
+    const missingEntries = statuses
+        .map((status, index) => ({ status, index, room: rooms[index] }))
+        .filter(entry => !entry.status);
+    if (missingEntries.length > 0) {
+        const fallbackStatuses = await mapWithConcurrency(missingEntries, 2, entry =>
+            fetchBilibiliInfoStatus(entry.room)
+        );
+        missingEntries.forEach((entry, index) => {
+            statuses[entry.index] = fallbackStatuses[index];
+        });
+    }
+
     return statuses;
+}
+
+function fetchBilibiliStatusesIndividually(rooms) {
+    return mapWithConcurrency(rooms, 2, room => fetchBilibiliInfoStatus(room));
 }
 
 async function fetchBilibiliRoomBaseInfo(ids) {
@@ -640,6 +657,39 @@ function applyBilibiliBaseInfo(status, data) {
     status.heatValue = parseHeatValue(data.online || 0);
     status.startTime = status.isLive ? parseTimestamp(data.live_time, '+08:00') : null;
     status.cover = data.cover || data.user_cover || data.keyframe || status.cover;
+    status._uid = data.uid ? String(data.uid) : '';
+}
+
+async function fetchBilibiliInfoStatus(room) {
+    const id = String(room.id);
+    const info = await fetchBilibiliJson(appendCommonQuery(`https://api.live.bilibili.com/room/v1/Room/get_info?room_id=${encodeURIComponent(id)}`), {
+        timeoutMs: 7000
+    });
+    if (info?.code !== 0 || !info.data) return null;
+
+    const status = createDefaultStatus('bilibili', id);
+    applyBilibiliInfo(status, info.data);
+
+    if (room.fetchAvatar !== false && status._uid) {
+        const uidInfo = await fetchBilibiliUidStatusInfo([status._uid]);
+        const data = uidInfo?.data?.[String(status._uid)];
+        if (data) {
+            applyBilibiliUidInfo(status, data, room.fetchAvatar);
+        }
+    }
+
+    delete status._uid;
+    return status;
+}
+
+function applyBilibiliInfo(status, data) {
+    const liveStatus = data.live_status;
+    status.isLive = liveStatus === 1;
+    status.isReplay = liveStatus === 2;
+    status.title = data.title || status.title;
+    status.heatValue = parseHeatValue(data.online || 0);
+    status.startTime = status.isLive ? parseTimestamp(data.live_time, '+08:00') : null;
+    status.cover = data.keyframe || data.user_cover || status.cover;
     status._uid = data.uid ? String(data.uid) : '';
 }
 
