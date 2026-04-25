@@ -156,6 +156,6 @@ describe('cloudflare platform status helpers', () => {
                 avatar: 'https://example.com/200-face.jpg'
             }
         });
-        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveBeenCalledTimes(6);
     });
 });

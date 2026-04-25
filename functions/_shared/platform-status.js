@@ -6,10 +6,17 @@ const BATCH_LIMIT = 10;
 const BATCH_CONCURRENCY = 4;
 const BILIBILI_ROOM_BASE_URL = 'https://api.live.bilibili.com/xlive/web-room/v1/index/getRoomBaseInfo';
 const BILIBILI_UID_STATUS_URL = 'https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids';
-const BILIBILI_PROXY = {
-    name: 'allorigins-raw',
-    url: targetUrl => `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
-};
+const BILIBILI_INDIVIDUAL_FALLBACK_LIMIT = 4;
+const BILIBILI_PROXIES = [
+    {
+        name: 'codetabs',
+        url: targetUrl => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
+    },
+    {
+        name: 'allorigins-raw',
+        url: targetUrl => `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+    }
+];
 const BILIBILI_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36 LiveRadar/3.1',
     Referer: 'https://live.bilibili.com/',
@@ -100,9 +107,16 @@ function appendCommonQuery(url) {
     });
 }
 
-function timeoutController(timeoutMs) {
+function timeoutController(timeoutMs, externalSignal = null) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    if (externalSignal) {
+        if (externalSignal.aborted) {
+            controller.abort();
+        } else {
+            externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
+        }
+    }
     return {
         signal: controller.signal,
         clear: () => clearTimeout(timeoutId)
@@ -116,7 +130,7 @@ async function fetchJson(url, options = {}) {
 
 async function fetchJsonResult(url, options = {}) {
     const timeoutMs = options.timeoutMs ?? STATUS_TIMEOUT_MS;
-    const timeout = timeoutController(timeoutMs);
+    const timeout = timeoutController(timeoutMs, options.signal);
     try {
         const response = await fetch(url, {
             method: options.method ?? 'GET',
@@ -462,6 +476,33 @@ async function mapWithConcurrency(items, limit, worker) {
     return results;
 }
 
+function promiseAny(promises) {
+    if (typeof Promise.any === 'function') return Promise.any(promises);
+
+    return new Promise((resolve, reject) => {
+        const errors = [];
+        let pending = promises.length;
+        if (pending === 0) {
+            reject(new Error('No promises provided'));
+            return;
+        }
+
+        promises.forEach((promise, index) => {
+            Promise.resolve(promise)
+                .then(resolve)
+                .catch(error => {
+                    errors[index] = error;
+                    pending -= 1;
+                    if (pending === 0) {
+                        const aggregate = new Error('All promises rejected');
+                        aggregate.errors = errors;
+                        reject(aggregate);
+                    }
+                });
+        });
+    });
+}
+
 async function getPlatformStatus(platform, id, options) {
     switch (platform) {
         case 'douyu':
@@ -552,7 +593,7 @@ async function getBilibiliBatchStatuses(rooms) {
 
     const ids = rooms.map(room => String(room.id));
     const baseData = await fetchBilibiliRoomBaseInfo(ids);
-    if (!baseData) return fetchBilibiliStatusesIndividually(rooms);
+    if (!baseData) return rooms.map(() => null);
 
     const byRoomIds = baseData?.data?.by_room_ids ?? {};
     const statuses = rooms.map(room => {
@@ -589,19 +630,16 @@ async function getBilibiliBatchStatuses(rooms) {
         .map((status, index) => ({ status, index, room: rooms[index] }))
         .filter(entry => !entry.status);
     if (missingEntries.length > 0) {
-        const fallbackStatuses = await mapWithConcurrency(missingEntries, 2, entry =>
+        const fallbackEntries = missingEntries.slice(0, BILIBILI_INDIVIDUAL_FALLBACK_LIMIT);
+        const fallbackStatuses = await mapWithConcurrency(fallbackEntries, 2, entry =>
             fetchBilibiliInfoStatus(entry.room)
         );
-        missingEntries.forEach((entry, index) => {
+        fallbackEntries.forEach((entry, index) => {
             statuses[entry.index] = fallbackStatuses[index];
         });
     }
 
     return statuses;
-}
-
-function fetchBilibiliStatusesIndividually(rooms) {
-    return mapWithConcurrency(rooms, 2, room => fetchBilibiliInfoStatus(room));
 }
 
 async function fetchBilibiliRoomBaseInfo(ids) {
@@ -629,23 +667,41 @@ async function fetchBilibiliUidStatusInfo(uids) {
 }
 
 async function fetchBilibiliJson(url, options = {}) {
-    const direct = await fetchJsonResult(url, {
-        ...options,
-        headers: {
-            ...BILIBILI_HEADERS,
-            ...(options.headers ?? {})
-        }
-    });
-    if (direct.ok && direct.data) return direct.data;
+    const timeoutMs = Math.min(options.timeoutMs ?? 6500, 6500);
+    const attempts = [
+        {
+            url,
+            headers: {
+                ...BILIBILI_HEADERS,
+                ...(options.headers ?? {})
+            }
+        },
+        ...BILIBILI_PROXIES.map(proxy => ({
+            url: proxy.url(url),
+            headers: options.headers ?? {}
+        }))
+    ];
+    const controllers = attempts.map(() => new AbortController());
 
-    const proxied = await fetchJsonResult(BILIBILI_PROXY.url(url), {
-        ...options,
-        headers: {
-            ...BILIBILI_HEADERS,
-            ...(options.headers ?? {})
-        }
-    });
-    return proxied.ok ? proxied.data : null;
+    const requests = attempts.map((attempt, index) =>
+        fetchJsonResult(attempt.url, {
+            ...options,
+            timeoutMs,
+            headers: attempt.headers,
+            signal: controllers[index].signal
+        }).then(result => {
+            if (result.ok && result.data) return result.data;
+            throw new Error(result.error || 'fetch_failed');
+        })
+    );
+
+    try {
+        return await promiseAny(requests);
+    } catch (_error) {
+        return null;
+    } finally {
+        controllers.forEach(controller => controller.abort());
+    }
 }
 
 function applyBilibiliBaseInfo(status, data) {
