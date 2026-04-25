@@ -3,7 +3,18 @@ const STATUS_TIMEOUT_MS = 8000;
 const STATUS_CACHE_SECONDS = 20;
 const STATUS_CACHE_STALE_SECONDS = 40;
 const BATCH_LIMIT = 10;
-const BATCH_CONCURRENCY = 6;
+const BATCH_CONCURRENCY = 4;
+const BILIBILI_ROOM_BASE_URL = 'https://api.live.bilibili.com/xlive/web-room/v1/index/getRoomBaseInfo';
+const BILIBILI_UID_STATUS_URL = 'https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids';
+const BILIBILI_PROXY = {
+    name: 'allorigins-raw',
+    url: targetUrl => `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+};
+const BILIBILI_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36 LiveRadar/3.1',
+    Referer: 'https://live.bilibili.com/',
+    Origin: 'https://live.bilibili.com'
+};
 
 let twitchTokenCache = {
     key: '',
@@ -99,6 +110,11 @@ function timeoutController(timeoutMs) {
 }
 
 async function fetchJson(url, options = {}) {
+    const result = await fetchJsonResult(url, options);
+    return result.ok ? result.data : null;
+}
+
+async function fetchJsonResult(url, options = {}) {
     const timeoutMs = options.timeoutMs ?? STATUS_TIMEOUT_MS;
     const timeout = timeoutController(timeoutMs);
     try {
@@ -113,10 +129,26 @@ async function fetchJson(url, options = {}) {
             }
         });
 
-        if (!response.ok) return null;
-        return await response.json();
-    } catch (_error) {
-        return null;
+        if (!response.ok) {
+            return {
+                ok: false,
+                error: `http_${response.status}`,
+                status: response.status
+            };
+        }
+
+        const data = await response.json();
+        return {
+            ok: true,
+            data,
+            status: response.status
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: error?.name === 'AbortError' ? 'timeout' : 'network_error',
+            message: error?.message || ''
+        };
     } finally {
         timeout.clear();
     }
@@ -176,6 +208,34 @@ function cacheRequestFor(request, platform, id, fetchAvatar) {
     return new Request(url.toString(), { method: 'GET' });
 }
 
+function canUseStatusCache() {
+    return typeof caches !== 'undefined' && caches.default;
+}
+
+async function readCachedStatus(context, platform, id, fetchAvatar) {
+    if (!canUseStatusCache()) return null;
+
+    const cached = await caches.default.match(cacheRequestFor(context.request, platform, id, fetchAvatar));
+    if (!cached) return null;
+
+    const payload = await cached.json();
+    return {
+        status: payload.status ?? null,
+        cache: 'HIT'
+    };
+}
+
+function writeCachedStatus(context, platform, id, fetchAvatar, status) {
+    if (!canUseStatusCache()) return;
+
+    const response = jsonResponse(statusPayload(platform, id, status), {
+        headers: {
+            'Cache-Control': `public, max-age=${STATUS_CACHE_SECONDS}, stale-while-revalidate=${STATUS_CACHE_STALE_SECONDS}`
+        }
+    });
+    waitFor(context, caches.default.put(cacheRequestFor(context.request, platform, id, fetchAvatar), response));
+}
+
 function waitFor(context, promise) {
     if (typeof context.waitUntil === 'function') {
         context.waitUntil(promise);
@@ -204,19 +264,8 @@ function statusPayload(platform, id, status, cacheStatus = 'MISS') {
 }
 
 async function fetchStatusDataWithCache(context, platform, id, fetchAvatar) {
-    const cacheRequest = cacheRequestFor(context.request, platform, id, fetchAvatar);
-    const canUseCache = typeof caches !== 'undefined' && caches.default;
-
-    if (canUseCache) {
-        const cached = await caches.default.match(cacheRequest);
-        if (cached) {
-            const payload = await cached.json();
-            return {
-                status: payload.status ?? null,
-                cache: 'HIT'
-            };
-        }
-    }
+    const cached = await readCachedStatus(context, platform, id, fetchAvatar);
+    if (cached) return cached;
 
     const status = await getPlatformStatus(platform, id, { fetchAvatar, env: context.env ?? {} });
     if (!status) {
@@ -226,14 +275,7 @@ async function fetchStatusDataWithCache(context, platform, id, fetchAvatar) {
         };
     }
 
-    if (canUseCache) {
-        const response = jsonResponse(statusPayload(platform, id, status), {
-            headers: {
-                'Cache-Control': `public, max-age=${STATUS_CACHE_SECONDS}, stale-while-revalidate=${STATUS_CACHE_STALE_SECONDS}`
-            }
-        });
-        waitFor(context, caches.default.put(cacheRequest, response));
-    }
+    writeCachedStatus(context, platform, id, fetchAvatar, status);
 
     return {
         status,
@@ -310,7 +352,39 @@ export async function handleBatchStatusRequest(context) {
         return jsonResponse({ ok: false, error: 'invalid_room', room: invalid }, { status: 400 });
     }
 
-    const results = await mapWithConcurrency(normalizedRooms, BATCH_CONCURRENCY, async (room) => {
+    const results = new Array(normalizedRooms.length);
+    const bilibiliEntries = [];
+    const regularEntries = [];
+
+    normalizedRooms.forEach((room, index) => {
+        const entry = { room, index };
+        if (room.platform === 'bilibili') {
+            bilibiliEntries.push(entry);
+        } else {
+            regularEntries.push(entry);
+        }
+    });
+
+    if (bilibiliEntries.length > 0) {
+        const bilibiliResults = await fetchBilibiliBatchDataWithCache(
+            context,
+            bilibiliEntries.map(entry => entry.room)
+        );
+        bilibiliEntries.forEach((entry, index) => {
+            const result = bilibiliResults[index];
+            results[entry.index] = {
+                ok: !!result.status,
+                platform: entry.room.platform,
+                id: entry.room.id,
+                status: result.status,
+                cache: result.cache,
+                error: result.status ? null : (result.error || 'fetch_failed')
+            };
+        });
+    }
+
+    const regularResults = await mapWithConcurrency(regularEntries, BATCH_CONCURRENCY, async (entry) => {
+        const { room } = entry;
         const result = await fetchStatusDataWithCache(context, room.platform, room.id, room.fetchAvatar);
         return {
             ok: !!result.status,
@@ -321,6 +395,9 @@ export async function handleBatchStatusRequest(context) {
             error: result.status ? null : 'fetch_failed'
         };
     });
+    regularEntries.forEach((entry, index) => {
+        results[entry.index] = regularResults[index];
+    });
 
     return jsonResponse({
         ok: true,
@@ -328,6 +405,44 @@ export async function handleBatchStatusRequest(context) {
     }, {
         headers: { 'Cache-Control': 'no-store' }
     });
+}
+
+async function fetchBilibiliBatchDataWithCache(context, rooms) {
+    const results = new Array(rooms.length);
+    const missing = [];
+
+    for (let index = 0; index < rooms.length; index += 1) {
+        const room = rooms[index];
+        const cached = await readCachedStatus(context, room.platform, room.id, room.fetchAvatar);
+        if (cached) {
+            results[index] = cached;
+        } else {
+            missing.push({ room, index });
+        }
+    }
+
+    if (missing.length === 0) return results;
+
+    const fetched = await getBilibiliBatchStatuses(missing.map(entry => entry.room));
+    missing.forEach((entry, fetchedIndex) => {
+        const status = fetched[fetchedIndex] ?? null;
+        if (status) {
+            writeCachedStatus(context, entry.room.platform, entry.room.id, entry.room.fetchAvatar, status);
+            results[entry.index] = {
+                status,
+                cache: 'MISS'
+            };
+            return;
+        }
+
+        results[entry.index] = {
+            status: null,
+            cache: 'MISS',
+            error: 'bilibili_batch_fetch_failed'
+        };
+    });
+
+    return results;
 }
 
 async function mapWithConcurrency(items, limit, worker) {
@@ -425,81 +540,122 @@ async function attachDouyuAvatar(status, roomId) {
 }
 
 async function getBilibiliStatus(id, fetchAvatar) {
-    const status = createDefaultStatus('bilibili', id);
-    const roomId = encodeURIComponent(id);
-    const info = await fetchJson(appendCommonQuery(`https://api.live.bilibili.com/room/v1/Room/get_info?room_id=${roomId}`), {
-        timeoutMs: 7000
-    });
-
-    if (info?.code === 0 && info.data) {
-        applyBilibiliInfo(status, info.data);
-        const uid = info.data.uid;
-        if (uid) {
-            await attachBilibiliProfile(status, uid, fetchAvatar);
-        }
-        return status;
-    }
-
-    const init = await fetchJson(appendCommonQuery(`https://api.live.bilibili.com/room/v1/Room/room_init?id=${roomId}`), {
-        timeoutMs: 6000
-    });
-    if (!init) return null;
-
-    if (init.code !== 0) {
-        return status;
-    }
-
-    const data = init.data ?? {};
-    const liveStatus = data.live_status;
-    status.isLive = liveStatus === 1;
-    status.isReplay = liveStatus === 2;
-    status.startTime = status.isLive ? parseTimestamp(data.live_time) : null;
-    if (data.uid) {
-        await attachBilibiliProfile(status, data.uid, fetchAvatar);
-    }
-    return status;
+    const results = await getBilibiliBatchStatuses([{
+        id: String(id),
+        fetchAvatar
+    }]);
+    return results[0] ?? null;
 }
 
-function applyBilibiliInfo(status, data) {
+async function getBilibiliBatchStatuses(rooms) {
+    if (!Array.isArray(rooms) || rooms.length === 0) return [];
+
+    const ids = rooms.map(room => String(room.id));
+    const baseData = await fetchBilibiliRoomBaseInfo(ids);
+    if (!baseData) return rooms.map(() => null);
+
+    const byRoomIds = baseData?.data?.by_room_ids ?? {};
+    const statuses = rooms.map(room => {
+        const id = String(room.id);
+        const data = findBilibiliRoomData(byRoomIds, id);
+        if (!data) return null;
+
+        const status = createDefaultStatus('bilibili', id);
+        applyBilibiliBaseInfo(status, data);
+        return status;
+    });
+
+    const roomsNeedingAvatar = rooms
+        .map((room, index) => ({ room, index, status: statuses[index] }))
+        .filter(entry => entry.status && entry.room.fetchAvatar !== false && entry.status._uid);
+
+    if (roomsNeedingAvatar.length > 0) {
+        const uidInfo = await fetchBilibiliUidStatusInfo(roomsNeedingAvatar.map(entry => entry.status._uid));
+        if (uidInfo?.data) {
+            roomsNeedingAvatar.forEach(entry => {
+                const data = uidInfo.data[String(entry.status._uid)];
+                if (data) {
+                    applyBilibiliUidInfo(entry.status, data, entry.room.fetchAvatar);
+                }
+            });
+        }
+    }
+
+    statuses.forEach(status => {
+        if (status) delete status._uid;
+    });
+    return statuses;
+}
+
+async function fetchBilibiliRoomBaseInfo(ids) {
+    const url = new URL(BILIBILI_ROOM_BASE_URL);
+    ids.forEach(id => url.searchParams.append('room_ids', String(id)));
+    url.searchParams.set('req_biz', 'web_room_componet');
+    const data = await fetchBilibiliJson(url.toString(), { timeoutMs: 7000 });
+    return data?.code === 0 ? data : null;
+}
+
+function findBilibiliRoomData(byRoomIds, id) {
+    const direct = byRoomIds[id] ?? byRoomIds[Number(id)];
+    if (direct) return direct;
+
+    return Object.values(byRoomIds).find(data =>
+        String(data?.room_id ?? '') === id || String(data?.short_id ?? '') === id
+    ) ?? null;
+}
+
+async function fetchBilibiliUidStatusInfo(uids) {
+    const url = new URL(BILIBILI_UID_STATUS_URL);
+    uids.forEach(uid => url.searchParams.append('uids[]', String(uid)));
+    const data = await fetchBilibiliJson(url.toString(), { timeoutMs: 7000 });
+    return data?.code === 0 ? data : null;
+}
+
+async function fetchBilibiliJson(url, options = {}) {
+    const direct = await fetchJsonResult(url, {
+        ...options,
+        headers: {
+            ...BILIBILI_HEADERS,
+            ...(options.headers ?? {})
+        }
+    });
+    if (direct.ok && direct.data) return direct.data;
+
+    const proxied = await fetchJsonResult(BILIBILI_PROXY.url(url), {
+        ...options,
+        headers: {
+            ...BILIBILI_HEADERS,
+            ...(options.headers ?? {})
+        }
+    });
+    return proxied.ok ? proxied.data : null;
+}
+
+function applyBilibiliBaseInfo(status, data) {
     const liveStatus = data.live_status;
     status.isLive = liveStatus === 1;
     status.isReplay = liveStatus === 2;
     status.title = data.title || status.title;
+    status.owner = data.uname || status.owner;
     status.heatValue = parseHeatValue(data.online || 0);
     status.startTime = status.isLive ? parseTimestamp(data.live_time, '+08:00') : null;
-
-    if (status.isLive) {
-        status.cover = data.keyframe || data.user_cover || status.cover;
-    } else if (status.isReplay) {
-        status.cover = data.user_cover || data.keyframe || status.cover;
-    } else {
-        status.cover = data.user_cover || status.cover;
-    }
+    status.cover = data.cover || data.user_cover || data.keyframe || status.cover;
+    status._uid = data.uid ? String(data.uid) : '';
 }
 
-async function attachBilibiliProfile(status, uid, fetchAvatar) {
-    const master = await fetchJson(appendCommonQuery(`https://api.live.bilibili.com/live_user/v1/Master/info?uid=${encodeURIComponent(uid)}`), {
-        timeoutMs: 6000
-    });
-    const info = master?.code === 0 ? master.data?.info : null;
-    if (info) {
-        status.owner = info.uname || status.owner;
-        if (fetchAvatar !== false) {
-            status.avatar = info.face || status.avatar;
-        }
-        status._profileFetched = true;
-        return;
-    }
+function applyBilibiliUidInfo(status, data, fetchAvatar) {
+    const liveStatus = data.live_status;
+    status.isLive = liveStatus === 1;
+    status.isReplay = liveStatus === 2;
+    status.title = data.title || status.title;
+    status.owner = data.uname || status.owner;
+    status.heatValue = parseHeatValue(data.online ?? status.heatValue);
+    status.startTime = status.isLive ? parseTimestamp(data.live_time, '+08:00') : null;
+    status.cover = data.keyframe || data.cover_from_user || status.cover;
 
-    const userInfo = await fetchJson(appendCommonQuery(`https://api.bilibili.com/x/space/acc/info?mid=${encodeURIComponent(uid)}`), {
-        timeoutMs: 6000
-    });
-    if (userInfo?.code === 0 && userInfo.data) {
-        status.owner = userInfo.data.name || status.owner;
-        if (fetchAvatar !== false) {
-            status.avatar = userInfo.data.face || status.avatar;
-        }
-        status._profileFetched = true;
+    if (fetchAvatar !== false) {
+        status.avatar = data.face || status.avatar;
+        status._profileFetched = !!status.avatar || status._profileFetched;
     }
 }
 
