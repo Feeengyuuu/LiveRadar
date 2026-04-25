@@ -158,4 +158,95 @@ describe('cloudflare platform status helpers', () => {
         });
         expect(fetchMock).toHaveBeenCalledTimes(6);
     });
+
+    it('uses Douyu betard before the older ratestream fallback', async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+            const rawUrl = String(url);
+            if (rawUrl.includes('ratestream')) {
+                throw new Error('ratestream should not be called after betard succeeds');
+            }
+            if (rawUrl.includes('betard')) {
+                return new Response(JSON.stringify({
+                    room: {
+                        videoLoop: 0,
+                        show_status: 1,
+                        room_name: 'Douyu Live',
+                        nickname: 'Douyu Anchor',
+                        online: '1.2万',
+                        room_pic: 'https://example.com/douyu.jpg',
+                        owner_avatar: 'https://example.com/douyu-face.jpg',
+                        show_time: 1777041600
+                    }
+                }), { status: 200 });
+            }
+
+            throw new Error(`Unexpected fetch: ${rawUrl}`);
+        });
+
+        const response = await handleStatusRequest({
+            request: new Request('https://liveradar.pages.dev/api/status?platform=douyu&id=100'),
+            env: {}
+        });
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({
+            ok: true,
+            platform: 'douyu',
+            status: {
+                isLive: true,
+                owner: 'Douyu Anchor',
+                heatValue: 12000
+            }
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses the official Kick API when a token is configured', async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
+            const rawUrl = String(url);
+            if (rawUrl.includes('api.kick.com/public/v1/channels')) {
+                expect(options.headers.Authorization).toBe('Bearer token-123');
+                return new Response(JSON.stringify({
+                    data: [{
+                        slug: 'xqc',
+                        stream_title: 'Kick Stream',
+                        banner_picture: 'https://example.com/kick-banner.jpg',
+                        user: {
+                            username: 'xqc',
+                            profile_pic: 'https://example.com/kick-face.jpg'
+                        },
+                        stream: {
+                            is_live: true,
+                            viewer_count: 321,
+                            start_time: '2026-04-24T12:00:00Z',
+                            thumbnail: 'https://example.com/kick-live.jpg'
+                        }
+                    }]
+                }), { status: 200 });
+            }
+
+            throw new Error(`Unexpected fetch: ${rawUrl}`);
+        });
+
+        const response = await handleStatusRequest({
+            request: new Request('https://liveradar.pages.dev/api/status?platform=kick&id=xqc'),
+            env: {
+                KICK_ACCESS_TOKEN: 'token-123'
+            }
+        });
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({
+            ok: true,
+            platform: 'kick',
+            status: {
+                isLive: true,
+                title: 'Kick Stream',
+                owner: 'xqc',
+                heatValue: 321,
+                avatar: 'https://example.com/kick-face.jpg'
+            }
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
 });

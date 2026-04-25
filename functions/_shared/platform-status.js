@@ -4,23 +4,39 @@ const STATUS_CACHE_SECONDS = 20;
 const STATUS_CACHE_STALE_SECONDS = 40;
 const BATCH_LIMIT = 10;
 const BATCH_CONCURRENCY = 4;
+const CODETABS_PROXY = {
+    name: 'codetabs',
+    url: targetUrl => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
+};
+const ALLORIGINS_RAW_PROXY = {
+    name: 'allorigins-raw',
+    url: targetUrl => `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+};
 const BILIBILI_ROOM_BASE_URL = 'https://api.live.bilibili.com/xlive/web-room/v1/index/getRoomBaseInfo';
 const BILIBILI_UID_STATUS_URL = 'https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids';
 const BILIBILI_INDIVIDUAL_FALLBACK_LIMIT = 4;
 const BILIBILI_PROXIES = [
-    {
-        name: 'codetabs',
-        url: targetUrl => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
-    },
-    {
-        name: 'allorigins-raw',
-        url: targetUrl => `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
-    }
+    CODETABS_PROXY,
+    ALLORIGINS_RAW_PROXY
+];
+const DOUYU_PROXIES = [
+    CODETABS_PROXY
 ];
 const BILIBILI_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36 LiveRadar/3.1',
     Referer: 'https://live.bilibili.com/',
     Origin: 'https://live.bilibili.com'
+};
+const DOUYU_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36 LiveRadar/3.1',
+    Referer: 'https://www.douyu.com/',
+    Origin: 'https://www.douyu.com'
+};
+const KICK_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36 LiveRadar/3.1',
+    Accept: 'application/json, text/plain, */*',
+    Referer: 'https://kick.com/',
+    Origin: 'https://kick.com'
 };
 
 let twitchTokenCache = {
@@ -503,6 +519,54 @@ function promiseAny(promises) {
     });
 }
 
+async function firstNonNull(promises) {
+    try {
+        return await promiseAny(promises.map(promise =>
+            Promise.resolve(promise).then(value => {
+                if (value) return value;
+                throw new Error('empty_result');
+            })
+        ));
+    } catch (_error) {
+        return null;
+    }
+}
+
+async function fetchJsonFromCandidates(url, options = {}) {
+    const timeoutMs = options.timeoutMs ?? STATUS_TIMEOUT_MS;
+    const directHeaders = options.headers ?? {};
+    const proxyHeaders = options.proxyHeaders ?? {};
+    const proxies = options.proxies ?? [];
+    const attempts = [
+        { url, headers: directHeaders },
+        ...proxies.map(proxy => ({
+            url: proxy.url(url),
+            headers: proxyHeaders
+        }))
+    ];
+    const controllers = attempts.map(() => new AbortController());
+
+    const requests = attempts.map((attempt, index) =>
+        fetchJsonResult(attempt.url, {
+            ...options,
+            timeoutMs,
+            headers: attempt.headers,
+            signal: controllers[index].signal
+        }).then(result => {
+            if (result.ok && result.data) return result.data;
+            throw new Error(result.error || 'fetch_failed');
+        })
+    );
+
+    try {
+        return await promiseAny(requests);
+    } catch (_error) {
+        return null;
+    } finally {
+        controllers.forEach(controller => controller.abort());
+    }
+}
+
 async function getPlatformStatus(platform, id, options) {
     switch (platform) {
         case 'douyu':
@@ -512,7 +576,7 @@ async function getPlatformStatus(platform, id, options) {
         case 'twitch':
             return getTwitchStatus(id, options.fetchAvatar, options.env);
         case 'kick':
-            return getKickStatus(id);
+            return getKickStatus(id, options.env);
         default:
             return null;
     }
@@ -522,45 +586,41 @@ async function getDouyuStatus(id, fetchAvatar) {
     const status = createDefaultStatus('douyu', id);
     const roomId = encodeURIComponent(id);
 
-    const rateData = await fetchJson(appendCommonQuery(`https://m.douyu.com/api/room/ratestream?rid=${roomId}`));
-    if (rateData?.data) {
-        const data = rateData.data;
-        const roomInfo = data.roomInfo ?? {};
-        const bizAll = data.room_biz_all ?? {};
-        const isReplay = roomInfo.videoLoop === 1 || bizAll.videoLoop === 1;
-        const isLive = !isReplay && (roomInfo.show_status === 1 || bizAll.show_status === 1);
-        const showTime = bizAll.show_time || roomInfo.show_time;
-
-        status.isReplay = isReplay;
-        status.isLive = isLive;
-        status.title = bizAll.room_name || roomInfo.room_name || status.title;
-        status.owner = bizAll.nickname || roomInfo.nickname || status.owner;
-        status.heatValue = parseHeatValue(bizAll.online || roomInfo.online || 0);
-        status.cover = bizAll.room_pic || roomInfo.room_pic || status.cover;
-        status.avatar = bizAll.owner_avatar || roomInfo.avatar || status.avatar;
-        status.startTime = isLive ? parseTimestamp(showTime) : null;
-
+    const betardData = await fetchDouyuJson(appendCommonQuery(`https://www.douyu.com/betard/${roomId}`));
+    if (betardData?.room) {
+        const data = betardData.room;
+        applyDouyuRoomStatus(status, data);
         if (fetchAvatar && !status.avatar) {
             await attachDouyuAvatar(status, roomId);
         }
         return status;
     }
 
-    const betardData = await fetchJson(appendCommonQuery(`https://www.douyu.com/betard/${roomId}`));
-    if (betardData?.room) {
-        const data = betardData.room;
-        const isReplay = data.videoLoop === 1;
-        const isLive = !isReplay && data.show_status === 1;
+    const openData = await fetchDouyuJson(`https://open.douyucdn.cn/api/RoomApi/room/${roomId}`, {
+        timeoutMs: 4500
+    });
+    if (openData?.data) {
+        applyDouyuOpenStatus(status, openData.data);
+        return status;
+    }
 
-        status.isReplay = isReplay;
-        status.isLive = isLive;
-        status.title = data.room_name || status.title;
-        status.owner = data.nickname || status.owner;
-        status.heatValue = parseHeatValue(data.online || 0);
-        status.cover = data.room_pic || status.cover;
-        status.avatar = data.owner_avatar || status.avatar;
-        status.startTime = isLive ? parseTimestamp(data.show_time) : null;
-
+    const rateData = await fetchDouyuJson(appendCommonQuery(`https://m.douyu.com/api/room/ratestream?rid=${roomId}`), {
+        timeoutMs: 4500
+    });
+    if (rateData?.data) {
+        const data = rateData.data;
+        const roomInfo = data.roomInfo ?? {};
+        const bizAll = data.room_biz_all ?? {};
+        applyDouyuRoomStatus(status, {
+            videoLoop: roomInfo.videoLoop ?? bizAll.videoLoop,
+            show_status: roomInfo.show_status ?? bizAll.show_status,
+            room_name: bizAll.room_name || roomInfo.room_name,
+            nickname: bizAll.nickname || roomInfo.nickname,
+            online: bizAll.online || roomInfo.online,
+            room_pic: bizAll.room_pic || roomInfo.room_pic,
+            owner_avatar: bizAll.owner_avatar || roomInfo.avatar,
+            show_time: bizAll.show_time || roomInfo.show_time
+        });
         if (fetchAvatar && !status.avatar) {
             await attachDouyuAvatar(status, roomId);
         }
@@ -570,8 +630,49 @@ async function getDouyuStatus(id, fetchAvatar) {
     return null;
 }
 
+async function fetchDouyuJson(url, options = {}) {
+    return fetchJsonFromCandidates(url, {
+        ...options,
+        timeoutMs: options.timeoutMs ?? 5000,
+        headers: {
+            ...DOUYU_HEADERS,
+            ...(options.headers ?? {})
+        },
+        proxyHeaders: options.headers ?? {},
+        proxies: DOUYU_PROXIES
+    });
+}
+
+function applyDouyuRoomStatus(status, data) {
+    const isReplay = data.videoLoop === 1;
+    const isLive = !isReplay && data.show_status === 1;
+
+    status.isReplay = isReplay;
+    status.isLive = isLive;
+    status.title = data.room_name || status.title;
+    status.owner = data.nickname || status.owner;
+    status.heatValue = parseHeatValue(data.online || 0);
+    status.cover = data.room_pic || status.cover;
+    status.avatar = data.owner_avatar || status.avatar;
+    status.startTime = isLive ? parseTimestamp(data.show_time) : null;
+}
+
+function applyDouyuOpenStatus(status, data) {
+    const isLive = String(data.room_status) === '1';
+
+    status.isReplay = false;
+    status.isLive = isLive;
+    status.title = data.room_name || status.title;
+    status.owner = data.owner_name || status.owner;
+    status.heatValue = parseHeatValue(data.hn || data.online || 0);
+    status.cover = data.room_thumb || status.cover;
+    status.avatar = data.avatar || status.avatar;
+    status.startTime = isLive ? parseTimestamp(data.start_time, '+08:00') : null;
+    status._profileFetched = !!status.avatar;
+}
+
 async function attachDouyuAvatar(status, roomId) {
-    const roomData = await fetchJson(appendCommonQuery(`https://open.douyucdn.cn/api/RoomApi/room/${roomId}`), {
+    const roomData = await fetchDouyuJson(`https://open.douyucdn.cn/api/RoomApi/room/${roomId}`, {
         timeoutMs: 4000
     });
     if (roomData?.data?.avatar) {
@@ -667,41 +768,16 @@ async function fetchBilibiliUidStatusInfo(uids) {
 }
 
 async function fetchBilibiliJson(url, options = {}) {
-    const timeoutMs = Math.min(options.timeoutMs ?? 6500, 6500);
-    const attempts = [
-        {
-            url,
-            headers: {
-                ...BILIBILI_HEADERS,
-                ...(options.headers ?? {})
-            }
+    return fetchJsonFromCandidates(url, {
+        ...options,
+        timeoutMs: Math.min(options.timeoutMs ?? 6500, 6500),
+        headers: {
+            ...BILIBILI_HEADERS,
+            ...(options.headers ?? {})
         },
-        ...BILIBILI_PROXIES.map(proxy => ({
-            url: proxy.url(url),
-            headers: options.headers ?? {}
-        }))
-    ];
-    const controllers = attempts.map(() => new AbortController());
-
-    const requests = attempts.map((attempt, index) =>
-        fetchJsonResult(attempt.url, {
-            ...options,
-            timeoutMs,
-            headers: attempt.headers,
-            signal: controllers[index].signal
-        }).then(result => {
-            if (result.ok && result.data) return result.data;
-            throw new Error(result.error || 'fetch_failed');
-        })
-    );
-
-    try {
-        return await promiseAny(requests);
-    } catch (_error) {
-        return null;
-    } finally {
-        controllers.forEach(controller => controller.abort());
-    }
+        proxyHeaders: options.headers ?? {},
+        proxies: BILIBILI_PROXIES
+    });
 }
 
 function applyBilibiliBaseInfo(status, data) {
@@ -766,9 +842,19 @@ function applyBilibiliUidInfo(status, data, fetchAvatar) {
 }
 
 async function getTwitchStatus(id, fetchAvatar, env) {
-    const helixStatus = await getTwitchHelixStatus(id, fetchAvatar, env);
-    if (helixStatus) return helixStatus;
-    return getTwitchDecapiStatus(id, fetchAvatar);
+    const candidates = [getTwitchDecapiStatus(id, fetchAvatar)];
+    if (hasTwitchCredentials(env)) {
+        candidates.unshift(getTwitchHelixStatus(id, fetchAvatar, env));
+    }
+
+    return firstNonNull(candidates);
+}
+
+function hasTwitchCredentials(env = {}) {
+    return !!(
+        env.TWITCH_CLIENT_ID &&
+        (env.TWITCH_ACCESS_TOKEN || env.TWITCH_APP_TOKEN || env.TWITCH_CLIENT_SECRET)
+    );
 }
 
 async function getTwitchHelixStatus(id, fetchAvatar, env) {
@@ -918,18 +1004,65 @@ function parseTwitchUptimeMs(uptime) {
     return totalMs;
 }
 
-async function getKickStatus(id) {
+async function getKickStatus(id, env = {}) {
+    const officialStatus = await getKickOfficialStatus(id, env);
+    if (officialStatus) return officialStatus;
+
     const status = createDefaultStatus('kick', id);
-    const data = await fetchJson(`https://kick.com/api/v2/channels/${encodeURIComponent(id)}`, {
-        timeoutMs: 7000,
+    const data = await fetchKickInternalJson(id);
+
+    if (!data?.user || data.error) return null;
+
+    applyKickInternalStatus(status, data);
+    return status;
+}
+
+async function getKickOfficialStatus(id, env = {}) {
+    const token = getKickAccessToken(env);
+    if (!token) return null;
+
+    const data = await fetchJson(`https://api.kick.com/public/v1/channels?slug=${encodeURIComponent(id)}`, {
+        timeoutMs: 6000,
         headers: {
-            Accept: 'application/json',
-            Referer: 'https://kick.com/'
+            Authorization: `Bearer ${String(token).replace(/^Bearer\s+/i, '')}`,
+            Accept: 'application/json'
         }
     });
 
-    if (!data?.user) return null;
+    const channel = Array.isArray(data?.data)
+        ? data.data[0]
+        : (data?.channel ?? data?.data);
+    if (!channel) return null;
 
+    const status = createDefaultStatus('kick', id);
+    applyKickOfficialStatus(status, channel);
+    return status;
+}
+
+function getKickAccessToken(env = {}) {
+    return env.KICK_ACCESS_TOKEN ||
+        env.KICK_APP_TOKEN ||
+        env.KICK_BEARER_TOKEN ||
+        env.KICK_API_TOKEN ||
+        '';
+}
+
+async function fetchKickInternalJson(id) {
+    const url = `https://kick.com/api/v2/channels/${encodeURIComponent(id)}`;
+    return fetchJsonFromCandidates(url, {
+        timeoutMs: 6500,
+        headers: KICK_HEADERS,
+        proxyHeaders: {
+            Accept: 'application/json, text/plain, */*'
+        },
+        proxies: [
+            CODETABS_PROXY,
+            ALLORIGINS_RAW_PROXY
+        ]
+    });
+}
+
+function applyKickInternalStatus(status, data) {
     const livestream = data.livestream;
     const user = data.user;
     status.owner = user.username || status.owner;
@@ -949,6 +1082,41 @@ async function getKickStatus(id) {
     } else {
         status.cover = user.profile_pic || status.cover;
     }
+}
 
-    return status;
+function applyKickOfficialStatus(status, channel) {
+    const stream = channel.stream ?? channel.livestream;
+    const user = channel.user ?? {};
+
+    status.owner = channel.slug ||
+        channel.username ||
+        user.username ||
+        status.owner;
+    status.avatar = user.profile_pic ||
+        user.profile_picture ||
+        channel.profile_picture ||
+        channel.profile_image ||
+        channel.banner_picture ||
+        status.avatar;
+    status.isLive = stream?.is_live === true || channel.is_live === true;
+
+    if (status.isLive && stream) {
+        status.title = stream.session_title ||
+            stream.title ||
+            channel.stream_title ||
+            status.title;
+        status.heatValue = parseHeatValue(stream.viewer_count ?? stream.viewers ?? 0);
+        status.startTime = parseTimestamp(stream.start_time || stream.created_at);
+        status.cover = stream.thumbnail ||
+            stream.thumbnail_url ||
+            stream.url ||
+            channel.banner_picture ||
+            status.avatar ||
+            status.cover;
+    } else {
+        status.title = channel.stream_title || status.title;
+        status.cover = channel.banner_picture ||
+            status.avatar ||
+            status.cover;
+    }
 }
