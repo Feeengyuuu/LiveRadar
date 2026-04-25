@@ -217,6 +217,121 @@ export function registerDefaultAdapters() {
 // Unified Fetch Function
 // ====================================================================
 
+const SERVER_STATUS_TIMEOUT_MS = 5000;
+const SERVER_BATCH_STATUS_TIMEOUT_MS = 20000;
+const SERVER_BATCH_CHUNK_SIZE = 100;
+
+function shouldUseServerStatusApi() {
+    if (typeof window === 'undefined') return false;
+    if (!['http:', 'https:'].includes(window.location.protocol)) return false;
+
+    const explicit = import.meta.env.VITE_STATUS_API_ENABLED;
+    if (explicit === 'false') return false;
+    if (explicit === 'true') return true;
+
+    return import.meta.env.PROD === true;
+}
+
+function normalizeServerStatus(status, id, prevData = null) {
+    if (!status || typeof status !== 'object') return null;
+
+    const heatValue = Number(status.heatValue);
+    const normalized = {
+        isLive: status.isLive === true,
+        isReplay: status.isReplay === true,
+        title: status.title || prevData?.title || '',
+        owner: status.owner || prevData?.owner || id,
+        cover: status.cover || prevData?.cover || '',
+        avatar: status.avatar || prevData?.avatar || '',
+        heatValue: Number.isFinite(heatValue) ? Math.max(0, Math.floor(heatValue)) : 0,
+        isError: false,
+        startTime: Number.isFinite(status.startTime) ? status.startTime : null
+    };
+
+    if (status._profileFetched === true) normalized._profileFetched = true;
+    if (Number.isFinite(status.lastTitleUpdate)) normalized.lastTitleUpdate = status.lastTitleUpdate;
+
+    return normalized;
+}
+
+async function fetchServerPlatformStatus(platform, id, options = {}, prevData = null) {
+    if (!shouldUseServerStatusApi()) return null;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), options.timeout ?? SERVER_STATUS_TIMEOUT_MS);
+
+    try {
+        const url = new URL('/api/status', window.location.origin);
+        url.searchParams.set('platform', platform);
+        url.searchParams.set('id', String(id));
+        url.searchParams.set('avatar', options.fetchAvatar === false ? '0' : '1');
+
+        const response = await fetch(url.toString(), {
+            signal: controller.signal,
+            headers: {
+                Accept: 'application/json'
+            }
+        });
+
+        if (!response.ok) return null;
+        const payload = await response.json();
+        return normalizeServerStatus(payload.status ?? payload, id, prevData);
+    } catch (_error) {
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+async function fetchServerPlatformStatusesBatch(requests) {
+    if (!shouldUseServerStatusApi()) return null;
+    if (!Array.isArray(requests) || requests.length === 0) return [];
+
+    const results = new Array(requests.length).fill(null);
+
+    for (let start = 0; start < requests.length; start += SERVER_BATCH_CHUNK_SIZE) {
+        const chunk = requests.slice(start, start + SERVER_BATCH_CHUNK_SIZE);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), SERVER_BATCH_STATUS_TIMEOUT_MS);
+
+        try {
+            const response = await fetch(new URL('/api/status/batch', window.location.origin).toString(), {
+                method: 'POST',
+                signal: controller.signal,
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    rooms: chunk.map(request => ({
+                        platform: request.platform,
+                        id: String(request.id),
+                        fetchAvatar: request.options?.fetchAvatar !== false
+                    }))
+                })
+            });
+
+            if (!response.ok) return null;
+
+            const payload = await response.json();
+            if (!payload?.ok || !Array.isArray(payload.results)) return null;
+
+            payload.results.forEach((item, index) => {
+                const sourceRequest = chunk[index];
+                results[start + index] = item?.ok
+                    ? normalizeServerStatus(item.status, sourceRequest.id, sourceRequest.prevData)
+                    : null;
+            });
+        } catch (_error) {
+            return null;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
+
+    return results;
+}
+
 /**
  * Fetch status for any platform
  * @param {string} platform - Platform identifier
@@ -239,11 +354,26 @@ export async function fetchPlatformStatus(platform, id, options = {}, prevData =
     }
 
     try {
+        const serverStatus = await fetchServerPlatformStatus(platform, id, options, prevData);
+        if (serverStatus) return serverStatus;
+
         return await adapter.getStatus(id, options, prevData);
     } catch (error) {
         ErrorHandler.log(error, `${platform}:${id}`);
         return null;
     }
+}
+
+/**
+ * Fetch status for multiple platforms through the server batch API.
+ * Returns null when the server batch path is unavailable so callers can
+ * fall back to single-room fetching without changing behavior.
+ *
+ * @param {Array<{platform:string,id:string,options?:FetchOptions,prevData?:Object}>} requests
+ * @returns {Promise<Array<RoomStatus|null>|null>}
+ */
+export async function fetchPlatformStatusesBatch(requests) {
+    return fetchServerPlatformStatusesBatch(requests);
 }
 
 // ====================================================================

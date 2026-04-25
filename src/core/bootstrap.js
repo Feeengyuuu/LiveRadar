@@ -26,7 +26,7 @@ import { init, initAppDependencies } from './init.js';
 import { initVisibilityRecovery } from './renderer/image-handler.js';
 
 // Feature modules
-import { initSnow } from '../features/enhancements/snow-effect.js';
+import { initSnow } from '../features/enhancements/snow-effect-loader.js';
 import { scheduleMusicPlayerInit } from '../features/enhancements/music-player-loader.js';
 import { initAutoRefresh } from '../features/core/auto-refresh.js';
 import { initNotifications, checkNotifications } from '../features/core/notifications.js';
@@ -37,11 +37,17 @@ import { initAudioManager } from '../features/audio/audio-manager.js';
 // Event delegation
 import { initEventRouter } from './event-router.js';
 
+let initialized = false;
+let appDisposers = [];
+
 /**
  * Main application initialization function
  * @returns {Promise<void>}
  */
 export async function initializeApp() {
+    if (initialized) return;
+    initialized = true;
+
     console.log('[Bootstrap] Starting application initialization...');
 
     try {
@@ -58,7 +64,7 @@ export async function initializeApp() {
         console.log('[Bootstrap] DOM cache initialized');
 
         // === Step 2: Initialize Event Delegation Router ===
-        initEventRouter();
+        appDisposers.push(initEventRouter());
 
         // === Step 3: Wire Up Module Dependencies (Simplified) ===
         // Most dependencies now come directly from state.js
@@ -74,22 +80,21 @@ export async function initializeApp() {
         });
 
         // Initialize refresh manager (only callbacks needed)
-        initRefreshManager({
+        appDisposers.push(initRefreshManager({
             detectStatusChanges: () => updateTicker(getRooms(), getRoomDataCache())
-        });
+        }));
 
         // Initialize renderer (no dependencies needed - uses state.js directly)
-        initRenderer();
+        appDisposers.push(initRenderer());
 
         console.log('[Bootstrap] All core modules initialized');
 
         // === Step 4: Initialize Feature Modules ===
         initNotificationAudio();
         initNotifications();
-        initSnow();
         initStatusTicker();
         initAudioManager();
-        initAutoRefresh();
+        appDisposers.push(initAutoRefresh());
 
         // Pass notifyAudio to init dependencies (must be called after initNotificationAudio)
         initAppDependencies({
@@ -117,14 +122,17 @@ export async function initializeApp() {
         await init();
 
         // Load non-critical UI widgets after the main monitoring flow is ready.
+        void initSnow();
         scheduleMusicPlayerInit();
 
         // === Step 6: Setup Page Unload Protection ===
         // 优化：确保所有防抖的localStorage写入在页面关闭前完成
-        window.addEventListener('beforeunload', () => {
+        const handleBeforeUnload = () => {
             console.log('[Bootstrap] Page unloading, flushing pending storage writes...');
             flushPendingStorageWrites();
-        });
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        appDisposers.push(() => window.removeEventListener('beforeunload', handleBeforeUnload));
 
         // === Step 7: CSS Animation Pause on Tab Hidden ===
         // 标签页后台时给 <html> 打 .tab-hidden，CSS 用它暂停所有 infinite 动画。
@@ -133,17 +141,33 @@ export async function initializeApp() {
             document.documentElement.classList.toggle('tab-hidden', document.hidden);
         };
         document.addEventListener('visibilitychange', syncTabVisibility);
+        appDisposers.push(() => document.removeEventListener('visibilitychange', syncTabVisibility));
         syncTabVisibility();
 
         console.log('[Bootstrap] ✓ Initialization complete');
 
     } catch (error) {
         console.error('[Bootstrap] ✗ Initialization failed:', error);
+        disposeApp();
         console.error('[Bootstrap] Error name:', error?.name);
         console.error('[Bootstrap] Error message:', error?.message);
         console.error('[Bootstrap] Error stack:', error?.stack);
         throw error;
     }
+}
+
+export function disposeApp() {
+    for (let i = appDisposers.length - 1; i >= 0; i--) {
+        const dispose = appDisposers[i];
+        if (typeof dispose !== 'function') continue;
+        try {
+            dispose();
+        } catch (error) {
+            console.error('[Bootstrap] Cleanup failed:', error);
+        }
+    }
+    appDisposers = [];
+    initialized = false;
 }
 
 /**

@@ -15,7 +15,7 @@
  */
 
 import { APP_CONFIG } from '../config/constants.js';
-import { registerDefaultAdapters, fetchPlatformStatus } from '../api/platform-adapter.js';
+import { registerDefaultAdapters, fetchPlatformStatus, fetchPlatformStatusesBatch } from '../api/platform-adapter.js';
 import { fetchQuick } from '../api/proxy-manager.js';
 import { DataDiffer } from '../utils/data-differ.js';
 import { getRoomDataCache, getRooms, updateRoomCache } from './state.js';
@@ -128,6 +128,30 @@ export function fetchRoomStatus(room, jitter = 0) {
 async function fetchRoomStatusInner(room, jitter, cacheKey) {
     if (jitter > 0) await new Promise(r => setTimeout(r, jitter));
 
+    const context = createRoomFetchContext(room, cacheKey);
+    let result = null;
+
+    try {
+        result = await fetchPlatformStatus(
+            room.platform,
+            room.id,
+            { fetchAvatar: context.needProfileUpdate },
+            context.prevData
+        );
+    } catch (error) {
+        console.error(`[fetchStatus] ${room.platform}-${room.id} fetch failed:`, error.message);
+        result = null;
+    }
+
+    if (!isRoomStillTracked(room)) {
+        cancelPendingFetches(cacheKey);
+        return;
+    }
+
+    applyRoomStatusResult(room, cacheKey, result, context);
+}
+
+function createRoomFetchContext(room, cacheKey) {
     const roomDataCache = getRoomDataCache();
     const prevData = roomDataCache[cacheKey];
     const now = Date.now();
@@ -139,24 +163,139 @@ async function fetchRoomStatusInner(room, jitter, cacheKey) {
         || (now - prevData.lastAvatarUpdate > APP_CONFIG.CACHE.AVATAR_UPDATE_INTERVAL)
         || ownerNeedsRefresh;
 
-    let result = null;
+    return {
+        prevData,
+        now,
+        needProfileUpdate
+    };
+}
 
-    try {
-        result = await fetchPlatformStatus(
-            room.platform,
-            room.id,
-            { fetchAvatar: needProfileUpdate },
-            prevData
-        );
-    } catch (error) {
-        console.error(`[fetchStatus] ${room.platform}-${room.id} fetch failed:`, error.message);
-        result = null;
+/**
+ * Fetch multiple room statuses through the server batch API when available.
+ * Falls back per-room for missed or unavailable batch results.
+ *
+ * @param {Array} rooms
+ * @param {Object} [options]
+ * @param {(finished:number,total:number)=>void} [options.onProgress]
+ * @returns {Promise<void>}
+ */
+export function fetchRoomsStatusBatch(rooms, options = {}) {
+    if (!Array.isArray(rooms) || rooms.length === 0) return Promise.resolve();
+
+    const existingPromises = [];
+    const entries = [];
+
+    rooms.forEach(room => {
+        const cacheKey = getRoomCacheKey(room.platform, room.id);
+        const existing = inFlightFetches.get(cacheKey);
+        if (existing) {
+            existingPromises.push(existing);
+            return;
+        }
+
+        entries.push({
+            room,
+            cacheKey,
+            context: createRoomFetchContext(room, cacheKey)
+        });
+    });
+
+    if (entries.length === 0) {
+        return Promise.allSettled(existingPromises).then(() => undefined);
     }
 
-    if (!isRoomStillTracked(room)) {
-        cancelPendingFetches(cacheKey);
+    const batchPromise = fetchRoomsStatusBatchInner(entries, options).finally(() => {
+        entries.forEach(entry => {
+            if (inFlightFetches.get(entry.cacheKey) === batchPromise) {
+                inFlightFetches.delete(entry.cacheKey);
+            }
+        });
+    });
+
+    entries.forEach(entry => {
+        inFlightFetches.set(entry.cacheKey, batchPromise);
+    });
+
+    return Promise.allSettled([...existingPromises, batchPromise]).then(() => undefined);
+}
+
+async function fetchRoomsStatusBatchInner(entries, options = {}) {
+    const total = entries.length;
+    let finished = 0;
+    const notifyProgress = () => {
+        finished += 1;
+        if (options.onProgress) options.onProgress(finished, total);
+    };
+    const fallbackConcurrency = Math.max(1, Math.floor(options.fallbackConcurrency || 4));
+
+    const requests = entries.map(entry => ({
+        platform: entry.room.platform,
+        id: entry.room.id,
+        options: { fetchAvatar: entry.context.needProfileUpdate },
+        prevData: entry.context.prevData
+    }));
+
+    const batchResults = await fetchPlatformStatusesBatch(requests);
+
+    if (!Array.isArray(batchResults)) {
+        await mapWithConcurrency(entries, fallbackConcurrency, entry => fetchAndApplyEntry(entry, null), notifyProgress);
         return;
     }
+
+    for (let index = 0; index < entries.length; index += 1) {
+        const entry = entries[index];
+        await fetchAndApplyEntry(entry, batchResults[index]);
+        notifyProgress();
+    }
+}
+
+async function fetchAndApplyEntry(entry, initialResult) {
+    let result = initialResult;
+
+    if (!result) {
+        try {
+            result = await fetchPlatformStatus(
+                entry.room.platform,
+                entry.room.id,
+                { fetchAvatar: entry.context.needProfileUpdate },
+                entry.context.prevData
+            );
+        } catch (error) {
+            console.error(`[fetchStatus] ${entry.room.platform}-${entry.room.id} fetch failed:`, error.message);
+            result = null;
+        }
+    }
+
+    if (!isRoomStillTracked(entry.room)) {
+        cancelPendingFetches(entry.cacheKey);
+        return;
+    }
+
+    applyRoomStatusResult(entry.room, entry.cacheKey, result, entry.context);
+}
+
+async function mapWithConcurrency(items, limit, worker, onProgress) {
+    const pool = new Set();
+
+    for (const item of items) {
+        if (pool.size >= limit) await Promise.race(pool);
+
+        const task = Promise.resolve(worker(item))
+            .catch(error => {
+                console.error('[fetchStatusBatch] Task execution failed:', error);
+            })
+            .finally(() => {
+                pool.delete(task);
+                if (onProgress) onProgress();
+            });
+        pool.add(task);
+    }
+
+    await Promise.allSettled(pool);
+}
+
+function applyRoomStatusResult(room, cacheKey, result, context) {
+    const { prevData, now, needProfileUpdate } = context;
 
     if (result) {
         const finalIsLive = result.isLive && !result.isReplay;

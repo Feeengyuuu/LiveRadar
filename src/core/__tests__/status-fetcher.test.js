@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
         mockState,
         registerDefaultAdapters: vi.fn(),
         fetchPlatformStatus: vi.fn(),
+        fetchPlatformStatusesBatch: vi.fn(),
         fetchQuick: vi.fn(),
         emit: vi.fn(),
         updateRoomCache: vi.fn((key, data) => {
@@ -28,7 +29,8 @@ vi.mock('../state.js', () => ({
 
 vi.mock('../../api/platform-adapter.js', () => ({
     registerDefaultAdapters: mocks.registerDefaultAdapters,
-    fetchPlatformStatus: mocks.fetchPlatformStatus
+    fetchPlatformStatus: mocks.fetchPlatformStatus,
+    fetchPlatformStatusesBatch: mocks.fetchPlatformStatusesBatch
 }));
 
 vi.mock('../../api/proxy-manager.js', () => ({
@@ -51,6 +53,7 @@ vi.mock('../event-bus.js', () => ({
 
 const {
     cancelPendingFetches,
+    fetchRoomsStatusBatch,
     fetchRoomStatus,
     initStatusFetcher
 } = await import('../status-fetcher.js');
@@ -143,5 +146,48 @@ describe('status-fetcher', () => {
 
         expect(mocks.updateRoomCache).toHaveBeenCalledTimes(1);
         expect(mocks.updateRoomCache.mock.calls[0][0]).toBe('douyu-100');
+    });
+
+    it('applies server batch results and falls back per missed room', async () => {
+        const rooms = [
+            { id: '100', platform: 'douyu', isFav: false },
+            { id: '200', platform: 'bilibili', isFav: false }
+        ];
+        const progress = vi.fn();
+        mocks.mockState.rooms = rooms;
+        mocks.fetchPlatformStatusesBatch.mockResolvedValue([
+            {
+                isLive: true,
+                isReplay: false,
+                title: 'batch online',
+                owner: 'batch streamer',
+                cover: 'https://example.com/batch.jpg',
+                avatar: 'https://example.com/batch-avatar.jpg',
+                heatValue: 1000,
+                isError: false,
+                startTime: null
+            },
+            null
+        ]);
+        mocks.fetchPlatformStatus.mockResolvedValue({
+            isLive: false,
+            isReplay: false,
+            title: 'fallback offline',
+            owner: 'fallback streamer',
+            cover: '',
+            avatar: '',
+            heatValue: 0,
+            isError: false,
+            startTime: null
+        });
+
+        await fetchRoomsStatusBatch(rooms, { onProgress: progress, fallbackConcurrency: 2 });
+
+        expect(mocks.fetchPlatformStatusesBatch).toHaveBeenCalledTimes(1);
+        expect(mocks.fetchPlatformStatus).toHaveBeenCalledTimes(1);
+        expect(mocks.updateRoomCache).toHaveBeenCalledTimes(2);
+        expect(mocks.updateRoomCache.mock.calls[0][0]).toBe('douyu-100');
+        expect(mocks.updateRoomCache.mock.calls[1][0]).toBe('bilibili-200');
+        expect(progress).toHaveBeenCalledTimes(2);
     });
 });

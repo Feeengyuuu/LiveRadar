@@ -16,6 +16,7 @@ import { showToast } from '../../utils/helpers.js';
 // State
 let autoRefreshTimer = null;
 let autoRefreshCountdown = APP_CONFIG.AUTO_REFRESH.INTERVAL;
+let disposeAutoRefresh = null;
 
 /**
  * Format countdown in MM:SS format
@@ -34,14 +35,18 @@ function formatCountdown(seconds) {
 function updateAutoRefreshBtn() {
     const btn = getElement('auto-refresh-btn');
     const label = getElement('auto-refresh-label');
+    const metricRefresh = getElement('metric-refresh-count');
     if (!btn || !label) return;
 
     if (isAutoRefreshEnabled()) {
         btn.classList.remove('off');
-        label.textContent = `自动: ${formatCountdown(autoRefreshCountdown)}`;
+        const countdown = formatCountdown(autoRefreshCountdown);
+        label.textContent = `自动: ${countdown}`;
+        if (metricRefresh) metricRefresh.textContent = countdown;
     } else {
         btn.classList.add('off');
         label.textContent = '自动: 关';
+        if (metricRefresh) metricRefresh.textContent = '--:--';
     }
 }
 
@@ -113,12 +118,26 @@ export function toggleAutoRefresh() {
  * Initialize auto-refresh on page load
  */
 export function initAutoRefresh() {
+    if (disposeAutoRefresh) {
+        updateAutoRefreshBtn();
+        return disposeAutoRefresh;
+    }
+
     if (isAutoRefreshEnabled()) {
         startAutoRefresh();
     }
     updateAutoRefreshBtn();
 
     // Cross-module requests from refresh-manager flow through the event bus
-    on(Events.AUTO_REFRESH_RESET, resetAutoRefreshCountdown);
-    on(Events.AUTO_REFRESH_UPDATE_BTN, updateAutoRefreshBtn);
+    const unsubscribeReset = on(Events.AUTO_REFRESH_RESET, resetAutoRefreshCountdown);
+    const unsubscribeUpdate = on(Events.AUTO_REFRESH_UPDATE_BTN, updateAutoRefreshBtn);
+
+    disposeAutoRefresh = () => {
+        unsubscribeReset();
+        unsubscribeUpdate();
+        stopAutoRefresh();
+        disposeAutoRefresh = null;
+    };
+
+    return disposeAutoRefresh;
 }

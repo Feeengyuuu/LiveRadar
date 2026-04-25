@@ -17,16 +17,27 @@ import { updateCard } from './card-renderer.js';
 // Tracks all card IDs currently in the DOM so prune() can remove stale ones
 // without a querySelectorAll on every render.
 const knownCardIds = new Set();
+let disposeRenderer = null;
 
 export function initRenderer() {
-    subscribeToState('rooms', () => {
+    if (disposeRenderer) return disposeRenderer;
+
+    const unsubscribeRooms = subscribeToState('rooms', () => {
         console.log('[Renderer] Rooms changed, auto-rendering...');
         debouncedRenderAll();
     });
 
-    on(Events.RENDER_REQUEST, () => renderAllImmediate());
+    const unsubscribeRenderRequest = on(Events.RENDER_REQUEST, () => renderAllImmediate());
+
+    disposeRenderer = () => {
+        unsubscribeRooms();
+        unsubscribeRenderRequest();
+        debouncedRenderAll.cancel?.();
+        disposeRenderer = null;
+    };
 
     console.log('[Renderer] Initialized with state subscriptions');
+    return disposeRenderer;
 }
 
 // ====================================================================
@@ -61,6 +72,7 @@ function assignCardZone(data, previousZone, flags) {
     if (!data.loading) {
         if (data.isError || data._retryFailed) {
             flags.hasOffline = true;
+            flags.offlineCount++;
             return { targetGridKey: 'offline', cardState: 'error' };
         }
         if (data.isLive) {
@@ -70,17 +82,25 @@ function assignCardZone(data, previousZone, flags) {
         }
         if (data.isReplay) {
             flags.hasLoop = true;
+            flags.loopCount++;
             return { targetGridKey: 'loop', cardState: 'loop' };
         }
         flags.hasOffline = true;
+        flags.offlineCount++;
         return { targetGridKey: 'offline', cardState: 'offline' };
     }
 
     const cardState = data._retrying ? 'retrying' : 'loading';
     const zone = previousZone || 'offline';
-    if (zone === 'live') flags.hasLive = true;
-    else if (zone === 'loop') flags.hasLoop = true;
-    else flags.hasOffline = true;
+    if (zone === 'live') {
+        flags.hasLive = true;
+    } else if (zone === 'loop') {
+        flags.hasLoop = true;
+        flags.loopCount++;
+    } else {
+        flags.hasOffline = true;
+        flags.offlineCount++;
+    }
     return { targetGridKey: zone, cardState };
 }
 
@@ -97,12 +117,15 @@ function shouldUpdateCard(card, roomInfo, data, cardState) {
 
     const currentIsFav = card.classList.contains('is-favorite');
     const favStatusChanged = currentIsFav !== !!roomInfo.isFav;
+    const platformChip = card._domRefs?.platformChip || card.querySelector('.platform-chip');
+    const platformChromeNeedsUpdate = !!platformChip && platformChip.textContent.trim() === '平台';
     const isLiveThumbnail = cardState === 'live'
         && (roomInfo.platform === 'twitch' || roomInfo.platform === 'kick');
 
     return data._hasChanges !== false
         || data._stale === true
         || favStatusChanged
+        || platformChromeNeedsUpdate
         || isLiveThumbnail;
 }
 
@@ -156,6 +179,11 @@ function pruneOrphanCards(presentCardIds) {
 
 function renderEmptyState(cache, grids, zones) {
     if (cache.liveCount) cache.liveCount.textContent = '0';
+    if (cache.offlineCount) cache.offlineCount.textContent = '0';
+    if (cache.loopCount) cache.loopCount.textContent = '0';
+    if (cache.metricLiveCount) cache.metricLiveCount.textContent = '0';
+    if (cache.metricOfflineCount) cache.metricOfflineCount.textContent = '0';
+    if (cache.metricFavoriteCount) cache.metricFavoriteCount.textContent = '0';
     cache.emptyState?.classList.remove('hidden');
     zones.forEach(el => el.classList.remove('active'));
     Object.values(grids).forEach(grid => {
@@ -198,7 +226,7 @@ function renderAllImmediate() {
     const sortedRooms = favorites.concat(others);
 
     const presentCardIds = new Set();
-    const flags = { hasLive: false, hasOffline: false, hasLoop: false, liveCount: 0 };
+    const flags = { hasLive: false, hasOffline: false, hasLoop: false, liveCount: 0, offlineCount: 0, loopCount: 0 };
     const gridPositions = { live: 0, offline: 0, loop: 0 };
     const newCardsByGrid = { live: [], offline: [], loop: [] };
 
@@ -259,6 +287,24 @@ function renderAllImmediate() {
             cache.liveCount.textContent = nextCount;
         }
     }
+    if (cache.offlineCount) {
+        const nextCount = String(flags.offlineCount);
+        if (cache.offlineCount.textContent !== nextCount) {
+            cache.offlineCount.textContent = nextCount;
+        }
+    }
+    if (cache.loopCount) {
+        const nextCount = String(flags.loopCount);
+        if (cache.loopCount.textContent !== nextCount) {
+            cache.loopCount.textContent = nextCount;
+        }
+    }
+
+    const favoriteCount = rooms.filter(room => room.isFav).length;
+    const offlineTotal = flags.offlineCount;
+    if (cache.metricLiveCount) cache.metricLiveCount.textContent = String(flags.liveCount);
+    if (cache.metricOfflineCount) cache.metricOfflineCount.textContent = String(offlineTotal);
+    if (cache.metricFavoriteCount) cache.metricFavoriteCount.textContent = String(favoriteCount);
 
     cache.zoneLive?.classList.toggle('active', flags.hasLive);
     cache.zoneOffline?.classList.toggle('active', flags.hasOffline);

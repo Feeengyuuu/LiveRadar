@@ -16,7 +16,7 @@
 
 import { APP_CONFIG } from '../config/constants.js';
 import { ResourceManager } from '../utils/resource-manager.js';
-import { fetchRoomStatus } from './status-fetcher.js';
+import { fetchRoomStatus, fetchRoomsStatusBatch } from './status-fetcher.js';
 import { getState, getRooms, getRoomDataCache, updateRefreshStatus, updateRefreshStats } from './state.js';
 import { getDOMCache } from '../utils/dom-cache.js';
 import { viewportTracker } from '../utils/viewport-tracker.js';
@@ -25,6 +25,7 @@ import { on, emit, Events } from './event-bus.js';
 
 // External dependencies (only callbacks need injection)
 let detectStatusChanges = null;
+let disposeRefreshManager = null;
 
 /**
  * Initialize refresh manager with external dependencies
@@ -32,11 +33,19 @@ let detectStatusChanges = null;
  */
 export function initRefreshManager(deps = {}) {
     if (deps.detectStatusChanges) detectStatusChanges = deps.detectStatusChanges;
+    if (disposeRefreshManager) return disposeRefreshManager;
 
     // Cross-module refresh requests flow through the event bus
-    on(Events.REFRESH_REQUEST, (silent = false, isAuto = false, options = {}) => {
+    const unsubscribeRefreshRequest = on(Events.REFRESH_REQUEST, (silent = false, isAuto = false, options = {}) => {
         refreshAll(silent, isAuto, options);
     });
+
+    disposeRefreshManager = () => {
+        unsubscribeRefreshRequest();
+        disposeRefreshManager = null;
+    };
+
+    return disposeRefreshManager;
 }
 
 // ====================================================================
@@ -289,7 +298,11 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
             }
         };
 
-        await promisePool(sortedRooms, concurrency, taskFn, onProgress);
+        if (options.disableServerBatch === true || sortedRooms.length <= 1) {
+            await promisePool(sortedRooms, concurrency, taskFn, onProgress);
+        } else {
+            await fetchRoomsStatusBatch(sortedRooms, { onProgress, fallbackConcurrency: concurrency });
+        }
 
         // Incremental update: Count data changes
         const roomDataCache = getRoomDataCache();

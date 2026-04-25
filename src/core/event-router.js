@@ -16,7 +16,7 @@
  */
 
 // Import all action handlers
-import { toggleSnow } from '../features/enhancements/snow-effect.js';
+import { toggleSnow } from '../features/enhancements/snow-effect-loader.js';
 import {
     toggleDropdown,
     selectPlatform,
@@ -45,7 +45,9 @@ import { getRooms } from './state.js';
  */
 const actionHandlers = {
     // Snow effect
-    'toggle-snow': () => toggleSnow(),
+    'toggle-snow': () => {
+        void toggleSnow();
+    },
 
     // Platform selector
     'toggle-dropdown': (element, event) => toggleDropdown(event),
@@ -98,6 +100,8 @@ const actionHandlers = {
     'unlock-audio': () => unlockAllAudio(),
     'play-notification-sound': () => playNotificationSound(true, true)
 };
+
+let disposeEventRouter = null;
 
 /**
  * Handle click events via delegation
@@ -180,6 +184,10 @@ function handleBodyClick(event) {
  * Sets up global event listeners
  */
 export function initEventRouter() {
+    if (disposeEventRouter) {
+        return disposeEventRouter;
+    }
+
     console.log('[Event Router] Initializing event delegation...');
 
     // Global click delegation
@@ -202,6 +210,18 @@ export function initEventRouter() {
 
     console.log('[Event Router] ✓ Event delegation initialized');
     console.log(`[Event Router] Registered ${Object.keys(actionHandlers).length} action handlers`);
+
+    disposeEventRouter = () => {
+        document.removeEventListener('click', handleClick);
+        document.removeEventListener('input', handleInputEvent);
+        document.removeEventListener('focus', handleFocus, true);
+        document.removeEventListener('keydown', handleKeydown);
+        document.removeEventListener('change', handleChange);
+        document.body.removeEventListener('click', handleBodyClick, true);
+        disposeEventRouter = null;
+    };
+
+    return disposeEventRouter;
 }
 
 /**

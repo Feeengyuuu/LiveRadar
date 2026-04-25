@@ -15,23 +15,28 @@
  */
 
 import SafeStorage from '../../utils/safe-storage.js';
+import '../../styles/components/music-player.css';
 
 // ====================================================================
 // 配置
 // ====================================================================
 
+function assetUrl(path) {
+    return `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
+}
+
 const PLAYLIST = [
     {
         title: "Travelers' Encore",
         artist: "Andrew Prahlow",
-        path: './music/Andrew Prahlow - Outer Wilds- Echoes of the Eye (The Lost Reels) -Deluxe Original Game Soundtrack- - 21 Travelers\' encore.mp3',
-        cover: '/covers/cover_travelers_encore.png'
+        path: assetUrl('music/Andrew Prahlow - Outer Wilds- Echoes of the Eye (The Lost Reels) -Deluxe Original Game Soundtrack- - 21 Travelers\' encore.mp3'),
+        cover: assetUrl('covers/cover_travelers_encore.png')
     },
     {
         title: "Outer Wilds",
         artist: "Andrew Prahlow",
-        path: './music/Outer Wilds.mp3',
-        cover: '/covers/cover_outer_wilds.jpg'
+        path: assetUrl('music/Outer Wilds.mp3'),
+        cover: assetUrl('covers/cover_outer_wilds.jpg')
     }
 ];
 
@@ -50,7 +55,7 @@ let audio = null;
 let isPlaying = false;
 let isDraggingProgress = false;
 let isDraggingVolume = false;
-let isMinimized = SafeStorage.getItem(CONFIG.SAVE_MINIMIZED_KEY, 'false') === 'true';
+let isMinimized = SafeStorage.getItem(CONFIG.SAVE_MINIMIZED_KEY, 'true') === 'true';
 let currentTrackIndex = parseInt(SafeStorage.getItem(CONFIG.SAVE_CURRENT_TRACK_KEY, '0'), 10);
 let hasEverPlayed = false; // 标记是否曾经播放过，用于控制封面显示
 let isAnimating = false;

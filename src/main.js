@@ -18,7 +18,6 @@
 // 1. Import CSS (Vite will handle bundling)
 // ============================================================
 import './styles/main.css';
-import './styles/components/music-player.css';
 
 // ============================================================
 // 2. Import Configuration (Side Effects)
@@ -33,11 +32,12 @@ import { PerformanceDetector } from './utils/performance-detector.js';
 import { LOADING_MESSAGES } from './config/constants.js';
 import { renderErrorScreen } from './core/error-screen.js';
 import { initFaviconAnimation } from './core/favicon-animation.js';
+import SafeStorage from './utils/safe-storage.js';
 
 // ============================================================
 // 4. Import Bootstrap Module
 // ============================================================
-import { initializeApp, hideLoader } from './core/bootstrap.js';
+import { initializeApp, hideLoader, disposeApp } from './core/bootstrap.js';
 import { checkFileProtocolAndWarn } from './core/file-protocol-warning.js';
 
 // ============================================================
@@ -73,7 +73,7 @@ function showErrorPage(error, context) {
             isDev: Boolean(import.meta.env?.DEV),
             onReload: () => window.location.reload(),
             onClearCache: () => {
-                localStorage.clear();
+                SafeStorage.clear();
                 window.location.reload();
             }
         });
@@ -86,7 +86,7 @@ function showErrorPage(error, context) {
 /**
  * Global error handler for uncaught errors
  */
-window.addEventListener('error', (event) => {
+function handleGlobalError(event) {
     console.error('[Global Error]', event.error);
     ErrorHandler.log(event.error, 'UncaughtError');
 
@@ -97,19 +97,23 @@ window.addEventListener('error', (event) => {
     }
 
     event.preventDefault();
-});
+}
+
+window.addEventListener('error', handleGlobalError);
 
 /**
  * Global handler for unhandled promise rejections
  */
-window.addEventListener('unhandledrejection', (event) => {
+function handleUnhandledRejection(event) {
     console.error('[Unhandled Promise Rejection]', event.reason);
     ErrorHandler.log(event.reason, 'UnhandledPromise');
 
     showToast('操作失败，请重试', 'error');
 
     event.preventDefault();
-});
+}
+
+window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
 console.log('[LiveRadar] ✓ Global error boundary initialized');
 
@@ -158,8 +162,10 @@ async function startApp() {
 }
 
 // Start when DOM is ready
+let domReadyHandler = null;
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startApp);
+    domReadyHandler = startApp;
+    document.addEventListener('DOMContentLoaded', domReadyHandler);
 } else {
     // DOM already loaded
     startApp();
@@ -170,6 +176,14 @@ if (document.readyState === 'loading') {
 // ============================================================
 if (import.meta.hot) {
     import.meta.hot.accept();
+    import.meta.hot.dispose(() => {
+        if (domReadyHandler) {
+            document.removeEventListener('DOMContentLoaded', domReadyHandler);
+        }
+        window.removeEventListener('error', handleGlobalError);
+        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        disposeApp();
+    });
 }
 
 console.log('[LiveRadar] main.js loaded');
