@@ -6,12 +6,57 @@
 import { isSnowEnabled, updateSnowEnabled } from '../../core/state.js';
 import { showToast } from '../../utils/helpers.js';
 
+function getViewportWidth() {
+    return typeof window === 'undefined' ? 1024 : window.innerWidth;
+}
+
+function getDeviceMemory() {
+    if (typeof navigator === 'undefined') return 4;
+    return Number(navigator.deviceMemory) || 4;
+}
+
+function getHardwareConcurrency() {
+    if (typeof navigator === 'undefined') return 4;
+    return Number(navigator.hardwareConcurrency) || 4;
+}
+
+function prefersReducedMotion() {
+    return Boolean(
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    );
+}
+
+function getPreferredSnowflakeCount() {
+    const viewportWidth = getViewportWidth();
+    const isMobile = viewportWidth < 768;
+    const isLowPowerDevice = getDeviceMemory() <= 2 || getHardwareConcurrency() <= 2;
+
+    if (prefersReducedMotion()) {
+        return isMobile ? 16 : 32;
+    }
+
+    if (isLowPowerDevice) {
+        return isMobile ? 24 : 80;
+    }
+
+    if (isMobile) {
+        return 40;
+    }
+
+    if (viewportWidth < 1200) {
+        return 120;
+    }
+
+    return 220;
+}
+
 // ========================================
 // Configuration (aligned with original file)
 // ========================================
 const CONFIG = {
     ENABLED: isSnowEnabled(),        // 默认关闭，状态统一由 state.js 恢复
-    COUNT: window.innerWidth < 768 ? 80 : 500,  // 优化：移动端80个，桌面端500个
+    COUNT: getPreferredSnowflakeCount(),
     MAX_SIZE: 3.5,                  // Maximum size (pixels)
     MIN_SIZE: 1,                    // Minimum size (pixels)
     MAX_SPEED: 1.2,                 // Maximum fall speed
@@ -130,6 +175,7 @@ const runtimeHandlers = {
         if (document.hidden) {
             stopAnimation();
         } else if (snowEnabled) {
+            schedulePositionUpdate(true);
             startAnimation();
         }
     }
@@ -160,9 +206,36 @@ function schedulePositionUpdate(forceUpdate = false) {
 
 function createSnowflakes() {
     snowflakes = [];
+    CONFIG.COUNT = getPreferredSnowflakeCount();
     for (let i = 0; i < CONFIG.COUNT; i++) {
         snowflakes.push(new Snowflake());
     }
+}
+
+function removeSnowflakes(count) {
+    if (count <= 0) return;
+
+    const removed = snowflakes.splice(Math.max(0, snowflakes.length - count));
+    removed.forEach((flake) => {
+        if (flake.isAccumulated && flake.accumulatedOn) {
+            decrementAccumulated(flake.accumulatedOn);
+        }
+    });
+}
+
+function syncSnowflakeCount(targetCount = getPreferredSnowflakeCount()) {
+    const normalizedTarget = Math.max(0, Math.floor(targetCount));
+    const currentCount = snowflakes.length;
+
+    if (currentCount > normalizedTarget) {
+        removeSnowflakes(currentCount - normalizedTarget);
+    } else if (currentCount < normalizedTarget) {
+        for (let i = currentCount; i < normalizedTarget; i++) {
+            snowflakes.push(new Snowflake());
+        }
+    }
+
+    CONFIG.COUNT = normalizedTarget;
 }
 
 function startDomObserver() {
@@ -391,7 +464,7 @@ class Snowflake {
         }
 
         // Check if card is being hovered
-        if (this.accumulatedOn.matches(':hover')) {
+        if (this.accumulatedOn === hoveredCard) {
             this.startFalling();
             return;
         }
@@ -541,6 +614,9 @@ function resize() {
     height = window.innerHeight;
     canvas.width = width;
     canvas.height = height;
+    if (runtimeInitialized || snowflakes.length) {
+        syncSnowflakeCount();
+    }
     updateCardPositions(true);
 }
 
@@ -556,9 +632,14 @@ function checkPerformance() {
         lastFpsCheck = now;
 
         // Reduce snowflakes if FPS too low
-        if (fps < 30 && snowflakes.length > 50) {
-            console.log(`[Snow] FPS: ${fps}, reducing snowflakes`);
-            snowflakes.splice(0, 20);
+        const minimumCount = Math.min(30, getPreferredSnowflakeCount());
+        if (fps < 30 && snowflakes.length > minimumCount) {
+            const reducedCount = Math.max(
+                minimumCount,
+                snowflakes.length - Math.max(10, Math.ceil(snowflakes.length * 0.15))
+            );
+            console.log(`[Snow] FPS: ${fps}, reducing snowflakes to ${reducedCount}`);
+            syncSnowflakeCount(reducedCount);
         }
     }
 }

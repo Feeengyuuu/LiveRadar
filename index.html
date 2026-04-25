@@ -37,7 +37,7 @@
       id="favicon"
       rel="icon"
       type="image/svg+xml"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='2.5' fill='%23ef4444' fill-opacity='0.8'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='2.5' fill='%23f26a21' fill-opacity='0.9'/%3E%3C/svg%3E"
     />
 
     <!-- Critical CSS - 防止FOUC，确保加载器优先显示 -->
@@ -114,17 +114,18 @@
 
     <!-- Header -->
     <header
-      class="max-w-[2200px] mx-auto flex flex-col md:flex-row items-center gap-6 mb-12 bg-[#0a0a0a] p-6 rounded-3xl border border-[#1f1f1f] shadow-2xl relative z-50"
+      class="app-header max-w-[2200px] mx-auto flex flex-col md:flex-row items-center gap-6 mb-12 bg-[#0a0a0a] p-6 rounded-3xl border border-[#1f1f1f] shadow-2xl relative z-50"
     >
-      <div class="flex items-center gap-5 px-4 border-r border-[#1f1f1f] pr-8">
+      <div class="brand-cluster flex items-center gap-5 px-4 border-r border-[#1f1f1f] pr-8">
+        <div class="led-badge" aria-hidden="true">LIVE</div>
         <div
           id="secret-audio-button"
           class="w-3 h-3 bg-red-600 rounded-full animate-pulse cursor-pointer"
           title="播放测试音效"
         ></div>
         <h1 class="flex flex-col items-start">
-          <span class="text-2xl font-black italic tracking-tighter text-gray-100">直播监控室</span>
-          <span class="text-xs not-italic font-mono text-gray-500 mt-1">LiveRadar</span>
+          <span class="text-2xl font-black italic tracking-tighter text-gray-100">LiveRadar</span>
+          <span class="text-xs not-italic font-mono text-gray-500 mt-1">直播监控室</span>
         </h1>
         <button
           id="snow-toggle-btn"
@@ -149,7 +150,7 @@
 
       <!-- Platform Selector & Input -->
       <div
-        class="flex flex-1 w-full lg:w-auto items-center gap-3 bg-[#111] p-2 rounded-2xl border border-[#1f1f1f] relative"
+        class="command-search flex flex-1 w-full lg:w-auto items-center gap-3 bg-[#111] p-2 rounded-2xl border border-[#1f1f1f] relative"
       >
         <div class="relative w-40" id="custom-selector-container">
           <button
@@ -239,12 +240,12 @@
           data-action="add-room"
           class="bg-gray-100 text-black hover:bg-orange-500 hover:text-white text-sm font-bold px-6 py-3 rounded-xl transition-all active:scale-95"
         >
-          添加
+          添加主播
         </button>
       </div>
 
       <!-- Control Buttons -->
-      <div class="flex items-center gap-4 px-4">
+      <div class="command-actions flex items-center gap-4 px-4">
         <button id="auto-refresh-btn" data-action="toggle-auto-refresh" class="auto-refresh-btn off">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -263,7 +264,7 @@
           <span id="auto-refresh-label">自动: 关</span>
         </button>
         <button id="notify-btn" data-action="toggle-notifications" class="notify-btn off">
-          <span>推送: 关</span>
+          <span>通知: 关</span>
         </button>
         <button data-action="export-rooms" class="import-export-btn" title="导出主播列表">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -321,6 +322,21 @@
       </div>
     </header>
 
+    <section class="metric-strip max-w-[2200px] mx-auto relative z-40" aria-label="直播监控概览">
+      <div class="metric-card">
+        <span class="metric-label">Live</span>
+        <span id="metric-live-count" class="metric-value">0</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Offline</span>
+        <span id="metric-offline-count" class="metric-value">0</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">最爱直播中</span>
+        <span id="metric-favorite-count" class="metric-value">0</span>
+      </div>
+    </section>
+
     <!-- File Protocol Warning -->
     <div id="file-protocol-warning" class="hidden max-w-[2200px] mx-auto"></div>
 
@@ -340,20 +356,26 @@
         <div class="monitor-grid" id="grid-live"></div>
       </section>
 
-      <section id="zone-offline" class="zone-container">
-        <div class="zone-header">
-          <div class="zone-title">离线房间</div>
-          <div class="zone-sub">OFFLINE</div>
-        </div>
-        <div class="monitor-grid" id="grid-offline"></div>
-      </section>
-
       <section id="zone-loop" class="zone-container">
         <div class="zone-header">
-          <div class="zone-title">轮播录像</div>
+          <div class="zone-title">
+            <span class="zone-title-label">轮播录像</span>
+            <span id="loop-count" class="zone-title-count">0</span>
+          </div>
           <div class="zone-sub">REPLAY</div>
         </div>
         <div class="monitor-grid" id="grid-loop"></div>
+      </section>
+
+      <section id="zone-offline" class="zone-container">
+        <div class="zone-header">
+          <div class="zone-title">
+            <span class="zone-title-label">离线</span>
+            <span id="offline-count" class="zone-title-count">0</span>
+          </div>
+          <div class="zone-sub">OFFLINE</div>
+        </div>
+        <div class="monitor-grid" id="grid-offline"></div>
       </section>
 
       <div id="empty-state" class="hidden py-40 text-center opacity-30">
@@ -391,45 +413,54 @@
             ></div>
           </div>
           <img class="card-thumbnail" src="" alt="" loading="lazy" />
+          <div class="thumb-scrim"></div>
+          <div class="thumb-meta-bar">
+            <div class="viewer-pill">
+              <span class="viewer-icon">🔥</span><span class="viewer-num">--</span>
+            </div>
+            <span class="live-duration hidden">⏱ --:--</span>
+          </div>
         </div>
+        <span class="platform-chip">平台</span>
         <span class="status-chip chip-off"><span class="status-text">加载中</span></span>
         <div class="card-info">
-          <img class="u-avatar hidden" src="" alt="" />
-          <div class="w-14 h-14 rounded-full bg-[#262626] flex-shrink-0 skeleton-avatar"></div>
+          <div class="avatar-stack">
+            <img class="u-avatar hidden" src="" alt="" />
+            <div class="w-14 h-14 rounded-full bg-[#262626] flex-shrink-0 skeleton-avatar"></div>
+          </div>
           <div class="meta-text">
             <span class="room-title">正在连接...</span>
-            <span class="room-owner owner-name">---</span>
-            <div class="card-bottom-bar">
-              <div class="viewer-pill">
-                <span class="viewer-icon">🔥</span><span class="viewer-num">--</span>
-              </div>
-              <span class="live-duration hidden">⏱ --:--</span>
-              <div class="card-actions">
-                <button
-                  class="action-btn fav-btn"
-                  data-action="toggle-favorite"
-                >
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.01 4.38.38-3.32 2.88 1 4.28L12 15.4z"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    />
-                  </svg>
-                </button>
-                <button
-                  class="action-btn delete-btn"
-                  data-action="remove-room"
-                >
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
-              </div>
+            <div class="room-meta-row">
+              <span class="room-owner owner-name">---</span>
+              <span class="room-id-chip">#---</span>
             </div>
+          </div>
+          <div class="card-actions">
+            <button
+              class="action-btn fav-btn"
+              data-action="toggle-favorite"
+              aria-label="收藏主播"
+            >
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.01 4.38.38-3.32 2.88 1 4.28L12 15.4z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+              </svg>
+            </button>
+            <button
+              class="action-btn delete-btn"
+              data-action="remove-room"
+              aria-label="删除主播"
+            >
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
           </div>
         </div>
       </a>

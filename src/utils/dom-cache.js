@@ -58,6 +58,8 @@ const domCache = {
     backToTop: null,
     statusTicker: null,
     liveCount: null,
+    offlineCount: null,
+    loopCount: null,
 
     // Selectors
     selectorTrigger: null,
@@ -107,7 +109,11 @@ export function initDOMCache() {
     domCache.backToTop = document.getElementById('back-to-top');
     domCache.statusTicker = document.getElementById('status-ticker');
     domCache.liveCount = document.getElementById('live-count');
-
+    domCache.offlineCount = document.getElementById('offline-count');
+    domCache.loopCount = document.getElementById('loop-count');
+    domCache.metricLiveCount = document.getElementById('metric-live-count');
+    domCache.metricOfflineCount = document.getElementById('metric-offline-count');
+    domCache.metricFavoriteCount = document.getElementById('metric-favorite-count');
     // Selectors
     domCache.selectorTrigger = document.getElementById('selector-trigger');
     domCache.selectorMenu = document.getElementById('selector-menu');

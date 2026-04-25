@@ -63,6 +63,16 @@ let dragListenersBound = false;
 let isInitialized = false;
 
 const ANIMATION_DURATION_MS = 300;
+const PLAYER_INTERACTIVE_SELECTOR = [
+    'button',
+    'a',
+    'input',
+    '[role="button"]',
+    '.progress-bar',
+    '.volume-slider',
+    '.playlist-item',
+    '.playlist-items',
+].join(',');
 
 // ====================================================================
 // DOM元素引用
@@ -70,6 +80,7 @@ const ANIMATION_DURATION_MS = 300;
 
 const elements = {
     player: null,
+    header: null,
     playBtn: null,
     prevBtn: null,
     nextBtn: null,
@@ -102,6 +113,7 @@ export function initMusicPlayer() {
 
     // 获取DOM元素
     elements.player = document.getElementById('music-player');
+    elements.header = elements.player?.querySelector('.player-header') || null;
     elements.playBtn = document.getElementById('music-play-btn');
     elements.prevBtn = document.getElementById('music-prev-btn');
     elements.nextBtn = document.getElementById('music-next-btn');
@@ -152,6 +164,7 @@ export function initMusicPlayer() {
     if (isMinimized) {
         elements.player.classList.add('minimized');
     }
+    updatePlayerDisclosureUI();
 
     // 绑定事件
     bindEvents();
@@ -218,11 +231,23 @@ const eventHandlers = {
         console.log('[MusicPlayer] Toggle button clicked, current state:', isMinimized);
         toggleMinimize();
     },
+    headerClick: (e) => {
+        if (isMinimized || isAnimating || isInteractivePlayerTarget(e.target)) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[MusicPlayer] Header clicked while expanded, minimizing...');
+        toggleMinimize();
+    },
     playerClick: (e) => {
         if (isMinimized && !elements.toggleBtn.contains(e.target)) {
             console.log('[MusicPlayer] Player clicked while minimized');
             toggleMinimize();
         } else if (!isMinimized) {
+            if (!isAnimating && !isInteractivePlayerTarget(e.target)) {
+                console.log('[MusicPlayer] Expanded panel surface clicked, minimizing...');
+                toggleMinimize();
+            }
             e.stopPropagation();
         }
     },
@@ -265,6 +290,7 @@ function bindEvents() {
 
     // 最小化/展开
     elements.toggleBtn.addEventListener('click', eventHandlers.toggleBtnClick);
+    elements.header?.addEventListener('click', eventHandlers.headerClick);
 
     // 播放器点击事件（包含缩小状态展开和阻止冒泡）
     elements.player.addEventListener('click', eventHandlers.playerClick);
@@ -436,6 +462,29 @@ function unbindDragListeners() {
 // 最小化/展开
 // ====================================================================
 
+function isInteractivePlayerTarget(target) {
+    if (!(target instanceof Element)) return false;
+    return Boolean(target.closest(PLAYER_INTERACTIVE_SELECTOR));
+}
+
+function updatePlayerDisclosureUI() {
+    if (!elements.player) return;
+
+    const isExpanded = !isMinimized;
+    elements.player.setAttribute('aria-expanded', isExpanded.toString());
+    elements.player.dataset.state = isExpanded ? 'expanded' : 'minimized';
+
+    if (elements.toggleBtn) {
+        elements.toggleBtn.setAttribute('aria-expanded', isExpanded.toString());
+        elements.toggleBtn.setAttribute('aria-label', isExpanded ? '收起音乐播放器' : '展开音乐播放器');
+        elements.toggleBtn.title = isExpanded ? '收起音乐播放器' : '展开音乐播放器';
+    }
+
+    if (elements.header) {
+        elements.header.title = isExpanded ? '收起音乐播放器' : '展开音乐播放器';
+    }
+}
+
 function measureExpandedHeight() {
     const player = elements.player;
     if (!player) return 0;
@@ -471,6 +520,7 @@ function finalizeAnimation(type) {
 
     player.classList.remove('is-animating');
     player.style.removeProperty('--player-open-height');
+    updatePlayerDisclosureUI();
     isAnimating = false;
 }
 
@@ -482,6 +532,7 @@ function toggleMinimize() {
     isMinimized = !isMinimized;
     console.log('[MusicPlayer] toggleMinimize called, new state:', isMinimized);
     isAnimating = true;
+    updatePlayerDisclosureUI();
 
     if (!isMinimized) {
         const expandedHeight = measureExpandedHeight();
@@ -781,6 +832,9 @@ export function destroyMusicPlayer() {
     // 移除播放器相关事件
     if (elements.toggleBtn) {
         elements.toggleBtn.removeEventListener('click', eventHandlers.toggleBtnClick);
+    }
+    if (elements.header) {
+        elements.header.removeEventListener('click', eventHandlers.headerClick);
     }
     if (elements.player) {
         elements.player.removeEventListener('click', eventHandlers.playerClick);

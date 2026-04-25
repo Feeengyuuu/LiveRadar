@@ -35,18 +35,15 @@ function formatCountdown(seconds) {
 function updateAutoRefreshBtn() {
     const btn = getElement('auto-refresh-btn');
     const label = getElement('auto-refresh-label');
-    const metricRefresh = getElement('metric-refresh-count');
     if (!btn || !label) return;
 
     if (isAutoRefreshEnabled()) {
         btn.classList.remove('off');
         const countdown = formatCountdown(autoRefreshCountdown);
         label.textContent = `自动: ${countdown}`;
-        if (metricRefresh) metricRefresh.textContent = countdown;
     } else {
         btn.classList.add('off');
         label.textContent = '自动: 关';
-        if (metricRefresh) metricRefresh.textContent = '--:--';
     }
 }
 

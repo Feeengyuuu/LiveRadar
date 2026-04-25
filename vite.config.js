@@ -23,35 +23,47 @@ export default defineConfig({
       output: {
         // 🔥 Advanced code splitting strategy
         manualChunks(id) {
+          const normalizedId = id.replace(/\\/g, '/');
+
           // Vendor dependencies (node_modules)
-          if (id.includes('node_modules')) {
+          if (normalizedId.includes('node_modules')) {
             return 'vendor';
           }
 
+          // Optional widgets must keep their own lazy chunks. If they are
+          // grouped with the generic enhancements chunk, static imports such
+          // as snow initialization can pull the music player into startup.
+          if (normalizedId.includes('/features/enhancements/music-player.js')) {
+            return 'music-player';
+          }
+          if (normalizedId.includes('/features/enhancements/snow-effect.js')) {
+            return 'snow-effect';
+          }
+
           // Feature-based splitting (src/features/)
-          if (id.includes('/features/core/')) {
+          if (normalizedId.includes('/features/core/')) {
             return 'features-core'; // Core features: refresh, notifications, etc.
           }
-          if (id.includes('/features/enhancements/')) {
+          if (normalizedId.includes('/features/enhancements/')) {
             return 'features-enhancements'; // Enhancements: music, snow, region
           }
 
           // API modules (can be lazy loaded)
-          if (id.includes('/api/')) {
-            if (id.includes('/api/bilibili')) return 'api-bilibili';
-            if (id.includes('/api/douyu')) return 'api-douyu';
-            if (id.includes('/api/twitch')) return 'api-twitch';
-            if (id.includes('/api/kick')) return 'api-kick';
+          if (normalizedId.includes('/api/')) {
+            if (normalizedId.includes('/api/bilibili')) return 'api-bilibili';
+            if (normalizedId.includes('/api/douyu')) return 'api-douyu';
+            if (normalizedId.includes('/api/twitch')) return 'api-twitch';
+            if (normalizedId.includes('/api/kick')) return 'api-kick';
             return 'api-common';
           }
 
           // Core renderer (already split into sub-modules)
-          if (id.includes('/core/renderer/')) {
+          if (normalizedId.includes('/core/renderer/')) {
             return 'renderer';
           }
 
           // Utils (shared utilities)
-          if (id.includes('/utils/')) {
+          if (normalizedId.includes('/utils/')) {
             return 'utils';
           }
 

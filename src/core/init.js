@@ -24,7 +24,7 @@ import { playNotificationSound as playNotificationSoundManager } from '../featur
 import { getRoomCacheKey, showToast } from '../utils/helpers.js';
 import { emit, Events } from './event-bus.js';
 import { updateNotifyBtn } from '../features/core/notifications.js';
-import { updateSnowBtn } from '../features/enhancements/snow-effect.js';
+import { updateSnowBtn } from '../features/enhancements/snow-effect-loader.js';
 
 // External dependencies (injected)
 let rooms = [];

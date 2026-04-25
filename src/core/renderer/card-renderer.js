@@ -13,6 +13,7 @@
  */
 
 import { setImageSource, getSmartImageUrl } from './image-handler.js';
+import { PLATFORM_CONFIG } from '../../config/constants.js';
 
 // ====================================================================
 // Helper Functions
@@ -73,6 +74,13 @@ function formatDuration(startTime) {
     }
 }
 
+function getPlatformMeta(platform) {
+    return PLATFORM_CONFIG[platform] || {
+        name: platform || '平台',
+        color: '#f26a21'
+    };
+}
+
 // ====================================================================
 // Card Update Function
 // ====================================================================
@@ -94,10 +102,12 @@ export function updateCard(card, roomInfo, data, cardState) {
         // Fallback: If cache doesn't exist, query directly (for compatibility)
         refs = {
             thumb: card.querySelector('.card-thumbnail'),
+            platformChip: card.querySelector('.platform-chip'),
             chip: card.querySelector('.status-chip'),
             chipText: card.querySelector('.status-text'),
             titleEl: card.querySelector('.room-title'),
             ownerEl: card.querySelector('.room-owner'),
+            roomIdEl: card.querySelector('.room-id-chip'),
             viewerIcon: card.querySelector('.viewer-icon'),
             viewerNum: card.querySelector('.viewer-num'),
             avatar: card.querySelector('.u-avatar'),
@@ -107,10 +117,29 @@ export function updateCard(card, roomInfo, data, cardState) {
         };
     }
 
-    const { thumb, chip, chipText, titleEl, ownerEl, viewerIcon, viewerNum, avatar: avt, favBtn, loader, durationEl } = refs;
+    const {
+        thumb,
+        platformChip,
+        chip,
+        chipText,
+        titleEl,
+        ownerEl,
+        roomIdEl,
+        viewerIcon,
+        viewerNum,
+        avatar: avt,
+        favBtn,
+        loader,
+        durationEl
+    } = refs;
 
-    const cols = { douyu: '#ff5d23', bilibili: '#fb7299', twitch: '#9146ff', kick: '#53fc18' };
-    card.style.setProperty('--brand-color', cols[roomInfo.platform]);
+    const platformMeta = getPlatformMeta(roomInfo.platform);
+    card.style.setProperty('--brand-color', platformMeta.color);
+    if (platformChip) {
+        platformChip.textContent = platformMeta.name;
+        platformChip.dataset.platform = roomInfo.platform || '';
+        platformChip.style.setProperty('--platform-color', platformMeta.color);
+    }
     viewerIcon.textContent = (roomInfo.platform === 'twitch' || roomInfo.platform === 'kick') ? '👤' : '🔥';
 
     // Favorite status: Always sync to ensure consistency
@@ -138,13 +167,19 @@ export function updateCard(card, roomInfo, data, cardState) {
     card.classList.toggle('is-offline-card', cardState === 'offline' || cardState === 'error');
     card.classList.toggle('is-loop-card', cardState === 'loop');
     card.classList.toggle('is-error-card', cardState === 'error');
+    refs.viewerPill?.classList.toggle('hidden', cardState !== 'live');
 
     let newThumbSrc = '';
     const newAvatarSrc = data.avatar || '';
 
     // Get display title using unified helper (eliminates code duplication)
     const displayTitle = getDisplayTitle(data, roomInfo, cardState);
-    const ownerText = `${data.owner || roomInfo.id} - ${roomInfo.id}`;
+    const ownerText = data.owner || roomInfo.id;
+    const roomIdText = `#${roomInfo.id}`;
+
+    if (roomIdEl && roomIdEl.textContent !== roomIdText) {
+        roomIdEl.textContent = roomIdText;
+    }
 
     switch (cardState) {
         case 'live':

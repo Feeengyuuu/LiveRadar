@@ -86,18 +86,5 @@
       "Bash(MSYS_NO_PATHCONV=1 /c/Users/super/AppData/Local/Microsoft/WindowsApps/pwsh.exe *)",
       "Bash(MSYS_NO_PATHCONV=1 /c/Windows/System32/taskkill.exe /PID 37816 /F /T)"
     ]
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|MultiEdit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "npx eslint --fix ."
-          }
-        ]
-      }
-    ]
   }
 }

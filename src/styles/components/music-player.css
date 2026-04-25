@@ -12,8 +12,10 @@
 
 .music-player {
     --player-min-size: 60px;
-    --player-open-width: 320px;
-    --player-open-height: 420px;
+    --player-open-width: 340px;
+    --player-open-height: 408px;
+    --player-open-padding: 14px;
+    --player-panel-radius: 8px;
     --player-anim-duration: 0.3s;
     --player-anim-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 
@@ -23,16 +25,19 @@
     z-index: 999;
     width: var(--player-open-width);
     max-height: calc(100vh - 100px);
-    overflow-y: auto;
+    overflow: hidden;
     background: rgba(10, 10, 10, 0.85);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 16px;
+    border-radius: var(--player-panel-radius);
+    padding: var(--player-open-padding);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
     transition: box-shadow 0.2s ease, transform 0.2s ease;
     transform-origin: bottom left;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
@@ -96,22 +101,30 @@
     border-radius: 50%;
     cursor: pointer;
     pointer-events: auto;
+    overflow: hidden;
 
     /* 缩小状态：增加边框厚度，更明显的胶片效果 */
-    border-width: 6px;
-    font-size: 24px; /* 更大的emoji */
+    border-width: 5px;
+    font-size: 0;
 }
 
 /* 缩小状态下的中间圆环/封面 */
 .music-player.minimized .player-cover::before,
 .music-player.minimized .player-cover img {
-    width: calc(100% - 10px);
-    height: calc(100% - 10px);
+    width: calc(var(--player-min-size) - 14px);
+    height: calc(var(--player-min-size) - 14px);
 }
 
 /* 缩小状态下的Emoji */
 .music-player.minimized .player-cover::after {
-    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--player-min-size) - 14px);
+    height: calc(var(--player-min-size) - 14px);
+    font-size: calc(var(--player-min-size) * 0.46);
+    line-height: 1;
+    text-align: center;
 }
 
 .music-player.minimized .player-info,
@@ -179,13 +192,13 @@
         width: var(--player-min-size);
         height: var(--player-open-height);
         padding: 0;
-        border-radius: 20px;
+        border-radius: calc(var(--player-panel-radius) + 6px);
     }
     100% {
         width: var(--player-open-width);
         height: var(--player-open-height);
-        padding: 16px;
-        border-radius: 16px;
+        padding: var(--player-open-padding);
+        border-radius: var(--player-panel-radius);
     }
 }
 
@@ -193,14 +206,14 @@
     0% {
         width: var(--player-open-width);
         height: var(--player-open-height);
-        padding: 16px;
-        border-radius: 16px;
+        padding: var(--player-open-padding);
+        border-radius: var(--player-panel-radius);
     }
     45% {
         width: var(--player-min-size);
         height: var(--player-open-height);
         padding: 0;
-        border-radius: 20px;
+        border-radius: calc(var(--player-panel-radius) + 6px);
     }
     100% {
         width: var(--player-min-size);
@@ -715,14 +728,142 @@
     opacity: 1;
 }
 
-/* 移动端优化 */
+/* Expanded layout */
+.music-player:not(.minimized) {
+    width: var(--player-open-width);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    cursor: default;
+}
+
+.music-player:not(.minimized) .player-header {
+    order: 2;
+    min-height: 72px;
+    margin-bottom: 0;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background:
+        linear-gradient(135deg, rgba(255, 93, 35, 0.12), rgba(255, 255, 255, 0.025)),
+        rgba(255, 255, 255, 0.035);
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.music-player:not(.minimized) .player-header:hover {
+    border-color: rgba(255, 138, 80, 0.28);
+    background:
+        linear-gradient(135deg, rgba(255, 93, 35, 0.18), rgba(255, 255, 255, 0.04)),
+        rgba(255, 255, 255, 0.045);
+}
+
+.music-player:not(.minimized) .player-header:active {
+    transform: translateY(1px);
+}
+
+.music-player:not(.minimized) .player-cover {
+    width: 52px;
+    height: 52px;
+}
+
+.music-player:not(.minimized) .player-info {
+    display: flex;
+    min-height: 48px;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.music-player:not(.minimized) .player-toggle {
+    background: rgba(255, 93, 35, 0.12);
+    border: 1px solid rgba(255, 138, 80, 0.18);
+}
+
+.music-player:not(.minimized) .player-toggle:hover {
+    background: rgba(255, 93, 35, 0.2);
+}
+
+.player-toggle svg {
+    transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.music-player:not(.minimized) .player-toggle svg {
+    color: #ffb380;
+}
+
+.music-player:not(.minimized) .player-content {
+    order: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+}
+
+.music-player:not(.minimized) .player-progress,
+.music-player:not(.minimized) .volume-control,
+.music-player:not(.minimized) .playlist-section {
+    margin: 0;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.026);
+}
+
+.music-player:not(.minimized) .player-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.music-player:not(.minimized) .progress-time {
+    margin-top: 0;
+}
+
+.music-player:not(.minimized) .player-controls {
+    padding: 0 2px;
+    gap: 10px;
+}
+
+.music-player:not(.minimized) .volume-control {
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.music-player:not(.minimized) .playlist-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+}
+
+.music-player:not(.minimized) .playlist-header {
+    margin-bottom: 0;
+    padding: 0 2px;
+}
+
+.music-player:not(.minimized) .playlist-items {
+    max-height: clamp(112px, 24vh, 168px);
+    gap: 6px;
+}
+
+.music-player:not(.minimized) .playlist-item {
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.music-player:not(.minimized) .playlist-item-cover {
+    width: 36px;
+    height: 36px;
+}
+
+/* Mobile layout */
 @media (max-width: 768px) {
     .music-player {
         bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
-        left: 16px;
+        left: 12px;
         --player-min-size: 56px;
-        --player-open-width: calc(100vw - 32px);
-        max-width: 320px;
+        --player-open-width: min(360px, calc(100vw - 24px));
+        --player-open-padding: 12px;
+        max-width: none;
     }
 
     .music-player.minimized {
@@ -760,7 +901,7 @@
 /* 超小屏幕 */
 @media (max-width: 375px) {
     .music-player {
-        width: calc(100vw - 32px);
+        width: calc(100vw - 24px);
     }
 }
 

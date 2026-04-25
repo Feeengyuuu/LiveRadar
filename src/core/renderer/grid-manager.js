@@ -300,11 +300,15 @@ function renderAllImmediate() {
         }
     }
 
-    const favoriteCount = rooms.filter(room => room.isFav).length;
+    const favoriteLiveCount = rooms.filter(room => {
+        if (!room.isFav) return false;
+        const data = roomDataCache[getRoomCacheKey(room.platform, room.id)];
+        return !!data && !data.loading && !data.isError && !data._retryFailed && data.isLive === true;
+    }).length;
     const offlineTotal = flags.offlineCount;
     if (cache.metricLiveCount) cache.metricLiveCount.textContent = String(flags.liveCount);
     if (cache.metricOfflineCount) cache.metricOfflineCount.textContent = String(offlineTotal);
-    if (cache.metricFavoriteCount) cache.metricFavoriteCount.textContent = String(favoriteCount);
+    if (cache.metricFavoriteCount) cache.metricFavoriteCount.textContent = String(favoriteLiveCount);
 
     cache.zoneLive?.classList.toggle('active', flags.hasLive);
     cache.zoneOffline?.classList.toggle('active', flags.hasOffline);

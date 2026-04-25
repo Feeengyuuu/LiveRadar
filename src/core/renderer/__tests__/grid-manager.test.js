@@ -66,6 +66,9 @@ describe('grid-manager empty-state cleanup', () => {
             <div id="grid-offline"></div>
             <div id="grid-loop"></div>
             <span id="live-count"></span>
+            <span id="metric-live-count"></span>
+            <span id="metric-offline-count"></span>
+            <span id="metric-favorite-count"></span>
         `;
 
         mocks.domCache = {
@@ -76,7 +79,10 @@ describe('grid-manager empty-state cleanup', () => {
             gridLive: document.getElementById('grid-live'),
             gridOffline: document.getElementById('grid-offline'),
             gridLoop: document.getElementById('grid-loop'),
-            liveCount: document.getElementById('live-count')
+            liveCount: document.getElementById('live-count'),
+            metricLiveCount: document.getElementById('metric-live-count'),
+            metricOfflineCount: document.getElementById('metric-offline-count'),
+            metricFavoriteCount: document.getElementById('metric-favorite-count')
         };
 
         mocks.state.rooms = [{ id: '1', platform: 'douyu', isFav: false }];
@@ -102,5 +108,38 @@ describe('grid-manager empty-state cleanup', () => {
         expect(mocks.unobserve).toHaveBeenCalledTimes(1);
         expect(mocks.domCache.gridOffline.children.length).toBe(0);
         expect(mocks.domCache.emptyState.classList.contains('hidden')).toBe(false);
+    });
+
+    it('counts only live favorite rooms in the favorite metric', () => {
+        mocks.state.rooms = [
+            { id: 'live-fav', platform: 'douyu', isFav: true },
+            { id: 'offline-fav', platform: 'douyu', isFav: true },
+            { id: 'live-other', platform: 'douyu', isFav: false }
+        ];
+        mocks.state.cache = {
+            'douyu-live-fav': {
+                loading: false,
+                isLive: true,
+                isReplay: false,
+                isError: false
+            },
+            'douyu-offline-fav': {
+                loading: false,
+                isLive: false,
+                isReplay: false,
+                isError: false
+            },
+            'douyu-live-other': {
+                loading: false,
+                isLive: true,
+                isReplay: false,
+                isError: false
+            }
+        };
+
+        renderAll();
+
+        expect(mocks.domCache.metricLiveCount.textContent).toBe('2');
+        expect(mocks.domCache.metricFavoriteCount.textContent).toBe('1');
     });
 });

@@ -48,10 +48,12 @@ export function createCard(cardId, roomInfo, data, cardState, updateCard) {
     // Performance optimization: Cache DOM references to card object, avoid repeated queries
     card._domRefs = {
         thumb: card.querySelector('.card-thumbnail'),
+        platformChip: card.querySelector('.platform-chip'),
         chip: card.querySelector('.status-chip'),
         chipText: card.querySelector('.status-text'),
         titleEl: card.querySelector('.room-title'),
         ownerEl: card.querySelector('.room-owner'),
+        roomIdEl: card.querySelector('.room-id-chip'),
         viewerPill: card.querySelector('.viewer-pill'),
         viewerIcon: card.querySelector('.viewer-icon'),
         viewerNum: card.querySelector('.viewer-num'),

@@ -44,6 +44,7 @@
 @import './utilities.css';
 @import './responsive.css';
 @import './mobile-optimized.css';
+@import './alyx-theme.css';
 
 /* ============================================================
    6. Tailwind Directives - MUST come after @import statements
