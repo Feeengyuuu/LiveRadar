@@ -2,7 +2,7 @@ const SUPPORTED_PLATFORMS = new Set(['douyu', 'bilibili', 'twitch', 'kick']);
 const STATUS_TIMEOUT_MS = 8000;
 const STATUS_CACHE_SECONDS = 20;
 const STATUS_CACHE_STALE_SECONDS = 40;
-const BATCH_LIMIT = 100;
+const BATCH_LIMIT = 10;
 const BATCH_CONCURRENCY = 6;
 
 let twitchTokenCache = {

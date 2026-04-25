@@ -219,7 +219,7 @@ export function registerDefaultAdapters() {
 
 const SERVER_STATUS_TIMEOUT_MS = 5000;
 const SERVER_BATCH_STATUS_TIMEOUT_MS = 20000;
-const SERVER_BATCH_CHUNK_SIZE = 100;
+const SERVER_BATCH_CHUNK_SIZE = 10;
 
 function shouldUseServerStatusApi() {
     if (typeof window === 'undefined') return false;

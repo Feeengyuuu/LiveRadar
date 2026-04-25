@@ -28,8 +28,8 @@ describe('cloudflare platform status helpers', () => {
         });
     });
 
-    it('keeps the batch limit above the uploaded 64-room backup size', async () => {
-        const rooms = Array.from({ length: 101 }, (_, index) => ({
+    it('rejects batch requests above the per-request stability limit', async () => {
+        const rooms = Array.from({ length: 11 }, (_, index) => ({
             platform: 'douyu',
             id: String(index + 1)
         }));
@@ -45,7 +45,7 @@ describe('cloudflare platform status helpers', () => {
         await expect(response.json()).resolves.toMatchObject({
             ok: false,
             error: 'too_many_rooms',
-            limit: 100
+            limit: 10
         });
     });
 });
