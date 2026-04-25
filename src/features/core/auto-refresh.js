@@ -37,13 +37,19 @@ function updateAutoRefreshBtn() {
     const label = getElement('auto-refresh-label');
     if (!btn || !label) return;
 
-    if (isAutoRefreshEnabled()) {
+    const enabled = isAutoRefreshEnabled();
+    const countdown = formatCountdown(autoRefreshCountdown);
+    btn.setAttribute('aria-pressed', enabled.toString());
+    btn.dataset.state = enabled ? 'on' : 'off';
+
+    if (enabled) {
         btn.classList.remove('off');
-        const countdown = formatCountdown(autoRefreshCountdown);
         label.textContent = `自动: ${countdown}`;
+        btn.title = `关闭自动刷新，剩余 ${countdown}`;
     } else {
         btn.classList.add('off');
         label.textContent = '自动: 关';
+        btn.title = '开启自动刷新';
     }
 }
 

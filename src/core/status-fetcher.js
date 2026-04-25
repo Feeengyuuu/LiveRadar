@@ -46,9 +46,6 @@ function applyTimestampParam(url, timestamp) {
     return `${url}${separator}t=${timestamp}`;
 }
 
-// External dependencies (only notification check needs injection)
-let checkAndNotify = null;
-
 // In-flight fetch dedup: multiple callers requesting the same cacheKey share a single promise
 const inFlightFetches = new Map();
 // Pending Douyu avatar fallbacks keyed by cacheKey, so cancelPendingFetches can drop them
@@ -61,10 +58,8 @@ function isRoomStillTracked(room) {
 
 /**
  * Initialize status fetcher with external dependencies
- * @param {Object} deps - Dependencies object
  */
-export function initStatusFetcher(deps) {
-    if (deps.checkAndNotify) checkAndNotify = deps.checkAndNotify;
+export function initStatusFetcher() {
     registerDefaultAdapters();
 }
 
@@ -328,11 +323,6 @@ function applyRoomStatusResult(room, cacheKey, result, context) {
 
         if (room.platform === 'douyu' && !result.avatar && !result.isError && needProfileUpdate) {
             ensureDouyuAvatar(room, cacheKey);
-        }
-
-        // Trigger notification check
-        if (checkAndNotify) {
-            checkAndNotify(room, finalIsLive, result.owner || room.id);
         }
 
         const prevCover = prevData?.cover || '';

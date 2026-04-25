@@ -326,7 +326,7 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
             showToast(`刷新完成${changeInfo} - ${elapsed}s`, 'success');
         }
 
-        // Detect status changes and show notifications
+        // Detect status changes and update the in-page ticker.
         if (detectStatusChanges) detectStatusChanges();
     } catch (error) {
         console.error('[LiveRadar] Refresh error:', error);

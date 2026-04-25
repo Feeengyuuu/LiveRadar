@@ -24,6 +24,43 @@ import { emit, Events } from '../../core/event-bus.js';
 let historyEventsBound = false;
 let historyPositionBound = false;
 
+function setSelectorMenuOpen(isOpen) {
+    const menu = getElement('selector-menu');
+    const trigger = getElement('selector-trigger');
+    if (!menu) return;
+
+    menu.classList.toggle('dropdown-enter', !isOpen);
+    menu.classList.toggle('dropdown-enter-active', isOpen);
+    menu.setAttribute('aria-hidden', (!isOpen).toString());
+
+    if (trigger) {
+        trigger.setAttribute('aria-expanded', isOpen.toString());
+    }
+}
+
+function syncPlatformOptions(value) {
+    const menu = getElement('selector-menu');
+    if (!menu) return;
+
+    menu.querySelectorAll('[data-platform]').forEach((option) => {
+        option.setAttribute('aria-selected', (option.dataset.platform === value).toString());
+    });
+}
+
+function setHistoryOpen(isOpen) {
+    const menu = getElement('history-dropdown');
+    const input = getElement('room-id-input');
+    if (!menu) return;
+
+    menu.classList.toggle('dropdown-enter', !isOpen);
+    menu.classList.toggle('dropdown-enter-active', isOpen);
+    menu.setAttribute('aria-hidden', (!isOpen).toString());
+
+    if (input) {
+        input.setAttribute('aria-expanded', isOpen.toString());
+    }
+}
+
 /**
  * Toggle platform selector dropdown
  * @param {Event} e - Click event
@@ -34,8 +71,7 @@ export function toggleDropdown(e) {
     if (!menu) return;
 
     if (menu.classList.contains('dropdown-enter')) {
-        menu.classList.remove('dropdown-enter');
-        menu.classList.add('dropdown-enter-active');
+        setSelectorMenuOpen(true);
     } else {
         closeDropdown();
     }
@@ -49,8 +85,7 @@ export function closeDropdown() {
     if (!menu) return;
 
     if (!menu.classList.contains('dropdown-enter')) {
-        menu.classList.remove('dropdown-enter-active');
-        menu.classList.add('dropdown-enter');
+        setSelectorMenuOpen(false);
     }
 }
 
@@ -76,6 +111,7 @@ export function selectPlatform(value, color, label) {
     }
 
     updatePlaceholder();
+    syncPlatformOptions(value);
     closeDropdown();
 }
 
@@ -103,8 +139,7 @@ export function showHistory() {
     const menu = getElement('history-dropdown');
     if (!menu) return;
 
-    menu.classList.remove('dropdown-enter');
-    menu.classList.add('dropdown-enter-active');
+    setHistoryOpen(true);
 }
 
 /**
@@ -112,7 +147,14 @@ export function showHistory() {
  * @param {Event} e - Click event
  */
 export function hideHistory(e) {
-    if (e && (e.target.closest('#custom-selector-container') || e.target.id === 'room-id-input')) {
+    if (
+        e &&
+        (
+            e.target.closest('#custom-selector-container') ||
+            e.target.closest('#history-dropdown') ||
+            e.target.id === 'room-id-input'
+        )
+    ) {
         return;
     }
 
@@ -120,8 +162,7 @@ export function hideHistory(e) {
     if (!menu) return;
 
     if (!menu.classList.contains('dropdown-enter')) {
-        menu.classList.remove('dropdown-enter-active');
-        menu.classList.add('dropdown-enter');
+        setHistoryOpen(false);
     }
 }
 
@@ -140,8 +181,7 @@ export function handleInput(e) {
     if (!menu) return;
 
     if (menu.classList.contains('dropdown-enter')) {
-        menu.classList.remove('dropdown-enter');
-        menu.classList.add('dropdown-enter-active');
+        setHistoryOpen(true);
     }
 }
 
@@ -285,6 +325,23 @@ function bindHistoryEvents() {
         }
     });
 
+    historyEl.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+
+        const deleteBtn = e.target.closest('.history-delete');
+        if (deleteBtn && deleteBtn.dataset.value != null) {
+            e.preventDefault();
+            deleteHistory(e, deleteBtn.dataset.value);
+            return;
+        }
+
+        const item = e.target.closest('.history-item');
+        if (item && item.dataset.value != null) {
+            e.preventDefault();
+            applyHistory(item.dataset.value);
+        }
+    });
+
     historyEventsBound = true;
 }
 
@@ -399,13 +456,18 @@ export function renderHistory(query = '') {
         const row = document.createElement('div');
         row.className = 'history-item';
         row.dataset.value = item;
+        row.tabIndex = 0;
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-label', `使用历史记录 ${item}`);
 
         const label = document.createElement('span');
         appendHighlighted(label, item, q);
 
-        const deleteBtn = document.createElement('span');
+        const deleteBtn = document.createElement('button');
         deleteBtn.className = 'history-delete';
+        deleteBtn.type = 'button';
         deleteBtn.dataset.value = item;
+        deleteBtn.setAttribute('aria-label', `删除历史记录 ${item}`);
         deleteBtn.textContent = '✕';
 
         row.appendChild(label);

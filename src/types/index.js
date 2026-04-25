@@ -68,7 +68,6 @@
  * @typedef {Object} AppState
  * @property {Room[]} rooms - Monitored rooms list
  * @property {string[]} searchHistory - Search history
- * @property {boolean} notificationsEnabled - Notifications enabled
  * @property {string} did - Device identifier
  * @property {Object<string, RoomCacheEntry>} roomDataCache - Room data cache
  * @property {Object<string, ProxyStats>} proxyStats - Proxy statistics
@@ -96,7 +95,7 @@
  */
 
 /**
- * Status change notification
+ * Status change message
  * @typedef {Object} StatusChange
  * @property {string} id - Room ID
  * @property {Platform} platform - Platform

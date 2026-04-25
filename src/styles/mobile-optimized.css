@@ -43,7 +43,6 @@
   /* #snow-canvas 由JS控制，不强制隐藏 */
 
   button,
-  .notify-btn,
   .auto-refresh-btn {
     min-height: 44px;
     padding: 10px 14px;
@@ -305,7 +304,6 @@
 
   /* 功能按钮 - 窄按钮，只显示图标 */
   .auto-refresh-btn,
-  .notify-btn,
   .import-export-btn {
     width: 36px !important; /* 固定窄宽度 */
     height: 36px !important;
@@ -326,14 +324,12 @@
 
   /* 隐藏按钮内的文字span */
   .auto-refresh-btn span,
-  .notify-btn span,
   .import-export-btn span {
     display: none !important;
   }
 
   /* 激活状态 - 统一橙色 */
-  .auto-refresh-btn:not(.off),
-  .notify-btn:not(.off) {
+  .auto-refresh-btn:not(.off) {
     background: linear-gradient(135deg, #ff5d23 0%, #ff8a50 100%) !important;
     border-color: transparent !important;
     color: white !important;
@@ -342,14 +338,12 @@
 
   /* 按压反馈 */
   .auto-refresh-btn:active,
-  .notify-btn:active,
   .import-export-btn:active {
     transform: scale(0.94);
   }
 
   /* 图标大小 */
   .auto-refresh-btn svg,
-  .notify-btn svg,
   .import-export-btn svg {
     width: 16px;
     height: 16px;
@@ -712,8 +706,7 @@
   }
 
   /* 按钮涟漪效果 */
-  .auto-refresh-btn:not(.off)::after,
-  .notify-btn:not(.off)::after {
+  .auto-refresh-btn:not(.off)::after {
     content: '';
     position: absolute;
     inset: -2px;
@@ -723,8 +716,7 @@
     transition: opacity 0.2s;
   }
 
-  .auto-refresh-btn:not(.off):active::after,
-  .notify-btn:not(.off):active::after {
+  .auto-refresh-btn:not(.off):active::after {
     opacity: 1;
   }
 }
@@ -827,7 +819,6 @@
   }
 
   .auto-refresh-btn,
-  .notify-btn,
   .import-export-btn {
     width: 32px !important; /* 超小屏稍微缩小 */
     height: 32px !important;

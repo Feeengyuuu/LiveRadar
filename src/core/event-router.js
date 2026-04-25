@@ -31,12 +31,10 @@ import {
     toggleFavorite
 } from '../features/core/room-management.js';
 import { getElement } from '../utils/dom-cache.js';
-import { toggleNotifications } from '../features/core/notifications.js';
 import { toggleAutoRefresh } from '../features/core/auto-refresh.js';
 import { unlockAllAudio } from '../features/audio/audio-manager.js';
 import { exportRooms, importRooms } from '../features/core/import-export.js';
 import { refreshAll } from './refresh-manager.js';
-import { playNotificationSound } from '../features/audio/notification-audio.js';
 import { getRooms } from './state.js';
 
 /**
@@ -84,7 +82,6 @@ const actionHandlers = {
     },
 
     // Settings toggles
-    'toggle-notifications': () => toggleNotifications(),
     'toggle-auto-refresh': () => toggleAutoRefresh(),
 
     // Import/Export
@@ -97,8 +94,7 @@ const actionHandlers = {
     'refresh-all': () => refreshAll(),
 
     // Audio
-    'unlock-audio': () => unlockAllAudio(),
-    'play-notification-sound': () => playNotificationSound(true, true)
+    'unlock-audio': () => unlockAllAudio()
 };
 
 let disposeEventRouter = null;
@@ -153,9 +149,63 @@ function handleFocus(event) {
  * @param {Event} event - Keydown event
  */
 function handleKeydown(event) {
+    if (event.key === 'Escape') {
+        closeDropdown();
+        hideHistory();
+        return;
+    }
+
+    if (event.target.id === 'selector-trigger' && event.key === 'ArrowDown') {
+        event.preventDefault();
+        const menu = getElement('selector-menu');
+        if (menu?.classList.contains('dropdown-enter')) {
+            toggleDropdown(event);
+        }
+        document.querySelector('#selector-menu [data-action="select-platform"]')?.focus();
+        return;
+    }
+
+    const platformOption = event.target.closest?.('#selector-menu [data-action="select-platform"]');
+    if (platformOption && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+        event.preventDefault();
+        const options = [...document.querySelectorAll('#selector-menu [data-action="select-platform"]')];
+        const currentIndex = options.indexOf(platformOption);
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = (currentIndex + direction + options.length) % options.length;
+        options[nextIndex]?.focus();
+        return;
+    }
+
+    if (platformOption && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+        const { platform, color, label } = platformOption.dataset;
+        selectPlatform(platform, color, label);
+        getElement('selector-trigger')?.focus();
+        return;
+    }
+
+    const historyItem = event.target.closest?.('#history-dropdown .history-item');
+    if (historyItem && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+        event.preventDefault();
+        const items = [...document.querySelectorAll('#history-dropdown .history-item')];
+        const currentIndex = items.indexOf(historyItem);
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = (currentIndex + direction + items.length) % items.length;
+        items[nextIndex]?.focus();
+        return;
+    }
+
     // Handle Enter key on room-id-input
     if (event.target.id === 'room-id-input' && event.key === 'Enter') {
+        event.preventDefault();
         handleAddInput();
+        return;
+    }
+
+    if (event.target.id === 'room-id-input' && event.key === 'ArrowDown') {
+        event.preventDefault();
+        showHistory();
+        document.querySelector('#history-dropdown .history-item')?.focus();
     }
 }
 
@@ -175,7 +225,9 @@ function handleChange(event) {
  * @param {Event} event - Click event
  */
 function handleBodyClick(event) {
-    closeDropdown();
+    if (!event.target.closest('#custom-selector-container')) {
+        closeDropdown();
+    }
     hideHistory(event);
 }
 

@@ -19,11 +19,34 @@ function getSnowCanvas() {
     return document.getElementById('snow-canvas');
 }
 
+function syncSnowButtonState(btn, enabled) {
+    btn.classList.toggle('on', enabled);
+    btn.classList.toggle('off', !enabled);
+    btn.dataset.state = enabled ? 'on' : 'off';
+    btn.setAttribute('aria-pressed', String(enabled));
+    btn.setAttribute('aria-label', enabled ? '关闭下雪特效' : '开启下雪特效');
+    btn.title = enabled ? '关闭下雪特效' : '开启下雪特效';
+}
+
+function setSnowButtonLoading(loading) {
+    const btn = getSnowButton();
+    if (!btn) return;
+
+    btn.classList.toggle('is-loading', loading);
+    btn.disabled = loading;
+
+    if (loading) {
+        btn.setAttribute('aria-busy', 'true');
+        btn.title = '下雪特效加载中...';
+    } else {
+        btn.removeAttribute('aria-busy');
+    }
+}
+
 function syncSnowShell(enabled = isSnowEnabled()) {
     const btn = getSnowButton();
     if (btn) {
-        btn.classList.toggle('on', enabled);
-        btn.classList.toggle('off', !enabled);
+        syncSnowButtonState(btn, enabled);
     }
 
     const canvas = getSnowCanvas();
@@ -75,6 +98,8 @@ export async function initSnow(options = {}) {
 }
 
 export async function toggleSnow(options = {}) {
+    setSnowButtonLoading(true);
+
     try {
         const module = await loadSnowEffect(options.importer);
         initializeSnowModule(module);
@@ -82,7 +107,11 @@ export async function toggleSnow(options = {}) {
         return module;
     } catch (error) {
         showToast('下雪特效加载失败', 'error');
+        syncSnowShell();
         return null;
+    } finally {
+        setSnowButtonLoading(false);
+        updateSnowBtn();
     }
 }
 

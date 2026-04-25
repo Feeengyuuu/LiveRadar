@@ -27,11 +27,11 @@ import { initVisibilityRecovery } from './renderer/image-handler.js';
 
 // Feature modules
 import { initSnow } from '../features/enhancements/snow-effect-loader.js';
+import { initAmbientBackground } from '../features/enhancements/ambient-background.js';
 import { scheduleMusicPlayerInit } from '../features/enhancements/music-player-loader.js';
 import { initAutoRefresh } from '../features/core/auto-refresh.js';
-import { initNotifications, checkNotifications } from '../features/core/notifications.js';
 import { initStatusTicker, updateTicker } from '../features/core/status-ticker.js';
-import { initNotificationAudio } from '../features/audio/notification-audio.js';
+import { initSoundEffects } from '../features/audio/sound-effects.js';
 import { initAudioManager } from '../features/audio/audio-manager.js';
 
 // Event delegation
@@ -72,12 +72,8 @@ export async function initializeApp() {
         // Initialize sniffers (no dependencies needed)
         initSniffers();
 
-        // Initialize status fetcher (only notification callback needed)
-        initStatusFetcher({
-            checkAndNotify: (room, isLive, owner) => {
-                checkNotifications(room, { isLive, owner });
-            }
-        });
+        // Initialize status fetcher
+        initStatusFetcher();
 
         // Initialize refresh manager (only callbacks needed)
         appDisposers.push(initRefreshManager({
@@ -90,13 +86,12 @@ export async function initializeApp() {
         console.log('[Bootstrap] All core modules initialized');
 
         // === Step 4: Initialize Feature Modules ===
-        initNotificationAudio();
-        initNotifications();
+        initSoundEffects();
         initStatusTicker();
         initAudioManager();
         appDisposers.push(initAutoRefresh());
 
-        // Pass notifyAudio to init dependencies (must be called after initNotificationAudio)
+        // Pass shared runtime state to init dependencies.
         initAppDependencies({
             rooms,
             roomDataCache,
@@ -122,6 +117,7 @@ export async function initializeApp() {
         await init();
 
         // Load non-critical UI widgets after the main monitoring flow is ready.
+        appDisposers.push(initAmbientBackground());
         void initSnow();
         scheduleMusicPlayerInit();
 

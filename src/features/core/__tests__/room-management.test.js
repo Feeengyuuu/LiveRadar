@@ -117,6 +117,20 @@ describe('room-management history', () => {
         expect(document.getElementById('history-dropdown').textContent).not.toContain('beta');
     });
 
+    it('renders history rows as keyboard-accessible options with delete buttons', () => {
+        mocks.appState.searchHistory = ['alpha'];
+        renderHistory();
+
+        const item = document.querySelector('.history-item');
+        const deleteButton = document.querySelector('.history-delete');
+
+        expect(item.getAttribute('role')).toBe('option');
+        expect(item.tabIndex).toBe(0);
+        expect(deleteButton.tagName).toBe('BUTTON');
+        expect(deleteButton.type).toBe('button');
+        expect(deleteButton.getAttribute('aria-label')).toContain('alpha');
+    });
+
     it('deletes history items and keeps the input focused', () => {
         mocks.appState.searchHistory = ['one', 'two'];
         renderHistory();

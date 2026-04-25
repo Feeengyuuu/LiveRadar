@@ -17,7 +17,6 @@ const mocks = vi.hoisted(() => ({
     removeRoom: vi.fn(),
     toggleFavorite: vi.fn(),
     getElement: vi.fn((id) => document.getElementById(id)),
-    toggleNotifications: vi.fn(),
     unlockAllAudio: vi.fn(),
     exportRooms: vi.fn(),
     importRooms: vi.fn(),
@@ -46,10 +45,6 @@ vi.mock('../../features/core/room-management.js', () => ({
 
 vi.mock('../../utils/dom-cache.js', () => ({
     getElement: mocks.getElement,
-}));
-
-vi.mock('../../features/core/notifications.js', () => ({
-    toggleNotifications: mocks.toggleNotifications,
 }));
 
 vi.mock('../../features/core/auto-refresh.js', () => ({
@@ -100,5 +95,52 @@ describe('event-router', () => {
         document.querySelector('[data-action="toggle-auto-refresh"]').click();
 
         expect(mocks.toggleAutoRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes open transient panels when Escape is pressed', () => {
+        const dispose = initEventRouter();
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+        expect(mocks.closeDropdown).toHaveBeenCalledTimes(1);
+        expect(mocks.hideHistory).toHaveBeenCalledTimes(1);
+
+        dispose();
+    });
+
+    it('does not pre-close the platform menu when the trigger itself is clicked', () => {
+        document.body.innerHTML = `
+            <div id="custom-selector-container">
+                <button data-action="toggle-dropdown">platform</button>
+            </div>
+        `;
+        const dispose = initEventRouter();
+
+        document.querySelector('[data-action="toggle-dropdown"]').click();
+
+        expect(mocks.toggleDropdown).toHaveBeenCalledTimes(1);
+        expect(mocks.closeDropdown).not.toHaveBeenCalled();
+
+        dispose();
+    });
+
+    it('supports keyboard submit and history focus from the room input', () => {
+        document.body.innerHTML = `
+            <input id="room-id-input" />
+            <div id="history-dropdown">
+                <div class="history-item" tabindex="0">alpha</div>
+            </div>
+        `;
+        const dispose = initEventRouter();
+        const input = document.getElementById('room-id-input');
+
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        expect(mocks.handleAddInput).toHaveBeenCalledTimes(1);
+
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+        expect(mocks.showHistory).toHaveBeenCalledTimes(1);
+        expect(document.activeElement).toBe(document.querySelector('.history-item'));
+
+        dispose();
     });
 });

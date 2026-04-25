@@ -20,10 +20,9 @@ import { getDOMCache } from '../utils/dom-cache.js';
 import { PLACEHOLDERS } from '../config/ui-strings.js';
 import { updateRoomDataCache } from './state.js';
 import { unlockAllAudio as unlockAllAudioManager } from '../features/audio/audio-manager.js';
-import { playNotificationSound as playNotificationSoundManager } from '../features/audio/notification-audio.js';
+import { playYahahaSound } from '../features/audio/sound-effects.js';
 import { getRoomCacheKey, showToast } from '../utils/helpers.js';
 import { emit, Events } from './event-bus.js';
-import { updateNotifyBtn } from '../features/core/notifications.js';
 import { updateSnowBtn } from '../features/enhancements/snow-effect-loader.js';
 
 // External dependencies (injected)
@@ -173,12 +172,12 @@ function setupSecretAudioButton() {
 
         // If audio not unlocked, unlock first
         if (!window.audioContextUnlocked) {
-            // Play immediately within user gesture, then unlock in background
-            playNotificationSoundManager(true, true); // force play and bypass unlock check
+            // Play immediately within user gesture, then unlock in background.
+            playYahahaSound(true);
             Promise.resolve(unlockAllAudioManager({ silent: true }));
         } else {
             // Already unlocked, play directly
-            playNotificationSoundManager(true, true); // force play and bypass unlock check
+            playYahahaSound(true);
         }
         showToast('🎵 Yahaha~', 'info');
 
@@ -214,7 +213,6 @@ export function init() {
     // Update UI states
     updatePlaceholder();
 
-    updateNotifyBtn();
     updateSnowBtn();
 
     // Setup secret audio test button
@@ -226,7 +224,7 @@ export function init() {
     // Check if cache exists
     const hasCache = Object.keys(roomDataCache).length > 0;
 
-    // Initialize status snapshot to avoid false notifications on first refresh
+    // Initialize status snapshot to avoid false status-change messages on first refresh
     initializeStatusSnapshot();
 
     // If cache exists, render immediately

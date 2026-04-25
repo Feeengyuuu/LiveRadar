@@ -18,6 +18,10 @@
     --player-panel-radius: 8px;
     --player-anim-duration: 0.3s;
     --player-anim-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --music-progress-angle-soft: 0deg;
+    --music-progress-angle-mid: 0deg;
+    --music-progress-angle: 0deg;
+    --music-panel-cover: none;
 
     position: fixed;
     bottom: 20px;
@@ -26,7 +30,7 @@
     width: var(--player-open-width);
     max-height: calc(100vh - 100px);
     overflow: hidden;
-    background: rgba(10, 10, 10, 0.85);
+    background: rgba(8, 7, 6, 0.78);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -38,8 +42,51 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    isolation: isolate;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.music-player::before,
+.music-player::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    transition: opacity 0.28s ease;
+}
+
+.music-player::before {
+    inset: 0;
+    z-index: 0;
+    background-image: var(--music-panel-cover);
+    background-position: center;
+    background-size: auto 116%;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transform: scale(1.04);
+    filter: blur(10px) saturate(1.16) brightness(0.88);
+}
+
+.music-player::after {
+    inset: 0;
+    z-index: 0;
+    opacity: 0;
+    background:
+        radial-gradient(circle at 28% 10%, rgba(255, 177, 92, 0.14), transparent 32%),
+        linear-gradient(180deg, rgba(7, 5, 4, 0.34), rgba(7, 5, 4, 0.72) 58%, rgba(5, 4, 3, 0.9));
+}
+
+.music-player.has-panel-artwork:not(.minimized)::before {
+    opacity: 0.72;
+}
+
+.music-player:not(.minimized)::after {
+    opacity: 1;
+}
+
+.music-player > * {
+    position: relative;
+    z-index: 1;
 }
 
 .music-player::-webkit-scrollbar {
@@ -66,6 +113,11 @@
     justify-content: center;
     cursor: pointer;
     transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.music-player.minimized::before,
+.music-player.minimized::after {
+    opacity: 0;
 }
 
 /* 缩小状态下播放时的外层呼吸灯效果 */
@@ -233,6 +285,7 @@
 
 /* 封面容器 - 胶片旋转效果 */
 .player-cover {
+    --music-ring-size: 4px;
     width: 48px;
     height: 48px;
     border-radius: 50%; /* 改为圆形 */
@@ -255,6 +308,47 @@
         inset 0 0 0 1px rgba(255, 255, 255, 0.05), /* 内发光 */
         0 0 0 1px rgba(255, 255, 255, 0.08), /* 外发光 */
         0 4px 16px rgba(0, 0, 0, 0.6); /* 阴影 */
+}
+
+.player-progress-ring {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0.42;
+    background:
+        conic-gradient(
+            from -90deg,
+            rgba(255, 243, 190, 0.98) 0deg,
+            rgba(255, 205, 108, 0.98) var(--music-progress-angle-soft),
+            rgba(255, 135, 55, 0.98) var(--music-progress-angle-mid),
+            rgba(255, 83, 33, 0.98) var(--music-progress-angle),
+            rgba(255, 177, 92, 0.12) var(--music-progress-angle),
+            rgba(255, 177, 92, 0.1) 360deg
+        );
+    -webkit-mask: radial-gradient(
+        farthest-side,
+        transparent calc(100% - var(--music-ring-size)),
+        #000 calc(100% - var(--music-ring-size) + 1px)
+    );
+    mask: radial-gradient(
+        farthest-side,
+        transparent calc(100% - var(--music-ring-size)),
+        #000 calc(100% - var(--music-ring-size) + 1px)
+    );
+    filter:
+        drop-shadow(0 0 4px rgba(255, 205, 108, 0.22))
+        drop-shadow(0 0 7px rgba(255, 83, 33, 0.18));
+    transition: opacity 0.18s ease, filter 0.18s ease;
+}
+
+.music-player.playing .player-progress-ring {
+    opacity: 1;
+    filter:
+        drop-shadow(0 0 5px rgba(255, 220, 135, 0.38))
+        drop-shadow(0 0 10px rgba(255, 138, 61, 0.32))
+        drop-shadow(0 0 16px rgba(255, 83, 33, 0.16));
 }
 
 /* 中间一圈 - 橙色圆环（默认状态）/ 专辑封面（播放状态） */
@@ -328,7 +422,7 @@
 
 /* 缩小状态下播放时旋转 */
 .music-player.minimized .player-cover.playing {
-    animation: coverRotate 7.5s linear infinite, orangeBreath 2s ease-in-out infinite;
+    animation: orangeBreath 2s ease-in-out infinite;
 }
 
 /* 橙色呼吸光环动画
@@ -885,16 +979,7 @@
 
     /* 移动端缩小状态下播放时旋转 */
     .music-player.minimized .player-cover.playing {
-        animation: coverRotateMobile 7.5s linear infinite;
-    }
-
-    @keyframes coverRotateMobile {
-        from {
-            transform: translate(-50%, -50%) rotate(0deg);
-        }
-        to {
-            transform: translate(-50%, -50%) rotate(360deg);
-        }
+        animation: orangeBreath 2s ease-in-out infinite;
     }
 }
 

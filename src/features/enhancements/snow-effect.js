@@ -708,10 +708,18 @@ export function updateSnowBtn() {
     if (snowEnabled) {
         btn.classList.remove('off');
         btn.classList.add('on');
+        btn.dataset.state = 'on';
+        btn.setAttribute('aria-pressed', 'true');
+        btn.setAttribute('aria-label', '关闭下雪特效');
+        btn.title = '关闭下雪特效';
         if (canvas) canvas.style.display = 'block';
     } else {
         btn.classList.remove('on');
         btn.classList.add('off');
+        btn.dataset.state = 'off';
+        btn.setAttribute('aria-pressed', 'false');
+        btn.setAttribute('aria-label', '开启下雪特效');
+        btn.title = '开启下雪特效';
         if (canvas) canvas.style.display = 'none';
     }
 }

@@ -33,6 +33,8 @@ describe('snow-effect-loader', () => {
 
         expect(importer).not.toHaveBeenCalled();
         expect(document.getElementById('snow-toggle-btn').classList.contains('off')).toBe(true);
+        expect(document.getElementById('snow-toggle-btn').getAttribute('aria-pressed')).toBe('false');
+        expect(document.getElementById('snow-toggle-btn').title).toBe('开启下雪特效');
         expect(document.getElementById('snow-canvas').style.display).toBe('none');
     });
 
@@ -51,6 +53,8 @@ describe('snow-effect-loader', () => {
         expect(importer).toHaveBeenCalledTimes(1);
         expect(init).toHaveBeenCalledTimes(1);
         expect(toggle).toHaveBeenCalledTimes(2);
+        expect(document.getElementById('snow-toggle-btn').classList.contains('is-loading')).toBe(false);
+        expect(document.getElementById('snow-toggle-btn').disabled).toBe(false);
     });
 
     it('delegates button updates after the effect has loaded', async () => {
@@ -64,6 +68,6 @@ describe('snow-effect-loader', () => {
         await toggleSnow({ importer });
         updateSnowBtn();
 
-        expect(update).toHaveBeenCalledTimes(1);
+        expect(update).toHaveBeenCalledTimes(2);
     });
 });

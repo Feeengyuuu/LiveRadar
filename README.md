@@ -2,455 +2,266 @@
 
 <div align="center">
 
-![LiveRadar](https://img.shields.io/badge/LiveRadar-v3.1.1-orange?style=for-the-badge)
-![License](https://img.shields.io/badge/License-Educational-blue?style=for-the-badge)
-![Platform](https://img.shields.io/badge/Platform-Web-green?style=for-the-badge)
+![LiveRadar](https://img.shields.io/badge/LiveRadar-v3.1.1-f26a21?style=for-the-badge)
+![Stack](https://img.shields.io/badge/Vite%20%2B%20Vanilla%20JS-Frontend-646cff?style=for-the-badge)
+![License](https://img.shields.io/badge/Use-Educational%20Only-00a67d?style=for-the-badge)
 
-**多平台直播监控工具 | Multi-platform Live Streaming Monitor**
+**多平台直播状态监控面板。一个页面集中查看斗鱼、B站、Twitch、Kick 主播的直播、离线和轮播录像状态。**
 
-实时监控多个直播平台的主播状态，支持自动刷新、桌面通知、数据导入导出等功能。
-
-### [🚀 在线体验](https://liveradar.pages.dev/)
-
-[功能特性](#功能特性) • [快速开始](#快速开始) • [使用说明](#使用说明) • [开发指南](#开发指南)
+[在线体验](https://liveradar.pages.dev/) · [快速开始](#快速开始) · [功能特性](#功能特性) · [项目结构](#项目结构) · [开发与验证](#开发与验证)
 
 </div>
 
----
+![LiveRadar hero preview](public/readme-hero.png)
+
+> README 中的宣传图为项目辅助展示图，真实运行界面以当前代码和浏览器渲染为准。
+
+## 项目定位
+
+LiveRadar 是一个 Vite / Tailwind / Vanilla JavaScript 构建的直播监控 Web App。它面向需要同时关注多个平台主播状态的使用场景：直播中、离线、轮播录像、收藏主播、手动或自动刷新、导入导出备份。
+
+当前版本的视觉方向是 Half-Life: Alyx 风格的工业橙色控制台：暗色底、橙色主光、紧凑信息密度、卡片 hover 放大、平台品牌色反馈，以及轻量纯代码动态背景。
 
 ## 功能特性
 
-### 核心功能
-- **多平台支持**: 同时监控斗鱼、B站、Twitch、Kick 等主流直播平台
-- **实时监控**: 自动检测主播在线状态，实时更新直播信息
-- **智能刷新**: 可配置的自动刷新间隔，智能并发控制
-- **桌面通知**: 主播开播时浏览器通知提醒（需授权）
-- **收藏系统**: 标记喜爱的主播，收藏主播优先显示
+### 监控能力
 
-### 增强功能
-- **数据管理**
-  - 导入/导出主播列表（JSON 格式）
-  - 本地存储，数据持久化
-  - 自动缓存直播信息
+- 支持平台：斗鱼、B站、Twitch、Kick。
+- 分区展示：正在直播、离线、轮播录像。
+- 指标信息栏：Live、Offline、最爱直播中。
+- 支持主播封面、头像、标题、房间号、观看人数、直播时长等关键信息。
+- 收藏主播使用金色边框标识，不受在线/离线状态影响。
 
-- **用户体验**
-  - 响应式设计，支持移动端和桌面端
-  - 直播状态分区显示（正在直播/离线/轮播录像）
-  - 实时观看人数和直播时长显示
-  - 防休眠模式（静音音频保持页面活跃）
+### 操作体验
 
-- **性能优化**
-  - 智能代理管理，自动选择最佳代理
-  - 增量渲染，减少 80%+ DOM 操作
-  - 并发请求池，优化网络性能
-  - 图片懒加载，减少初始加载时间
+- 顶部命令栏：平台选择、搜索/房间号输入、添加主播、自动刷新、导入、导出、手动刷新。
+- 搜索历史支持键盘操作与删除。
+- 卡片 hover 放大，信息区可根据平台品牌色反馈。
+- 删除按钮 hover 时转为红色反馈，降低误操作感知成本。
+- iPhone 视图保留左右安全边距，并使用双列卡片提升信息量。
 
-- **特色功能**
-  - 地区检测（国内/海外）自动优化网络请求
-  - 音乐播放器（背景音乐）
-  - 雪花特效动画
-  - 返回顶部按钮
+### 数据与本地能力
 
----
+- 主播列表本地持久化。
+- 支持 JSON / LiveRadar 备份导入导出。
+- 自动刷新倒计时。
+- 批量状态获取、增量渲染和图片加载恢复。
+- 页面可在静态部署环境运行。
+
+### 氛围与增强功能
+
+- Alyx 工业橙色 UI 主题。
+- 纯代码动态背景：慢速字符层、橙色环境光、鼠标划过的柔和反馈。
+- 下雪特效模块，按需加载。
+- 浮动音乐播放器，支持播放/暂停、上一曲/下一曲、进度、音量、圆形播放进度和专辑背景。
+- 移动端降低或关闭高成本动态效果，尊重 `prefers-reduced-motion`。
+
+## 移动端预览
+
+<p align="center">
+  <img src="public/readme-mobile.png" alt="LiveRadar mobile preview" width="360">
+</p>
 
 ## 技术栈
 
-### 前端技术
-- **核心**: Vanilla JavaScript (ES6+)
-- **构建工具**: Vite 7.3
-- **样式**: TailwindCSS 3.4
-- **测试**: Vitest 4.0
+| 分类 | 技术 |
+| --- | --- |
+| 前端 | Vanilla JavaScript ES Modules |
+| 构建 | Vite 7 |
+| 样式 | TailwindCSS + 原生 CSS 主题层 |
+| 测试 | Vitest + jsdom / happy-dom |
+| 质量 | ESLint + Prettier + Husky + lint-staged |
+| 部署 | 静态站点，支持 Cloudflare Pages / Netlify / Vercel / Nginx |
 
-### 工具链
-- **代码规范**: ESLint + Prettier
-- **Git Hooks**: Husky + lint-staged
-- **包管理**: npm/pnpm
+## 架构概览
 
-### 特性
-- 模块化架构设计
-- 依赖注入模式
-- 智能代理池管理
-- CORS 跨域处理
-- CSP 内容安全策略
+```mermaid
+flowchart LR
+    UI["UI / index.html"] --> Router["core/event-router.js"]
+    Router --> Rooms["features/core/room-management.js"]
+    Router --> Refresh["core/refresh-manager.js"]
+    Refresh --> Fetcher["core/status-fetcher.js"]
+    Fetcher --> API["api/platform-sniffers.js"]
+    API --> Platforms["Douyu / Bilibili / Twitch / Kick"]
+    Fetcher --> State["core/state.js"]
+    State --> Renderer["core/renderer.js"]
+    Renderer --> Cards["core/renderer/card-renderer.js"]
+    Cards --> UI
+    State --> Storage["utils/safe-storage.js"]
+    Enhancements["enhancements: music / snow / ambient bg"] --> UI
+```
 
----
+核心思路：
+
+- `core/` 管启动、状态、事件路由、刷新调度、状态获取、渲染入口。
+- `features/` 管业务功能，例如房间管理、导入导出、自动刷新、音频与增强效果。
+- `api/` 管平台状态获取和代理策略。
+- `styles/` 管基础样式、响应式、移动端和 Alyx 主题。
+- `utils/` 管安全存储、DOM 缓存、资源释放、设备检测、错误处理等基础工具。
 
 ## 快速开始
 
-### 在线使用（无需安装）
+### 环境要求
 
-**直接访问**: [https://liveradar.pages.dev/](https://liveradar.pages.dev/)
+- Node.js `>= 20.19.0`
+- npm
+- 现代浏览器：Chrome / Edge / Firefox / Safari
 
-无需安装任何依赖，打开即用。数据存储在浏览器本地，支持导入导出备份。
-
-### 本地开发
-
-#### 环境要求
-- Node.js >= 20.19.0
-- 现代浏览器（Chrome 80+, Firefox 75+, Safari 13+, Edge 80+）
-
-#### 安装
+### 安装与启动
 
 ```bash
-# 克隆项目
-git clone https://github.com/your-username/LiveRadar.git
+git clone https://github.com/Feeengyuuu/LiveRadar.git
 cd LiveRadar
-
-# 安装依赖
 npm install
-
-# 启动开发服务器
 npm run dev
 ```
 
-开发服务器将在 `http://localhost:3000` 启动。
+开发服务器默认运行在：
 
-#### 构建生产版本
+```text
+http://localhost:3000
+```
+
+### 构建生产版本
 
 ```bash
-# 构建
+npm run build
+npm run preview
+```
+
+构建产物输出到 `dist/`。
+
+## 使用说明
+
+### 添加主播
+
+1. 在顶部选择平台。
+2. 输入房间号、UID 或平台支持的主播标识。
+3. 点击“添加主播”。
+
+### 管理主播
+
+- 点击卡片：打开对应直播页面。
+- 点击星标：切换收藏状态。
+- 点击垃圾桶：删除主播。
+- 点击刷新：手动刷新全部主播状态。
+- 开启自动刷新：按倒计时周期更新状态。
+
+### 导入导出
+
+- 导出会保存当前主播列表备份。
+- 导入可恢复之前的备份文件。
+- 建议在大量调整主播列表前先导出一份备份。
+
+## 开发与验证
+
+```bash
+# 启动开发服务器
+npm run dev
+
+# 运行单元测试
+npm run test:run
+
+# ESLint 检查
+npm run lint
+
+# 生产构建
 npm run build
 
 # 预览构建结果
 npm run preview
 ```
 
-构建产物将输出到 `dist` 目录。
+当前常规验证标准：
 
----
-
-## 使用说明
-
-### 添加主播
-
-1. 在顶部选择平台（斗鱼/B站/Twitch/Kick）
-2. 输入主播房间号
-3. 点击"添加"按钮
-
-### 管理主播
-
-- **收藏**: 点击卡片上的星标图标
-- **删除**: 点击卡片上的删除图标
-- **查看直播**: 点击卡片可直接跳转到直播间
-
-### 功能开关
-
-- **自动刷新**: 启用后每隔一定时间自动刷新所有主播状态
-- **推送通知**: 启用后主播开播时发送桌面通知（需浏览器授权）
-- **防休眠**: 启用后播放静音音频防止设备休眠
-- **地区模式**: 自动/国内/海外，影响网络请求策略
-
-### 数据导入导出
-
-**导出**
-- 点击顶部"导出"按钮
-- 保存 JSON 文件到本地
-
-**导入**
-- 点击顶部"导入"按钮
-- 选择之前导出的 JSON 文件
-- 选择合并或覆盖模式
-
----
+- `npm run lint`
+- `npm run test:run`
+- `npm run build`
+- 本地页面 `http://127.0.0.1:3000/` 可访问
 
 ## 项目结构
 
-```
+```text
 LR_online/
-├── src/                           # 源代码目录
-│   ├── api/                      # API 层 - 平台接口适配
-│   │   ├── platform-adapter.js   # 平台适配器（统一接口）
-│   │   ├── platform-sniffers.js  # 各平台数据获取（Douyu/Bilibili/Twitch/Kick）
-│   │   └── proxy-manager.js      # 智能代理池管理
-│   │
-│   ├── config/                   # 配置文件
-│   │   ├── constants.js          # 全局常量配置
-│   │   ├── proxies.js            # 代理服务器配置
-│   │   ├── signer.js             # API 签名工具
-│   │   └── ui-strings.js         # UI 文案配置
-│   │
-│   ├── core/                     # 核心业务逻辑
-│   │   ├── bootstrap.js          # 应用启动引导
-│   │   ├── state.js              # 全局状态管理
-│   │   ├── event-router.js       # 事件路由分发
-│   │   ├── globals.js            # 全局对象暴露
-│   │   ├── init.js               # 初始化流程
-│   │   ├── refresh-manager.js    # 刷新调度管理
-│   │   ├── status-fetcher.js     # 状态获取调度
-│   │   ├── file-protocol-warning.js # 本地文件协议警告
-│   │   ├── renderer.js           # 渲染器入口
-│   │   └── renderer/             # 渲染引擎模块
-│   │       ├── card-factory.js   # 卡片创建工厂
-│   │       ├── card-renderer.js  # 卡片渲染逻辑
-│   │       ├── grid-manager.js   # 网格布局管理
-│   │       └── image-handler.js  # 图片加载处理
-│   │
-│   ├── features/                 # 功能模块（按业务划分）
-│   │   ├── audio/               # 音频系统
-│   │   │   ├── audio-manager.js # 音频管理器
-│   │   │   └── notification-audio.js # 通知音效
-│   │   ├── core/                # 核心功能
-│   │   │   ├── auto-refresh.js  # 自动刷新
-│   │   │   ├── import-export.js # 数据导入导出
-│   │   │   ├── notifications.js # 桌面通知
-│   │   │   ├── room-management.js # 房间管理
-│   │   │   └── status-ticker.js # 状态滚动条
-│   │   └── enhancements/        # 增强功能
-│   │       ├── music-player.js  # 背景音乐播放器
-│   │       ├── region-detector.js # 地区检测
-│   │       └── snow-effect.js   # 雪花特效
-│   │
-│   ├── styles/                   # 样式文件（CSS）
-│   │   ├── main.css             # 主样式入口
-│   │   ├── base.css             # 基础样式
-│   │   ├── layout.css           # 布局样式
-│   │   ├── variables.css        # CSS 变量
-│   │   ├── animations.css       # 动画效果
-│   │   ├── utilities.css        # 工具类
-│   │   ├── responsive.css       # 响应式适配
-│   │   ├── mobile-optimized.css # 移动端优化
-│   │   ├── components/          # 组件样式
-│   │   │   ├── card.css         # 卡片样式
-│   │   │   ├── ui.css           # UI 组件
-│   │   │   ├── music-player.css # 音乐播放器
-│   │   │   ├── warning-banner.css # 警告横幅
-│   │   │   └── secret-button.css # 隐藏按钮
-│   │   └── effects/             # 特效样式
-│   │
-│   ├── utils/                    # 工具函数库
-│   │   ├── helpers.js           # 通用辅助函数
-│   │   ├── safe-storage.js      # 安全的 localStorage 封装
-│   │   ├── dom-cache.js         # DOM 元素缓存
-│   │   ├── data-differ.js       # 数据差异检测
-│   │   ├── event-manager.js     # 事件管理器
-│   │   ├── error-handler.js     # 错误处理
-│   │   ├── logger.js            # 日志工具
-│   │   ├── lazy-image.js        # 图片懒加载
-│   │   ├── viewport-tracker.js  # 视口追踪
-│   │   ├── resource-manager.js  # 资源管理
-│   │   ├── device-detector.js   # 设备检测
-│   │   ├── performance-detector.js # 性能检测
-│   │   └── proxy-pool-manager.js # 代理池管理器
-│   │
-│   ├── types/                    # TypeScript 类型定义（JSDoc）
-│   └── main.js                   # 应用入口文件
-│
-├── public/                       # 静态资源
-│   ├── covers/                  # 音乐封面
-│   └── music/                   # 背景音乐
-│
-├── docs/                         # 项目文档
-│   └── EXTRACTION_SUMMARY.md   # 模块提取总结
-│
-├── tests/                        # 测试文件
-│   └── unit/                    # 单元测试
-│
-├── dist/                         # 构建输出目录（自动生成）
-│
-├── .claude/                      # Claude Code 配置
-├── index.html                    # HTML 入口
-├── package.json                  # 项目依赖配置
-├── vite.config.js               # Vite 构建配置
-├── vitest.config.js             # Vitest 测试配置
-├── tailwind.config.js           # TailwindCSS 配置
-├── postcss.config.js            # PostCSS 配置
-├── .eslintrc.json               # ESLint 代码规范
-├── .prettierrc                  # Prettier 格式化配置
-├── .gitignore                   # Git 忽略文件
-└── README.md                     # 项目说明文档
+├─ index.html
+├─ package.json
+├─ vite.config.js
+├─ vitest.config.js
+├─ public/
+│  ├─ covers/
+│  ├─ music/
+│  ├─ readme-hero.png
+│  └─ readme-mobile.png
+├─ src/
+│  ├─ api/                 # 平台状态获取、代理与签名
+│  ├─ config/              # 常量、代理、UI 文案
+│  ├─ core/                # 启动、状态、刷新、事件、渲染
+│  ├─ features/
+│  │  ├─ audio/            # 音频解锁与音效
+│  │  ├─ core/             # 自动刷新、导入导出、房间管理
+│  │  └─ enhancements/     # 音乐播放器、下雪、动态背景
+│  ├─ styles/              # CSS 入口、组件、响应式和主题
+│  ├─ types/               # JSDoc 类型定义
+│  └─ utils/               # 存储、DOM、资源、设备、错误处理
+├─ functions/              # 平台状态相关服务端/边缘函数
+├─ docs/                   # 架构、安全、迁移、部署等文档
+└─ tests/                  # 测试辅助
 ```
 
-### 核心模块说明
+## 设计原则
 
-| 模块 | 职责 | 关键特性 |
-|------|------|---------|
-| **api/** | 平台接口适配 | 多平台统一接口、智能代理池、性能优化 |
-| **core/** | 核心业务逻辑 | 状态管理、渲染引擎、刷新调度、事件路由 |
-| **features/** | 功能模块 | 音频系统、通知、导入导出、音乐播放器 |
-| **utils/** | 工具函数 | 错误处理、性能监控、DOM 优化、数据缓存 |
-| **styles/** | 样式系统 | 响应式布局、动画效果、移动端适配 |
-
----
-
-## 开发指南
-
-### 开发命令
-
-```bash
-# 启动开发服务器
-npm run dev
-
-# 运行测试
-npm test
-
-# 测试（UI 模式）
-npm run test:ui
-
-# 代码检查
-npm run lint
-
-# 代码格式化
-npm run format
-
-# 构建生产版本
-npm run build
-```
-
-### 代码规范
-
-项目使用 ESLint 和 Prettier 进行代码规范检查：
-
-- 提交代码前会自动运行 lint-staged
-- 使用 Husky 管理 Git hooks
-- 遵循 ES6+ 标准
-
-### 核心设计模式
-
-1. **模块化架构**: 功能模块独立，职责清晰
-2. **依赖注入**: 避免循环依赖，提高可测试性
-3. **状态管理**: 集中式状态管理，发布订阅模式
-4. **增量渲染**: 智能 DOM diff，优化渲染性能
-5. **请求池管理**: 并发控制，防止浏览器限流
-
-### 添加新平台
-
-1. 在 `src/api/` 创建平台 API 模块
-2. 在 `src/config/constants.js` 添加平台配置
-3. 更新 `src/core/state.js` 添加平台支持
-4. 更新 UI 选择器
-
----
+- 监控面板优先：信息密度、扫描效率和稳定性优先于装饰。
+- 轻量动态：背景和特效使用 CSS 与少量 JS 控制，不使用视频背景或重型粒子。
+- 渐进增强：移动端、省电偏好和低性能设备自动降级。
+- 可恢复：导入导出和本地存储优先保证用户列表安全。
+- 可维护：事件委托、状态集中管理、模块边界清晰。
 
 ## 部署
 
-### Vercel / Netlify / Cloudflare Pages
+### Cloudflare Pages / Netlify / Vercel
 
-```bash
-# 构建命令
-npm run build
-
-# 输出目录
-dist
-
-# Node 版本
-20.x
+```text
+Build command: npm run build
+Output directory: dist
+Node version: 20.x
 ```
 
-### 静态服务器
-
-构建后的 `dist` 目录可直接部署到任何静态服务器：
-
-```bash
-# 使用 Python
-python -m http.server 8080 --directory dist
-
-# 使用 Node.js (http-server)
-npx http-server dist -p 8080
-
-# 使用 VS Code Live Server
-# 右键 dist/index.html -> Open with Live Server
-```
-
-### Docker
+### Nginx 静态部署
 
 ```dockerfile
-FROM node:20-alpine
+FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
+
 FROM nginx:alpine
-COPY --from=0 /app/dist /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
 ```
 
----
-
 ## 注意事项
 
-### CORS 跨域问题
+- 本项目需要访问第三方直播平台信息，平台接口、跨域策略和频率限制可能随时变化。
+- 请合理设置刷新频率，避免对平台产生过高请求压力。
+- 用户数据主要保存在浏览器本地，清理浏览器数据会导致列表丢失。
+- 建议定期导出备份。
 
-本项目需要访问多个第三方 API，部分平台可能存在跨域限制：
+## 合规声明
 
-- 开发环境：使用 Vite 的代理功能
-- 生产环境：使用内置的代理池系统自动处理
-
-### 隐私与合规
-
-**本项目仅供学习研究使用**
-
-- 请遵守各直播平台的服务条款
-- 不得用于商业用途
-- 不得对平台造成过度负载
-- 请尊重主播隐私和版权
-
-### 浏览器兼容性
-
-- 需要支持 ES6+ 特性
-- 需要支持 Fetch API
-- 桌面通知需要用户授权
-- 某些功能在 Safari 上可能受限
-
----
-
-## 常见问题
-
-**Q: 为什么某些主播显示"加载失败"？**
-
-A: 可能是网络问题或平台 API 限制，可以尝试：
-- 手动刷新
-- 切换地区模式
-- 检查浏览器控制台错误信息
-
-**Q: 通知不工作怎么办？**
-
-A: 确保已授予浏览器通知权限：
-- 点击地址栏的锁图标
-- 检查通知权限设置
-- 部分浏览器要求 HTTPS
-
-**Q: 数据会丢失吗？**
-
-A: 数据存储在浏览器 localStorage：
-- 清除浏览器数据会丢失
-- 建议定期导出备份
-- 更换浏览器需要重新导入
-
----
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-### 贡献流程
-
-1. Fork 本项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
-
----
-
-## 许可证
-
-本项目仅供学习研究使用，请遵守相关法律法规和平台规则。
-
----
+本项目仅供学习、研究和个人效率工具用途。使用者需要自行遵守各平台服务条款、当地法律法规、版权与隐私要求。请勿将本项目用于未经授权的数据采集、商业化监控或高频请求。
 
 ## 致谢
 
-- **Idea by**: Fengyu Xu
-- **Built with**: Gemini, Claude, Codex
-- **Powered by**: Vite, TailwindCSS, and the open-source community
+- Idea by Fengyu Xu
+- Built with Gemini, Claude and Codex
+- Powered by Vite, TailwindCSS and the open-source ecosystem
 
 ---
 
 <div align="center">
 
-**⚠️ DISCLAIMER: FOR LEARNING & RESEARCH ONLY. PLEASE COMPLY WITH LOCAL LAWS AND PLATFORM RULES.**
-
-Made with ❤️ by the LiveRadar Team
+**FOR LEARNING & RESEARCH ONLY. PLEASE COMPLY WITH LOCAL LAWS AND PLATFORM RULES.**
 
 </div>

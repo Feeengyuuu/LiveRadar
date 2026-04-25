@@ -1,10 +1,10 @@
 /**
  * Audio Manager Module
- * Coordinates one-time notification audio unlock for iOS/Chrome.
+ * Coordinates one-time sound-effect unlock for iOS/Chrome.
  */
 
 import { APP_CONFIG } from '../../config/constants.js';
-import { getNotificationAudio } from './notification-audio.js';
+import { getYahahaAudio } from './sound-effects.js';
 import { showToast } from '../../utils/helpers.js';
 
 let unlockPromise = null;
@@ -14,7 +14,7 @@ window.audioContextUnlocked = false;
 window.hasShownAudioUnlockToast = false;
 
 /**
- * Unlock notification audio context.
+ * Unlock sound-effect audio context.
  * Must be triggered by user interaction (click/touch).
  */
 export function unlockAllAudio(options = {}) {
@@ -23,32 +23,32 @@ export function unlockAllAudio(options = {}) {
     const silent = options?.silent === true;
     if (unlockPromise) return unlockPromise;
 
-    const notifyAudio = getNotificationAudio();
-    if (!notifyAudio) {
+    const yahahaAudio = getYahahaAudio();
+    if (!yahahaAudio) {
         return Promise.resolve(false);
     }
 
-    notifyAudio.volume = 0;
+    yahahaAudio.volume = 0;
 
-    unlockPromise = notifyAudio.play()
+    unlockPromise = yahahaAudio.play()
         .then(() => {
-            notifyAudio.pause();
-            notifyAudio.currentTime = 0;
-            notifyAudio.volume = APP_CONFIG.AUDIO.NOTIFICATION_VOLUME;
+            yahahaAudio.pause();
+            yahahaAudio.currentTime = 0;
+            yahahaAudio.volume = APP_CONFIG.AUDIO.SOUND_EFFECT_VOLUME;
             window.audioContextUnlocked = true;
 
             if (APP_CONFIG.DEBUG.LOG_AUDIO) {
-                console.log(`[Audio Manager] ✓ Notification audio unlocked, volume: ${(APP_CONFIG.AUDIO.NOTIFICATION_VOLUME * 100).toFixed(0)}%`);
+                console.log(`[Audio Manager] Sound effects unlocked, volume: ${(APP_CONFIG.AUDIO.SOUND_EFFECT_VOLUME * 100).toFixed(0)}%`);
             }
 
             if (!silent) {
-                showToast('音效已激活', 'info');
+                showToast('Audio enabled', 'info');
             }
 
             return true;
         })
         .catch(error => {
-            console.warn('[Audio Manager] Notification unlock failed:', error);
+            console.warn('[Audio Manager] Sound-effect unlock failed:', error);
             return false;
         })
         .finally(() => {

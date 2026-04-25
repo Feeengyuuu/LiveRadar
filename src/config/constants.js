@@ -268,7 +268,7 @@ export const APP_CONFIG = {
 
   // Audio
   AUDIO: {
-    NOTIFICATION_VOLUME: 1.0,
+    SOUND_EFFECT_VOLUME: 1.0,
     ENABLE_ON_IOS: false,
     AUTO_UNLOCK: true,
   },

@@ -17,7 +17,7 @@
  *
  * initDOMCache(); // Call once after DOM is ready
  * const cache = getDOMCache();
- * cache.notifyBtn.classList.add('active'); // Instant access
+ * cache.autoRefreshBtn.classList.add('active'); // Instant access
  * ```
  */
 
@@ -27,7 +27,6 @@
  */
 const domCache = {
     // Header elements
-    notifyBtn: null,
     snowToggleBtn: null,
     autoRefreshBtn: null,
     autoRefreshLabel: null,
@@ -78,7 +77,6 @@ export function initDOMCache() {
     console.log('[DOM Cache] Initializing element cache...');
 
     // Header elements
-    domCache.notifyBtn = document.getElementById('notify-btn');
     domCache.snowToggleBtn = document.getElementById('snow-toggle-btn');
     domCache.autoRefreshBtn = document.getElementById('auto-refresh-btn');
     domCache.autoRefreshLabel = document.getElementById('auto-refresh-label');

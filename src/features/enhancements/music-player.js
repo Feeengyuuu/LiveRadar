@@ -61,8 +61,10 @@ let hasEverPlayed = false; // 标记是否曾经播放过，用于控制封面�
 let isAnimating = false;
 let dragListenersBound = false;
 let isInitialized = false;
+let completionTimer = null;
 
 const ANIMATION_DURATION_MS = 300;
+const TRACK_COMPLETE_HOLD_MS = 120;
 const PLAYER_INTERACTIVE_SELECTOR = [
     'button',
     'a',
@@ -94,6 +96,7 @@ const elements = {
     title: null,
     artist: null,
     cover: null,
+    progressRing: null,
     playlistContainer: null,
 };
 
@@ -103,6 +106,7 @@ const elements = {
  * @type {WeakMap<HTMLElement, Function>}
  */
 const playlistItemHandlers = new WeakMap();
+const playlistItemKeyHandlers = new WeakMap();
 
 // ====================================================================
 // 初始化
@@ -127,6 +131,7 @@ export function initMusicPlayer() {
     elements.title = document.getElementById('music-title');
     elements.artist = document.getElementById('music-artist');
     elements.cover = document.getElementById('music-cover');
+    elements.progressRing = ensureProgressRing();
     elements.playlistContainer = document.getElementById('music-playlist-items');
 
     if (!elements.player) {
@@ -159,6 +164,7 @@ export function initMusicPlayer() {
     const savedVolume = parseFloat(SafeStorage.getItem(CONFIG.SAVE_VOLUME_KEY, CONFIG.DEFAULT_VOLUME.toString()));
     audio.volume = savedVolume;
     updateVolumeUI(savedVolume);
+    syncProgressUI(0);
 
     // 恢复最小化状态
     if (isMinimized) {
@@ -208,6 +214,10 @@ const eventHandlers = {
         e.stopPropagation();
         seekProgress(e);
     },
+    progressBarKeydown: (e) => {
+        e.stopPropagation();
+        handleProgressKeydown(e);
+    },
     progressBarTouchStart: (e) => {
         e.stopPropagation();
         startDraggingProgress(e);
@@ -219,6 +229,10 @@ const eventHandlers = {
     volumeSliderClick: (e) => {
         e.stopPropagation();
         adjustVolume(e);
+    },
+    volumeSliderKeydown: (e) => {
+        e.stopPropagation();
+        handleVolumeKeydown(e);
     },
     volumeSliderTouchStart: (e) => {
         e.stopPropagation();
@@ -279,10 +293,12 @@ function bindEvents() {
     // 进度条拖动
     elements.progressBar.addEventListener('mousedown', eventHandlers.progressBarMouseDown);
     elements.progressBar.addEventListener('click', eventHandlers.progressBarClick);
+    elements.progressBar.addEventListener('keydown', eventHandlers.progressBarKeydown);
 
     // 音量拖动
     elements.volumeSlider.addEventListener('mousedown', eventHandlers.volumeSliderMouseDown);
     elements.volumeSlider.addEventListener('click', eventHandlers.volumeSliderClick);
+    elements.volumeSlider.addEventListener('keydown', eventHandlers.volumeSliderKeydown);
 
     // 触摸事件支持
     elements.progressBar.addEventListener('touchstart', eventHandlers.progressBarTouchStart);
@@ -344,8 +360,12 @@ function onPause() {
 }
 
 function onAudioEnded() {
-    // 播放下一首
-    playNextTrack();
+    syncProgressUI(1);
+    clearCompletionTimer();
+    completionTimer = setTimeout(() => {
+        completionTimer = null;
+        playNextTrack();
+    }, TRACK_COMPLETE_HOLD_MS);
 }
 
 function updatePlayButtonUI(playing) {
@@ -353,6 +373,8 @@ function updatePlayButtonUI(playing) {
     if (icon) {
         icon.setAttribute('href', playing ? '#icon-pause' : '#icon-play');
     }
+    elements.playBtn.setAttribute('aria-pressed', playing.toString());
+    elements.playBtn.title = playing ? '暂停' : '播放';
 }
 
 // ====================================================================
@@ -362,9 +384,66 @@ function updatePlayButtonUI(playing) {
 function updateProgress() {
     if (isDraggingProgress) return;
 
-    const progress = (audio.currentTime / audio.duration) * 100;
-    elements.progressFill.style.width = `${progress}%`;
-    elements.currentTime.textContent = formatTime(audio.currentTime);
+    syncProgressUI();
+}
+
+function ensureProgressRing() {
+    const cover = document.getElementById('music-cover');
+    if (!cover) return null;
+
+    let ring = cover.querySelector('.player-progress-ring');
+    if (!ring) {
+        ring = document.createElement('span');
+        ring.className = 'player-progress-ring';
+        ring.setAttribute('aria-hidden', 'true');
+        cover.prepend(ring);
+    }
+
+    return ring;
+}
+
+function getPlaybackProgressRatio() {
+    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) {
+        return 0;
+    }
+
+    return Math.max(0, Math.min(1, audio.currentTime / audio.duration));
+}
+
+function syncProgressUI(ratio = getPlaybackProgressRatio()) {
+    const safeRatio = Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
+    const percent = safeRatio * 100;
+    const angle = safeRatio * 360;
+
+    if (elements.progressFill) {
+        elements.progressFill.style.width = `${percent}%`;
+    }
+    if (elements.currentTime && audio) {
+        elements.currentTime.textContent = formatTime(audio.currentTime);
+    }
+    if (elements.progressBar && audio) {
+        const now = Math.round(percent);
+        const total = Number.isFinite(audio.duration) ? formatTime(audio.duration) : '0:00';
+        elements.progressBar.setAttribute('aria-valuenow', now.toString());
+        elements.progressBar.setAttribute('aria-valuetext', `${formatTime(audio.currentTime)} / ${total}`);
+    }
+    setProgressRingVars(elements.player, angle);
+    setProgressRingVars(elements.cover, angle);
+    setProgressRingVars(elements.progressRing, angle);
+}
+
+function setProgressRingVars(target, angle) {
+    if (!target) return;
+
+    target.style.setProperty('--music-progress-angle-soft', `${angle * 0.34}deg`);
+    target.style.setProperty('--music-progress-angle-mid', `${angle * 0.68}deg`);
+    target.style.setProperty('--music-progress-angle', `${angle}deg`);
+}
+
+function clearCompletionTimer() {
+    if (!completionTimer) return;
+    clearTimeout(completionTimer);
+    completionTimer = null;
 }
 
 function startDraggingProgress(e) {
@@ -374,14 +453,46 @@ function startDraggingProgress(e) {
 }
 
 function seekProgress(e) {
+    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) {
+        syncProgressUI(0);
+        return;
+    }
+
     const rect = elements.progressBar.getBoundingClientRect();
     const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
     const offsetX = clientX - rect.left;
     const percent = Math.max(0, Math.min(1, offsetX / rect.width));
 
     audio.currentTime = percent * audio.duration;
-    elements.progressFill.style.width = `${percent * 100}%`;
-    elements.currentTime.textContent = formatTime(audio.currentTime);
+    syncProgressUI(percent);
+}
+
+function handleProgressKeydown(e) {
+    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+
+    const step = Math.max(5, audio.duration * 0.03);
+    const pageStep = Math.max(15, audio.duration * 0.1);
+    let nextTime = audio.currentTime;
+
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+        nextTime -= step;
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+        nextTime += step;
+    } else if (e.key === 'PageDown') {
+        nextTime -= pageStep;
+    } else if (e.key === 'PageUp') {
+        nextTime += pageStep;
+    } else if (e.key === 'Home') {
+        nextTime = 0;
+    } else if (e.key === 'End') {
+        nextTime = audio.duration;
+    } else {
+        return;
+    }
+
+    e.preventDefault();
+    audio.currentTime = Math.max(0, Math.min(audio.duration, nextTime));
+    syncProgressUI();
 }
 
 // ====================================================================
@@ -407,6 +518,34 @@ function adjustVolume(e) {
 
 function updateVolumeUI(volume) {
     elements.volumeFill.style.width = `${volume * 100}%`;
+    elements.volumeSlider?.setAttribute('aria-valuenow', Math.round(volume * 100).toString());
+    elements.volumeSlider?.setAttribute('aria-valuetext', `${Math.round(volume * 100)}%`);
+}
+
+function handleVolumeKeydown(e) {
+    if (!audio) return;
+
+    let nextVolume = audio.volume;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+        nextVolume -= 0.05;
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+        nextVolume += 0.05;
+    } else if (e.key === 'PageDown') {
+        nextVolume -= 0.1;
+    } else if (e.key === 'PageUp') {
+        nextVolume += 0.1;
+    } else if (e.key === 'Home') {
+        nextVolume = 0;
+    } else if (e.key === 'End') {
+        nextVolume = 1;
+    } else {
+        return;
+    }
+
+    e.preventDefault();
+    audio.volume = Math.max(0, Math.min(1, nextVolume));
+    updateVolumeUI(audio.volume);
+    SafeStorage.setItem(CONFIG.SAVE_VOLUME_KEY, audio.volume.toString());
 }
 
 // ====================================================================
@@ -589,6 +728,10 @@ function createPlaylist() {
             item.classList.add('active');
         }
         item.dataset.index = index;
+        item.tabIndex = 0;
+        item.setAttribute('role', 'button');
+        item.setAttribute('aria-pressed', (index === currentTrackIndex).toString());
+        item.setAttribute('aria-label', `播放 ${track.title}`);
 
         const iconWrap = document.createElement('div');
         iconWrap.className = 'playlist-item-icon';
@@ -621,8 +764,15 @@ function createPlaylist() {
 
         // 点击切换歌曲 - 存储处理函数引用以便后续移除
         const clickHandler = () => switchTrack(index);
+        const keyHandler = (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            switchTrack(index);
+        };
         playlistItemHandlers.set(item, clickHandler);
+        playlistItemKeyHandlers.set(item, keyHandler);
         item.addEventListener('click', clickHandler);
+        item.addEventListener('keydown', keyHandler);
 
         elements.playlistContainer.appendChild(item);
     });
@@ -650,6 +800,8 @@ function setPlaylistItemIcon(icon, isActive) {
 }
 
 function switchTrack(index) {
+    clearCompletionTimer();
+
     if (index === currentTrackIndex) {
         // 点击当前歌曲，切换播放/暂停
         togglePlay();
@@ -667,14 +819,17 @@ function switchTrack(index) {
 
     // 切换到新曲目
     currentTrackIndex = index;
+    const nextTrack = PLAYLIST[currentTrackIndex];
     SafeStorage.setItem(CONFIG.SAVE_CURRENT_TRACK_KEY, currentTrackIndex.toString());
 
     // 加载新音频
     audio.src = PLAYLIST[currentTrackIndex].path;
+    audio.src = nextTrack.path;
     audio.load();
+    syncProgressUI(0);
 
     // 更新UI
-    loadTrackInfo();
+    loadTrackInfo(nextTrack);
     updatePlaylistUI();
 
     // 如果之前在播放，自动播放新曲目
@@ -716,11 +871,13 @@ function updatePlaylistUI() {
 
         if (index === currentTrackIndex) {
             item.classList.add('active');
+            item.setAttribute('aria-pressed', 'true');
             if (icon) {
                 setPlaylistItemIcon(icon, true);
             }
         } else {
             item.classList.remove('active');
+            item.setAttribute('aria-pressed', 'false');
             if (icon) {
                 setPlaylistItemIcon(icon, false);
             }
@@ -728,10 +885,10 @@ function updatePlaylistUI() {
     });
 }
 
-function loadTrackInfo() {
-    const track = PLAYLIST[currentTrackIndex];
+function loadTrackInfo(track = getCurrentPlaybackTrack()) {
     elements.title.textContent = track.title;
     elements.artist.textContent = track.artist;
+    updatePanelArtwork(track);
 
     // 设置emoji属性（始终显示在最上层）
     elements.cover.setAttribute('data-emoji', '🎵');
@@ -764,8 +921,44 @@ function loadTrackInfo() {
     });
 }
 
+function getCurrentPlaybackTrack() {
+    const sources = [audio?.src, audio?.currentSrc].filter(Boolean);
+
+    for (const source of sources) {
+        const matchingTrack = PLAYLIST.find(track => getAbsoluteUrl(track.path) === source);
+        if (matchingTrack) return matchingTrack;
+    }
+
+    return PLAYLIST[currentTrackIndex];
+}
+
+function getAbsoluteUrl(path) {
+    try {
+        return new URL(path, window.location.href).href;
+    } catch {
+        return path;
+    }
+}
+
+function updatePanelArtwork(track) {
+    if (!elements.player) return;
+
+    if (!track?.cover) {
+        elements.player.classList.remove('has-panel-artwork');
+        elements.player.style.removeProperty('--music-panel-cover');
+        delete elements.player.dataset.panelTrack;
+        return;
+    }
+
+    const safeCover = track.cover.replace(/["\\\n\r\f]/g, '');
+    elements.player.style.setProperty('--music-panel-cover', `url("${safeCover}")`);
+    elements.player.dataset.panelTrack = track.title;
+    elements.player.classList.add('has-panel-artwork');
+}
+
 function onMetadataLoaded() {
     elements.totalTime.textContent = formatTime(audio.duration);
+    syncProgressUI();
     console.log('[MusicPlayer] Audio duration:', audio.duration);
 }
 
@@ -786,6 +979,8 @@ function formatTime(seconds) {
  * 用于防止内存泄漏
  */
 export function destroyMusicPlayer() {
+    clearCompletionTimer();
+
     // 停止音频播放
     if (audio) {
         audio.pause();
@@ -816,6 +1011,7 @@ export function destroyMusicPlayer() {
     if (elements.progressBar) {
         elements.progressBar.removeEventListener('mousedown', eventHandlers.progressBarMouseDown);
         elements.progressBar.removeEventListener('click', eventHandlers.progressBarClick);
+        elements.progressBar.removeEventListener('keydown', eventHandlers.progressBarKeydown);
         elements.progressBar.removeEventListener('touchstart', eventHandlers.progressBarTouchStart);
     }
 
@@ -823,6 +1019,7 @@ export function destroyMusicPlayer() {
     if (elements.volumeSlider) {
         elements.volumeSlider.removeEventListener('mousedown', eventHandlers.volumeSliderMouseDown);
         elements.volumeSlider.removeEventListener('click', eventHandlers.volumeSliderClick);
+        elements.volumeSlider.removeEventListener('keydown', eventHandlers.volumeSliderKeydown);
         elements.volumeSlider.removeEventListener('touchstart', eventHandlers.volumeSliderTouchStart);
     }
 
@@ -854,6 +1051,11 @@ export function destroyMusicPlayer() {
             if (handler) {
                 item.removeEventListener('click', handler);
                 playlistItemHandlers.delete(item);
+            }
+            const keyHandler = playlistItemKeyHandlers.get(item);
+            if (keyHandler) {
+                item.removeEventListener('keydown', keyHandler);
+                playlistItemKeyHandlers.delete(item);
             }
         });
     }

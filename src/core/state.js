@@ -171,9 +171,6 @@ export const state = {
     // Search history
     searchHistory: SafeStorage.getJSON('pro_search_history', ["6979222", "545318", "xqc"]),
 
-    // User preferences
-    notificationsEnabled: SafeStorage.getItem('pro_notify_enabled', 'false') === 'true',
-
     // Device identifier (generated once and persisted)
     did: SafeStorage.getItem('pro_did') || '100000' + Math.random().toString(36).substring(2),
 
@@ -200,7 +197,7 @@ export const state = {
     // Visual effects
     snowEnabled: SafeStorage.getItem('pro_snow_enabled', 'false') === 'true',
 
-    // Status change notifications
+    // Status change messages
     // 🔥 优化：previousLiveStatus 现在从 localStorage 恢复（避免页面刷新后误报）
     previousLiveStatus: SafeStorage.getJSON('pro_previous_live_status', {}), // Stores previous online status
     statusChangeQueue: [], // Status change message queue
@@ -271,18 +268,6 @@ export function updateRooms(newRooms, immediate = false) {
 export function updateSearchHistory(newHistory, immediate = false) {
     state.searchHistory = newHistory;
     debouncedStorageWrite('pro_search_history', newHistory, immediate);
-}
-
-/**
- * Update notifications enabled status
- * @param {boolean} enabled - Whether notifications are enabled
- */
-export function updateNotificationsEnabled(enabled) {
-    const oldValue = state.notificationsEnabled;
-    state.notificationsEnabled = enabled;
-    debouncedStorageSet('pro_notify_enabled', enabled);
-
-    notifyListeners('notificationsEnabled', enabled, oldValue);
 }
 
 /**
@@ -469,14 +454,6 @@ export function getSearchHistory() {
  */
 export function getDid() {
     return state.did;
-}
-
-/**
- * Check if notifications are enabled
- * @returns {boolean} True if notifications are enabled
- */
-export function isNotificationsEnabled() {
-    return state.notificationsEnabled;
 }
 
 /**

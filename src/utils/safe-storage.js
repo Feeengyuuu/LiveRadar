@@ -34,7 +34,6 @@ const CONFIG = {
     // Keys that should never be auto-deleted (in order of priority)
     PROTECTED_KEYS: [
         'pro_monitored_rooms',   // User's room list - most important
-        'pro_notify_enabled',    // User preferences
         'pro_auto_refresh',
         'pro_snow_enabled',
         'pro_did'                // Device ID

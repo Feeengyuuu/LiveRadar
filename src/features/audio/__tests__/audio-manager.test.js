@@ -12,13 +12,13 @@ const mocks = vi.hoisted(() => {
 
     return {
         audio,
-        getNotificationAudio: vi.fn(() => audio),
+        getYahahaAudio: vi.fn(() => audio),
         showToast: vi.fn()
     };
 });
 
-vi.mock('../notification-audio.js', () => ({
-    getNotificationAudio: mocks.getNotificationAudio
+vi.mock('../sound-effects.js', () => ({
+    getYahahaAudio: mocks.getYahahaAudio
 }));
 
 vi.mock('../../../utils/helpers.js', () => ({
@@ -37,11 +37,11 @@ describe('audio-manager', () => {
         mocks.audio.currentTime = 5;
         mocks.audio.play.mockResolvedValue(undefined);
         mocks.audio.pause.mockReset();
-        mocks.getNotificationAudio.mockImplementation(() => mocks.audio);
+        mocks.getYahahaAudio.mockImplementation(() => mocks.audio);
         mocks.showToast.mockReset();
     });
 
-    it('unlocks notification audio without requiring a keepalive audio element', async () => {
+    it('unlocks sound effects without requiring a keepalive audio element', async () => {
         initAudioManager();
 
         const unlocked = await unlockAllAudio();
@@ -51,7 +51,7 @@ describe('audio-manager', () => {
         expect(mocks.audio.play).toHaveBeenCalledTimes(1);
         expect(mocks.audio.pause).toHaveBeenCalledTimes(1);
         expect(mocks.audio.currentTime).toBe(0);
-        expect(mocks.showToast).toHaveBeenCalledWith('音效已激活', 'info');
+        expect(mocks.showToast).toHaveBeenCalledWith('Audio enabled', 'info');
     });
 
     it('supports silent unlocks for the secret audio path', async () => {
