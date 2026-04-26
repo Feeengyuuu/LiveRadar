@@ -25,11 +25,8 @@ function setMusicPlayerShellReady(isReady) {
 }
 
 function scheduleTask(callback) {
-    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-        window.requestIdleCallback(() => callback(), { timeout: 1500 });
-        return;
-    }
-
+    // Keep the player lazy-loaded, but do not wait for an idle slot: the widget
+    // is user-facing and should be ready as soon as the main app is interactive.
     setTimeout(callback, 0);
 }
 

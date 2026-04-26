@@ -1,25 +1,5 @@
-/**
- * ====================================================================
- * 音乐播放器 - 悬浮小工具
- * ====================================================================
- *
- * Features:
- * - 自动解析音频元数据（标题、艺术家）
- * - 可拖动进度条
- * - 音量控制
- * - 最小化/展开状态
- * - 本地存储音量和播放状态
- * - 自动循环播放
- *
- * @module features/music-player
- */
-
 import SafeStorage from '../../utils/safe-storage.js';
 import '../../styles/components/music-player.css';
-
-// ====================================================================
-// 配置
-// ====================================================================
 
 function assetUrl(path) {
     return `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
@@ -28,13 +8,13 @@ function assetUrl(path) {
 const PLAYLIST = [
     {
         title: "Travelers' Encore",
-        artist: "Andrew Prahlow",
+        artist: 'Andrew Prahlow',
         path: assetUrl('music/Andrew Prahlow - Outer Wilds- Echoes of the Eye (The Lost Reels) -Deluxe Original Game Soundtrack- - 21 Travelers\' encore.mp3'),
         cover: assetUrl('covers/cover_travelers_encore.png')
     },
     {
-        title: "Outer Wilds",
-        artist: "Andrew Prahlow",
+        title: 'Outer Wilds',
+        artist: 'Andrew Prahlow',
         path: assetUrl('music/Outer Wilds.mp3'),
         cover: assetUrl('covers/cover_outer_wilds.jpg')
     }
@@ -45,26 +25,19 @@ const CONFIG = {
     SAVE_VOLUME_KEY: 'music_player_volume',
     SAVE_MINIMIZED_KEY: 'music_player_minimized',
     SAVE_CURRENT_TRACK_KEY: 'music_player_current_track',
+    ANIMATION_DURATION_MS: 220,
+    TRACK_COMPLETE_HOLD_MS: 120,
 };
 
-// ====================================================================
-// 状态管理
-// ====================================================================
+const LABELS = {
+    play: '\u64ad\u653e',
+    pause: '\u6682\u505c',
+    expand: '\u5c55\u5f00\u97f3\u4e50\u64ad\u653e\u5668',
+    collapse: '\u6536\u8d77\u97f3\u4e50\u64ad\u653e\u5668',
+    playTrack: '\u64ad\u653e',
+    musicNote: '\uD83C\uDFB5',
+};
 
-let audio = null;
-let isPlaying = false;
-let isDraggingProgress = false;
-let isDraggingVolume = false;
-let isMinimized = SafeStorage.getItem(CONFIG.SAVE_MINIMIZED_KEY, 'true') === 'true';
-let currentTrackIndex = parseInt(SafeStorage.getItem(CONFIG.SAVE_CURRENT_TRACK_KEY, '0'), 10);
-let hasEverPlayed = false; // 标记是否曾经播放过，用于控制封面显示
-let isAnimating = false;
-let dragListenersBound = false;
-let isInitialized = false;
-let completionTimer = null;
-
-const ANIMATION_DURATION_MS = 420;
-const TRACK_COMPLETE_HOLD_MS = 120;
 const PLAYER_INTERACTIVE_SELECTOR = [
     'button',
     'a',
@@ -76,719 +49,857 @@ const PLAYER_INTERACTIVE_SELECTOR = [
     '.playlist-items',
 ].join(',');
 
-// ====================================================================
-// DOM元素引用
-// ====================================================================
+let controller = null;
 
-const elements = {
-    player: null,
-    header: null,
-    playBtn: null,
-    prevBtn: null,
-    nextBtn: null,
-    progressBar: null,
-    progressFill: null,
-    currentTime: null,
-    totalTime: null,
-    volumeSlider: null,
-    volumeFill: null,
-    toggleBtn: null,
-    title: null,
-    artist: null,
-    cover: null,
-    progressRing: null,
-    playlistContainer: null,
-};
+class MusicPlayerController {
+    constructor() {
+        this.elements = {};
+        this.audio = null;
+        this.cleanups = [];
+        this.activeDragCleanups = [];
+        this.completionTimer = null;
+        this.animationTimer = null;
+        this.animationFinish = null;
+        this.animationCleanup = null;
+        this.dragKind = null;
+        this.ready = false;
 
-/**
- * 存储播放列表项的点击事件处理函数引用
- * 用于正确移除事件监听器，防止内存泄漏
- * @type {WeakMap<HTMLElement, Function>}
- */
-const playlistItemHandlers = new WeakMap();
-const playlistItemKeyHandlers = new WeakMap();
-
-// ====================================================================
-// 初始化
-// ====================================================================
-
-export function initMusicPlayer() {
-    if (isInitialized) return;
-
-    // 获取DOM元素
-    elements.player = document.getElementById('music-player');
-    elements.header = elements.player?.querySelector('.player-header') || null;
-    elements.playBtn = document.getElementById('music-play-btn');
-    elements.prevBtn = document.getElementById('music-prev-btn');
-    elements.nextBtn = document.getElementById('music-next-btn');
-    elements.progressBar = document.getElementById('music-progress-bar');
-    elements.progressFill = document.getElementById('music-progress-fill');
-    elements.currentTime = document.getElementById('music-current-time');
-    elements.totalTime = document.getElementById('music-total-time');
-    elements.volumeSlider = document.getElementById('music-volume-slider');
-    elements.volumeFill = document.getElementById('music-volume-fill');
-    elements.toggleBtn = document.getElementById('music-toggle-btn');
-    elements.title = document.getElementById('music-title');
-    elements.artist = document.getElementById('music-artist');
-    elements.cover = document.getElementById('music-cover');
-    elements.progressRing = ensureProgressRing();
-    elements.playlistContainer = document.getElementById('music-playlist-items');
-
-    if (!elements.player) {
-        console.error('[MusicPlayer] Player element not found');
-        return;
+        this.state = {
+            playing: false,
+            minimized: SafeStorage.getItem(CONFIG.SAVE_MINIMIZED_KEY, 'true') === 'true',
+            currentTrackIndex: readStoredTrackIndex(),
+            playbackStarted: false,
+            animating: false,
+        };
     }
 
-    elements.player.classList.add('intro');
-    const onIntroEnd = (event) => {
-        if (event.target !== elements.player || event.animationName !== 'slideInUp') return;
-        elements.player.classList.remove('intro');
-        elements.player.removeEventListener('animationend', onIntroEnd);
-    };
-    elements.player.addEventListener('animationend', onIntroEnd);
-    setTimeout(() => {
-        elements.player.classList.remove('intro');
-        elements.player.removeEventListener('animationend', onIntroEnd);
-    }, 500);
+    init() {
+        if (!this.collectElements()) return false;
 
-    // 确保currentTrackIndex有效
-    if (!Number.isFinite(currentTrackIndex) || currentTrackIndex < 0 || currentTrackIndex >= PLAYLIST.length) {
-        currentTrackIndex = 0;
+        const track = this.currentTrack();
+        this.audio = new Audio(track.path);
+        this.audio.loop = false;
+        this.audio.preload = 'metadata';
+
+        this.ensureProgressRing();
+        this.restoreAudioSettings();
+        this.renderPlaylist();
+        this.syncTrackUI();
+        this.syncProgressUI(0);
+        this.bindEvents();
+        this.applyMinimizedState(this.state.minimized, { animate: false, persist: false });
+        this.addIntroAnimation();
+
+        this.ready = true;
+        return true;
     }
 
-    // 创建音频对象
-    audio = new Audio(PLAYLIST[currentTrackIndex].path);
-    audio.loop = false; // 不循环单曲，播放完后切换下一首
+    collectElements() {
+        const player = document.getElementById('music-player');
+        if (!player) {
+            console.error('[MusicPlayer] Player element not found');
+            return false;
+        }
 
-    // 从本地存储恢复音量
-    const savedVolume = parseFloat(SafeStorage.getItem(CONFIG.SAVE_VOLUME_KEY, CONFIG.DEFAULT_VOLUME.toString()));
-    audio.volume = savedVolume;
-    updateVolumeUI(savedVolume);
-    syncProgressUI(0);
+        this.elements = {
+            player,
+            header: player.querySelector('.player-header'),
+            playBtn: document.getElementById('music-play-btn'),
+            prevBtn: document.getElementById('music-prev-btn'),
+            nextBtn: document.getElementById('music-next-btn'),
+            progressBar: document.getElementById('music-progress-bar'),
+            progressFill: document.getElementById('music-progress-fill'),
+            currentTime: document.getElementById('music-current-time'),
+            totalTime: document.getElementById('music-total-time'),
+            volumeSlider: document.getElementById('music-volume-slider'),
+            volumeFill: document.getElementById('music-volume-fill'),
+            toggleBtn: document.getElementById('music-toggle-btn'),
+            title: document.getElementById('music-title'),
+            artist: document.getElementById('music-artist'),
+            cover: document.getElementById('music-cover'),
+            playlistContainer: document.getElementById('music-playlist-items'),
+            progressRing: null,
+        };
 
-    // 恢复最小化状态
-    if (isMinimized) {
-        elements.player.classList.add('minimized');
+        const missing = [
+            'playBtn',
+            'prevBtn',
+            'nextBtn',
+            'progressBar',
+            'progressFill',
+            'currentTime',
+            'totalTime',
+            'volumeSlider',
+            'volumeFill',
+            'toggleBtn',
+            'title',
+            'artist',
+            'cover',
+            'playlistContainer',
+        ].filter((key) => !this.elements[key]);
+
+        if (missing.length > 0) {
+            console.error(`[MusicPlayer] Missing required elements: ${missing.join(', ')}`);
+            return false;
+        }
+
+        return true;
     }
-    updatePlayerDisclosureUI();
 
-    // 绑定事件
-    bindEvents();
+    bindEvents() {
+        this.on(this.elements.playBtn, 'click', (event) => {
+            event.stopPropagation();
+            this.togglePlay();
+        });
 
-    // 创建播放列表UI
-    createPlaylist();
+        this.on(this.elements.prevBtn, 'click', (event) => {
+            event.stopPropagation();
+            this.playPreviousTrack();
+        });
 
-    // 加载当前曲目信息
-    loadTrackInfo();
+        this.on(this.elements.nextBtn, 'click', (event) => {
+            event.stopPropagation();
+            this.playNextTrack();
+        });
 
-    isInitialized = true;
+        this.bindSlider(this.elements.progressBar, 'progress');
+        this.bindSlider(this.elements.volumeSlider, 'volume');
 
-    console.log('[MusicPlayer] Initialized successfully');
-    console.log('[MusicPlayer] Playlist:', PLAYLIST);
-    console.log('[MusicPlayer] Current track:', currentTrackIndex);
-}
+        this.on(this.elements.toggleBtn, 'click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            this.toggleMinimize();
+        });
 
-// ====================================================================
-// 事件绑定
-// ====================================================================
+        this.on(this.elements.header, 'click', (event) => {
+            if (this.state.minimized || this.state.animating || this.isInteractiveTarget(event.target)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.applyMinimizedState(true);
+        });
 
-// 存储事件处理函数的引用，以便移除
-const eventHandlers = {
-    playBtnClick: (e) => {
-        e.stopPropagation();
-        togglePlay();
-    },
-    prevBtnClick: (e) => {
-        e.stopPropagation();
-        playPrevTrack();
-    },
-    nextBtnClick: (e) => {
-        e.stopPropagation();
-        playNextTrack();
-    },
-    progressBarMouseDown: (e) => {
-        e.stopPropagation();
-        startDraggingProgress(e);
-    },
-    progressBarClick: (e) => {
-        e.stopPropagation();
-        seekProgress(e);
-    },
-    progressBarKeydown: (e) => {
-        e.stopPropagation();
-        handleProgressKeydown(e);
-    },
-    progressBarTouchStart: (e) => {
-        e.stopPropagation();
-        startDraggingProgress(e);
-    },
-    volumeSliderMouseDown: (e) => {
-        e.stopPropagation();
-        startDraggingVolume(e);
-    },
-    volumeSliderClick: (e) => {
-        e.stopPropagation();
-        adjustVolume(e);
-    },
-    volumeSliderKeydown: (e) => {
-        e.stopPropagation();
-        handleVolumeKeydown(e);
-    },
-    volumeSliderTouchStart: (e) => {
-        e.stopPropagation();
-        startDraggingVolume(e);
-    },
-    toggleBtnClick: (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        console.log('[MusicPlayer] Toggle button clicked, current state:', isMinimized);
-        toggleMinimize();
-    },
-    headerClick: (e) => {
-        if (isMinimized || isAnimating || isInteractivePlayerTarget(e.target)) return;
+        this.on(this.elements.player, 'click', (event) => {
+            this.handlePlayerSurfaceClick(event);
+        });
 
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('[MusicPlayer] Header clicked while expanded, minimizing...');
-        toggleMinimize();
-    },
-    playerClick: (e) => {
-        if (isMinimized && !elements.toggleBtn.contains(e.target)) {
-            console.log('[MusicPlayer] Player clicked while minimized');
-            toggleMinimize();
-        } else if (!isMinimized) {
-            if (!isAnimating && !isInteractivePlayerTarget(e.target)) {
-                console.log('[MusicPlayer] Expanded panel surface clicked, minimizing...');
-                toggleMinimize();
+        this.on(this.elements.cover, 'click', (event) => {
+            if (!this.state.minimized) return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.applyMinimizedState(false);
+        });
+
+        this.on(document, 'click', (event) => {
+            const { player } = this.elements;
+            if (!this.state.minimized && player && !player.contains(event.target)) {
+                this.applyMinimizedState(true);
             }
-            e.stopPropagation();
-        }
-    },
-    coverClick: (e) => {
-        if (isMinimized) {
-            e.stopPropagation();
-            console.log('[MusicPlayer] Cover clicked while minimized');
-            toggleMinimize();
-        }
-    },
-    outsideClick: (e) => {
-        if (!isMinimized && elements.player && !elements.player.contains(e.target)) {
-            console.log('[MusicPlayer] Clicked outside, minimizing...');
-            toggleMinimize();
-        }
+        });
+
+        this.on(this.audio, 'timeupdate', () => {
+            if (this.dragKind !== 'progress') this.syncProgressUI();
+        });
+        this.on(this.audio, 'loadedmetadata', () => this.handleMetadataLoaded());
+        this.on(this.audio, 'ended', () => this.handleAudioEnded());
+        this.on(this.audio, 'play', () => this.handlePlay());
+        this.on(this.audio, 'playing', () => this.setPlayerStatus('ready'));
+        this.on(this.audio, 'pause', () => this.handlePause());
+        this.on(this.audio, 'loadstart', () => this.setPlayerStatus('loading'));
+        this.on(this.audio, 'canplay', () => this.setPlayerStatus('ready'));
+        this.on(this.audio, 'waiting', () => this.setPlayerStatus('loading'));
+        this.on(this.audio, 'error', () => this.setPlayerStatus('error'));
     }
-};
 
-function bindEvents() {
-    // 播放/暂停
-    elements.playBtn.addEventListener('click', eventHandlers.playBtnClick);
+    bindSlider(slider, kind) {
+        const start = (event) => {
+            this.startDrag(kind, event);
+        };
+        const keydown = (event) => {
+            if (kind === 'progress') {
+                this.handleProgressKeydown(event);
+            } else {
+                this.handleVolumeKeydown(event);
+            }
+        };
 
-    // 上一曲
-    elements.prevBtn.addEventListener('click', eventHandlers.prevBtnClick);
+        if (typeof window !== 'undefined' && 'PointerEvent' in window) {
+            this.on(slider, 'pointerdown', start);
+        } else {
+            this.on(slider, 'mousedown', start);
+            this.on(slider, 'touchstart', start, { passive: false });
+        }
 
-    // 下一曲
-    elements.nextBtn.addEventListener('click', eventHandlers.nextBtnClick);
+        this.on(slider, 'keydown', keydown);
+    }
 
-    // 进度条拖动
-    elements.progressBar.addEventListener('mousedown', eventHandlers.progressBarMouseDown);
-    elements.progressBar.addEventListener('click', eventHandlers.progressBarClick);
-    elements.progressBar.addEventListener('keydown', eventHandlers.progressBarKeydown);
+    on(target, type, handler, options) {
+        if (!target) return;
+        target.addEventListener(type, handler, options);
+        this.cleanups.push(() => target.removeEventListener(type, handler, options));
+    }
 
-    // 音量拖动
-    elements.volumeSlider.addEventListener('mousedown', eventHandlers.volumeSliderMouseDown);
-    elements.volumeSlider.addEventListener('click', eventHandlers.volumeSliderClick);
-    elements.volumeSlider.addEventListener('keydown', eventHandlers.volumeSliderKeydown);
+    togglePlay() {
+        if (!this.audio) return;
 
-    // 触摸事件支持
-    elements.progressBar.addEventListener('touchstart', eventHandlers.progressBarTouchStart);
-    elements.volumeSlider.addEventListener('touchstart', eventHandlers.volumeSliderTouchStart);
+        if (this.state.playing) {
+            this.audio.pause();
+            return;
+        }
 
-    // 最小化/展开
-    elements.toggleBtn.addEventListener('click', eventHandlers.toggleBtnClick);
-    elements.header?.addEventListener('click', eventHandlers.headerClick);
+        this.playAudio();
+    }
 
-    // 播放器点击事件（包含缩小状态展开和阻止冒泡）
-    elements.player.addEventListener('click', eventHandlers.playerClick);
+    playAudio() {
+        if (!this.audio) return;
 
-    // 缩小状态下点击封面也可以展开
-    elements.cover.addEventListener('click', eventHandlers.coverClick);
-
-    // 点击外部区域自动折叠
-    document.addEventListener('click', eventHandlers.outsideClick);
-
-    // 音频事件
-    audio.addEventListener('timeupdate', updateProgress);
-    audio.addEventListener('loadedmetadata', onMetadataLoaded);
-    audio.addEventListener('ended', onAudioEnded);
-    audio.addEventListener('play', onPlay);
-    audio.addEventListener('pause', onPause);
-}
-
-// ====================================================================
-// 播放控制
-// ====================================================================
-
-function togglePlay() {
-    if (isPlaying) {
-        audio.pause();
-    } else {
-        audio.play().catch(err => {
-            console.error('[MusicPlayer] Play failed:', err);
+        this.setPlayerStatus('loading');
+        this.audio.play().catch((error) => {
+            console.error('[MusicPlayer] Play failed:', error);
+            this.setPlayerStatus('error');
         });
     }
-}
 
-function onPlay() {
-    isPlaying = true;
-    updatePlayButtonUI(true);
-    elements.cover.classList.add('playing');
-    elements.player.classList.add('playing'); // 给整个播放器添加playing类，用于缩小状态的呼吸灯
-
-    // 第一次播放时标记并更新封面显示
-    if (!hasEverPlayed) {
-        hasEverPlayed = true;
-        loadTrackInfo(); // 重新加载信息以显示封面
-    }
-}
-
-function onPause() {
-    isPlaying = false;
-    updatePlayButtonUI(false);
-    elements.cover.classList.remove('playing');
-    elements.player.classList.remove('playing'); // 移除整个播放器的playing类
-}
-
-function onAudioEnded() {
-    syncProgressUI(1);
-    clearCompletionTimer();
-    completionTimer = setTimeout(() => {
-        completionTimer = null;
-        playNextTrack();
-    }, TRACK_COMPLETE_HOLD_MS);
-}
-
-function updatePlayButtonUI(playing) {
-    const icon = elements.playBtn.querySelector('svg use');
-    if (icon) {
-        icon.setAttribute('href', playing ? '#icon-pause' : '#icon-play');
-    }
-    elements.playBtn.setAttribute('aria-pressed', playing.toString());
-    elements.playBtn.title = playing ? '暂停' : '播放';
-}
-
-// ====================================================================
-// 进度控制
-// ====================================================================
-
-function updateProgress() {
-    if (isDraggingProgress) return;
-
-    syncProgressUI();
-}
-
-function ensureProgressRing() {
-    const cover = document.getElementById('music-cover');
-    if (!cover) return null;
-
-    let ring = cover.querySelector('.player-progress-ring');
-    if (!ring) {
-        ring = document.createElement('span');
-        ring.className = 'player-progress-ring';
-        ring.setAttribute('aria-hidden', 'true');
-        cover.prepend(ring);
+    handlePlay() {
+        this.state.playing = true;
+        this.state.playbackStarted = true;
+        this.setPlayerStatus('ready');
+        this.updatePlayButtonUI();
+        this.syncTrackUI();
+        this.elements.cover.classList.add('playing');
+        this.elements.player.classList.add('playing');
     }
 
-    return ring;
-}
-
-function getPlaybackProgressRatio() {
-    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) {
-        return 0;
+    handlePause() {
+        this.state.playing = false;
+        this.updatePlayButtonUI();
+        this.elements.cover.classList.remove('playing');
+        this.elements.player.classList.remove('playing');
     }
 
-    return Math.max(0, Math.min(1, audio.currentTime / audio.duration));
-}
-
-function syncProgressUI(ratio = getPlaybackProgressRatio()) {
-    const safeRatio = Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
-    const percent = safeRatio * 100;
-    const angle = safeRatio * 360;
-
-    if (elements.progressFill) {
-        elements.progressFill.style.width = `${percent}%`;
-    }
-    if (elements.currentTime && audio) {
-        elements.currentTime.textContent = formatTime(audio.currentTime);
-    }
-    if (elements.progressBar && audio) {
-        const now = Math.round(percent);
-        const total = Number.isFinite(audio.duration) ? formatTime(audio.duration) : '0:00';
-        elements.progressBar.setAttribute('aria-valuenow', now.toString());
-        elements.progressBar.setAttribute('aria-valuetext', `${formatTime(audio.currentTime)} / ${total}`);
-    }
-    setProgressRingVars(elements.player, angle);
-    setProgressRingVars(elements.cover, angle);
-    setProgressRingVars(elements.progressRing, angle);
-}
-
-function setProgressRingVars(target, angle) {
-    if (!target) return;
-
-    target.style.setProperty('--music-progress-angle-soft', `${angle * 0.34}deg`);
-    target.style.setProperty('--music-progress-angle-mid', `${angle * 0.68}deg`);
-    target.style.setProperty('--music-progress-angle', `${angle}deg`);
-}
-
-function clearCompletionTimer() {
-    if (!completionTimer) return;
-    clearTimeout(completionTimer);
-    completionTimer = null;
-}
-
-function startDraggingProgress(e) {
-    bindDragListeners();
-    isDraggingProgress = true;
-    seekProgress(e);
-}
-
-function seekProgress(e) {
-    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) {
-        syncProgressUI(0);
-        return;
+    handleAudioEnded() {
+        this.syncProgressUI(1);
+        this.clearCompletionTimer();
+        this.completionTimer = setTimeout(() => {
+            this.completionTimer = null;
+            this.playNextTrack();
+        }, CONFIG.TRACK_COMPLETE_HOLD_MS);
     }
 
-    const rect = elements.progressBar.getBoundingClientRect();
-    const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-    const offsetX = clientX - rect.left;
-    const percent = Math.max(0, Math.min(1, offsetX / rect.width));
-
-    audio.currentTime = percent * audio.duration;
-    syncProgressUI(percent);
-}
-
-function handleProgressKeydown(e) {
-    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
-
-    const step = Math.max(5, audio.duration * 0.03);
-    const pageStep = Math.max(15, audio.duration * 0.1);
-    let nextTime = audio.currentTime;
-
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-        nextTime -= step;
-    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-        nextTime += step;
-    } else if (e.key === 'PageDown') {
-        nextTime -= pageStep;
-    } else if (e.key === 'PageUp') {
-        nextTime += pageStep;
-    } else if (e.key === 'Home') {
-        nextTime = 0;
-    } else if (e.key === 'End') {
-        nextTime = audio.duration;
-    } else {
-        return;
+    playPreviousTrack() {
+        const previousIndex = wrapIndex(this.state.currentTrackIndex - 1);
+        this.selectTrack(previousIndex, { forcePlay: true });
     }
 
-    e.preventDefault();
-    audio.currentTime = Math.max(0, Math.min(audio.duration, nextTime));
-    syncProgressUI();
-}
-
-// ====================================================================
-// 音量控制
-// ====================================================================
-
-function startDraggingVolume(e) {
-    bindDragListeners();
-    isDraggingVolume = true;
-    adjustVolume(e);
-}
-
-function adjustVolume(e) {
-    const rect = elements.volumeSlider.getBoundingClientRect();
-    const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-    const offsetX = clientX - rect.left;
-    const percent = Math.max(0, Math.min(1, offsetX / rect.width));
-
-    audio.volume = percent;
-    updateVolumeUI(percent);
-    SafeStorage.setItem(CONFIG.SAVE_VOLUME_KEY, percent.toString());
-}
-
-function updateVolumeUI(volume) {
-    elements.volumeFill.style.width = `${volume * 100}%`;
-    elements.volumeSlider?.setAttribute('aria-valuenow', Math.round(volume * 100).toString());
-    elements.volumeSlider?.setAttribute('aria-valuetext', `${Math.round(volume * 100)}%`);
-}
-
-function handleVolumeKeydown(e) {
-    if (!audio) return;
-
-    let nextVolume = audio.volume;
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-        nextVolume -= 0.05;
-    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-        nextVolume += 0.05;
-    } else if (e.key === 'PageDown') {
-        nextVolume -= 0.1;
-    } else if (e.key === 'PageUp') {
-        nextVolume += 0.1;
-    } else if (e.key === 'Home') {
-        nextVolume = 0;
-    } else if (e.key === 'End') {
-        nextVolume = 1;
-    } else {
-        return;
+    playNextTrack() {
+        const nextIndex = wrapIndex(this.state.currentTrackIndex + 1);
+        this.selectTrack(nextIndex, { forcePlay: true });
     }
 
-    e.preventDefault();
-    audio.volume = Math.max(0, Math.min(1, nextVolume));
-    updateVolumeUI(audio.volume);
-    SafeStorage.setItem(CONFIG.SAVE_VOLUME_KEY, audio.volume.toString());
-}
+    selectTrack(index, options = {}) {
+        const nextIndex = clampTrackIndex(index);
+        const isCurrentTrack = nextIndex === this.state.currentTrackIndex;
 
-// ====================================================================
-// 鼠标/触摸事件处理
-// ====================================================================
-
-function handleMouseMove(e) {
-    if (isDraggingProgress) {
-        seekProgress(e);
-    } else if (isDraggingVolume) {
-        adjustVolume(e);
-    }
-}
-
-function handleTouchMove(e) {
-    if (isDraggingProgress || isDraggingVolume) {
-        e.preventDefault();
-        handleMouseMove(e);
-    }
-}
-
-function handleMouseUp() {
-    isDraggingProgress = false;
-    isDraggingVolume = false;
-    unbindDragListeners();
-}
-
-function bindDragListeners() {
-    if (dragListenersBound) return;
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleMouseUp);
-    document.addEventListener('touchcancel', handleMouseUp);
-
-    dragListenersBound = true;
-}
-
-function unbindDragListeners() {
-    if (!dragListenersBound) return;
-
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-    document.removeEventListener('touchmove', handleTouchMove);
-    document.removeEventListener('touchend', handleMouseUp);
-    document.removeEventListener('touchcancel', handleMouseUp);
-
-    dragListenersBound = false;
-}
-
-// ====================================================================
-// 最小化/展开
-// ====================================================================
-
-function isInteractivePlayerTarget(target) {
-    if (!(target instanceof Element)) return false;
-    return Boolean(target.closest(PLAYER_INTERACTIVE_SELECTOR));
-}
-
-function updatePlayerDisclosureUI() {
-    if (!elements.player) return;
-
-    const isExpanded = !isMinimized;
-    elements.player.setAttribute('aria-expanded', isExpanded.toString());
-    elements.player.dataset.state = isExpanded ? 'expanded' : 'minimized';
-
-    if (elements.toggleBtn) {
-        elements.toggleBtn.setAttribute('aria-expanded', isExpanded.toString());
-        elements.toggleBtn.setAttribute('aria-label', isExpanded ? '收起音乐播放器' : '展开音乐播放器');
-        elements.toggleBtn.title = isExpanded ? '收起音乐播放器' : '展开音乐播放器';
-    }
-
-    if (elements.header) {
-        elements.header.title = isExpanded ? '收起音乐播放器' : '展开音乐播放器';
-    }
-}
-
-function measureExpandedHeight() {
-    const player = elements.player;
-    if (!player) return 0;
-
-    const wasMinimized = player.classList.contains('minimized');
-    if (wasMinimized) {
-        player.classList.add('measuring');
-        player.classList.remove('minimized');
-        // Force reflow to ensure layout updates
-        void player.offsetHeight;
-    }
-
-    const height = player.scrollHeight || 0;
-
-    if (wasMinimized) {
-        player.classList.add('minimized');
-        player.classList.remove('measuring');
-    }
-
-    return height;
-}
-
-function finalizeAnimation(type) {
-    const player = elements.player;
-    if (!player || !isAnimating) return;
-
-    if (type === 'expand') {
-        player.classList.remove('expanding');
-    } else {
-        player.classList.remove('collapsing');
-        player.classList.add('minimized');
-    }
-
-    player.classList.remove('is-animating');
-    player.style.removeProperty('--player-open-height');
-    updatePlayerDisclosureUI();
-    isAnimating = false;
-}
-
-function toggleMinimize() {
-    if (!elements.player || isAnimating) return;
-
-    const player = elements.player;
-    player.classList.remove('intro');
-    isMinimized = !isMinimized;
-    console.log('[MusicPlayer] toggleMinimize called, new state:', isMinimized);
-    isAnimating = true;
-    updatePlayerDisclosureUI();
-
-    if (!isMinimized) {
-        const expandedHeight = measureExpandedHeight();
-        if (expandedHeight) {
-            player.style.setProperty('--player-open-height', `${expandedHeight}px`);
+        if (isCurrentTrack) {
+            if (options.toggleCurrent) this.togglePlay();
+            return;
         }
-        player.classList.remove('minimized');
-        player.classList.add('expanding', 'is-animating');
 
-        const onEnd = (event) => {
-            if (event.target !== player || event.animationName !== 'playerExpand') return;
-            player.removeEventListener('animationend', onEnd);
-            finalizeAnimation('expand');
+        this.clearCompletionTimer();
+        const shouldPlay = Boolean(options.forcePlay || (options.keepPlaybackState && this.state.playing));
+
+        if (this.audio) {
+            this.audio.pause();
+            this.audio.currentTime = 0;
+        }
+
+        this.state.currentTrackIndex = nextIndex;
+        SafeStorage.setItem(CONFIG.SAVE_CURRENT_TRACK_KEY, nextIndex.toString());
+
+        const track = this.currentTrack();
+        this.audio.src = track.path;
+        this.setPlayerStatus('loading');
+        this.audio.load();
+        this.syncProgressUI(0);
+        this.syncTrackUI();
+        this.updatePlaylistUI();
+
+        if (shouldPlay) this.playAudio();
+    }
+
+    startDrag(kind, event) {
+        if (event.cancelable) event.preventDefault();
+        event.stopPropagation();
+
+        this.dragKind = kind;
+        this.applyDragValue(event);
+        this.bindActiveDragListeners(event.type);
+    }
+
+    bindActiveDragListeners(startType) {
+        this.clearActiveDragListeners();
+
+        const move = (event) => {
+            if (event.cancelable) event.preventDefault();
+            this.applyDragValue(event);
         };
-        player.addEventListener('animationend', onEnd);
-        setTimeout(() => finalizeAnimation('expand'), ANIMATION_DURATION_MS + 80);
-    } else {
-        const expandedHeight = player.scrollHeight || measureExpandedHeight();
-        if (expandedHeight) {
-            player.style.setProperty('--player-open-height', `${expandedHeight}px`);
-        }
-        player.classList.add('collapsing', 'is-animating');
-
-        const onEnd = (event) => {
-            if (event.target !== player || event.animationName !== 'playerCollapse') return;
-            player.removeEventListener('animationend', onEnd);
-            finalizeAnimation('collapse');
+        const end = () => {
+            this.dragKind = null;
+            this.clearActiveDragListeners();
         };
-        player.addEventListener('animationend', onEnd);
-        setTimeout(() => finalizeAnimation('collapse'), ANIMATION_DURATION_MS + 80);
-    }
+        const add = (type, handler, options) => {
+            document.addEventListener(type, handler, options);
+            this.activeDragCleanups.push(() => document.removeEventListener(type, handler, options));
+        };
 
-    SafeStorage.setItem(CONFIG.SAVE_MINIMIZED_KEY, isMinimized.toString());
-}
-
-// ====================================================================
-// 播放列表管理
-// ====================================================================
-
-function createPlaylist() {
-    if (!elements.playlistContainer) {
-        console.warn('[MusicPlayer] Playlist container not found');
-        return;
-    }
-
-    // 清空容器
-    elements.playlistContainer.textContent = '';
-
-    // 为每首歌创建列表项
-    PLAYLIST.forEach((track, index) => {
-        const item = document.createElement('div');
-        item.className = 'playlist-item';
-        if (index === currentTrackIndex) {
-            item.classList.add('active');
+        if (startType === 'pointerdown') {
+            add('pointermove', move);
+            add('pointerup', end);
+            add('pointercancel', end);
+            return;
         }
-        item.dataset.index = index;
-        item.tabIndex = 0;
-        item.setAttribute('role', 'button');
-        item.setAttribute('aria-pressed', (index === currentTrackIndex).toString());
-        item.setAttribute('aria-label', `播放 ${track.title}`);
 
-        const iconWrap = document.createElement('div');
-        iconWrap.className = 'playlist-item-icon';
-        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        icon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        icon.setAttribute('fill', 'currentColor');
-        icon.setAttribute('viewBox', '0 0 24 24');
-        setPlaylistItemIcon(icon, index === currentTrackIndex);
-        iconWrap.appendChild(icon);
+        if (startType === 'touchstart') {
+            add('touchmove', move, { passive: false });
+            add('touchend', end);
+            add('touchcancel', end);
+            return;
+        }
 
-        const info = document.createElement('div');
-        info.className = 'playlist-item-info';
-        const title = document.createElement('div');
-        title.className = 'playlist-item-title';
-        title.textContent = track.title;
-        const artist = document.createElement('div');
-        artist.className = 'playlist-item-artist';
-        artist.textContent = track.artist;
-        info.append(title, artist);
+        add('mousemove', move);
+        add('mouseup', end);
+    }
 
-        const cover = document.createElement('div');
-        cover.className = 'playlist-item-cover';
+    clearActiveDragListeners() {
+        while (this.activeDragCleanups.length > 0) {
+            const cleanup = this.activeDragCleanups.pop();
+            cleanup();
+        }
+    }
+
+    applyDragValue(event) {
+        if (this.dragKind === 'progress') {
+            this.seekToRatio(this.getPointerRatio(event, this.elements.progressBar));
+            return;
+        }
+
+        if (this.dragKind === 'volume') {
+            this.setVolume(this.getPointerRatio(event, this.elements.volumeSlider));
+        }
+    }
+
+    seekToRatio(ratio) {
+        if (!this.audio || !Number.isFinite(this.audio.duration) || this.audio.duration <= 0) {
+            this.syncProgressUI(0);
+            return;
+        }
+
+        this.audio.currentTime = clamp(ratio) * this.audio.duration;
+        this.syncProgressUI();
+    }
+
+    handleProgressKeydown(event) {
+        if (!this.audio || !Number.isFinite(this.audio.duration) || this.audio.duration <= 0) return;
+
+        const step = Math.max(5, this.audio.duration * 0.03);
+        const pageStep = Math.max(15, this.audio.duration * 0.1);
+        let nextTime = this.audio.currentTime;
+
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+            nextTime -= step;
+        } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+            nextTime += step;
+        } else if (event.key === 'PageDown') {
+            nextTime -= pageStep;
+        } else if (event.key === 'PageUp') {
+            nextTime += pageStep;
+        } else if (event.key === 'Home') {
+            nextTime = 0;
+        } else if (event.key === 'End') {
+            nextTime = this.audio.duration;
+        } else {
+            return;
+        }
+
+        event.preventDefault();
+        this.audio.currentTime = clamp(nextTime / this.audio.duration) * this.audio.duration;
+        this.syncProgressUI();
+    }
+
+    handleVolumeKeydown(event) {
+        if (!this.audio) return;
+
+        let nextVolume = this.audio.volume;
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+            nextVolume -= 0.05;
+        } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+            nextVolume += 0.05;
+        } else if (event.key === 'PageDown') {
+            nextVolume -= 0.1;
+        } else if (event.key === 'PageUp') {
+            nextVolume += 0.1;
+        } else if (event.key === 'Home') {
+            nextVolume = 0;
+        } else if (event.key === 'End') {
+            nextVolume = 1;
+        } else {
+            return;
+        }
+
+        event.preventDefault();
+        this.setVolume(nextVolume);
+    }
+
+    setVolume(volume) {
+        const safeVolume = clamp(volume);
+        this.audio.volume = safeVolume;
+        this.syncVolumeUI();
+        SafeStorage.setItem(CONFIG.SAVE_VOLUME_KEY, safeVolume.toString());
+    }
+
+    syncVolumeUI() {
+        const volume = this.audio ? clamp(this.audio.volume) : CONFIG.DEFAULT_VOLUME;
+        const percent = Math.round(volume * 100);
+        this.elements.volumeFill.style.width = `${percent}%`;
+        this.elements.volumeSlider.setAttribute('aria-valuenow', percent.toString());
+        this.elements.volumeSlider.setAttribute('aria-valuetext', `${percent}%`);
+    }
+
+    syncProgressUI(forcedRatio = null) {
+        const ratio = forcedRatio === null ? this.getPlaybackRatio() : clamp(forcedRatio);
+        const percent = ratio * 100;
+        const angle = ratio * 360;
+        const duration = this.audio?.duration;
+        const currentTime = this.audio?.currentTime || 0;
+        const totalText = Number.isFinite(duration) && duration > 0 ? formatTime(duration) : '0:00';
+
+        this.elements.progressFill.style.width = `${percent}%`;
+        this.elements.currentTime.textContent = formatTime(currentTime);
+        this.elements.totalTime.textContent = totalText;
+        this.elements.progressBar.setAttribute('aria-valuenow', Math.round(percent).toString());
+        this.elements.progressBar.setAttribute('aria-valuetext', `${formatTime(currentTime)} / ${totalText}`);
+
+        this.setProgressRingVars(this.elements.player, angle);
+        this.setProgressRingVars(this.elements.cover, angle);
+        this.setProgressRingVars(this.elements.progressRing, angle);
+    }
+
+    getPlaybackRatio() {
+        if (!this.audio || !Number.isFinite(this.audio.duration) || this.audio.duration <= 0) return 0;
+        return clamp(this.audio.currentTime / this.audio.duration);
+    }
+
+    setProgressRingVars(target, angle) {
+        if (!target) return;
+        target.style.setProperty('--music-progress-angle-soft', `${angle * 0.34}deg`);
+        target.style.setProperty('--music-progress-angle-mid', `${angle * 0.68}deg`);
+        target.style.setProperty('--music-progress-angle', `${angle}deg`);
+    }
+
+    handleMetadataLoaded() {
+        this.setPlayerStatus('ready');
+        this.syncProgressUI();
+    }
+
+    setPlayerStatus(status) {
+        if (!this.elements.player) return;
+
+        this.elements.player.classList.toggle('is-loading', status === 'loading');
+        this.elements.player.classList.toggle('has-error', status === 'error');
+    }
+
+    getPointerRatio(event, element) {
+        const rect = element.getBoundingClientRect();
+        if (!rect.width) return 0;
+
+        return clamp((getClientX(event) - rect.left) / rect.width);
+    }
+
+    applyMinimizedState(minimized, options = {}) {
+        const { animate = true, persist = true } = options;
+        const nextMinimized = Boolean(minimized);
+        const player = this.elements.player;
+
+        if (!player || (this.state.animating && animate)) return;
+
+        player.classList.remove('intro');
+        this.state.minimized = nextMinimized;
+        if (persist) {
+            SafeStorage.setItem(CONFIG.SAVE_MINIMIZED_KEY, nextMinimized.toString());
+        }
+
+        if (!animate) {
+            this.finishAnimation(nextMinimized ? 'collapse' : 'expand', { immediate: true });
+            return;
+        }
+
+        this.startDisclosureAnimation(nextMinimized ? 'collapse' : 'expand');
+    }
+
+    startDisclosureAnimation(type) {
+        const player = this.elements.player;
+        this.clearAnimationTimer();
+        this.state.animating = true;
+        this.updateDisclosureUI();
+        this.setOpenHeight();
+
+        if (type === 'expand') {
+            player.classList.remove('minimized', 'collapsing');
+            player.classList.add('expanding', 'is-animating');
+        } else {
+            player.classList.remove('expanding');
+            player.classList.add('collapsing', 'is-animating');
+        }
+
+        let finished = false;
+        const finish = () => {
+            if (finished) return;
+            finished = true;
+            this.animationCleanup?.();
+            this.animationCleanup = null;
+            this.finishAnimation(type);
+        };
+        const onAnimationEnd = (event) => {
+            if (event.target !== player) return;
+            const expectedName = type === 'expand' ? 'playerExpand' : 'playerCollapse';
+            if (event.animationName !== expectedName) return;
+            finish();
+        };
+
+        this.animationFinish = finish;
+        this.animationCleanup = () => player.removeEventListener('animationend', onAnimationEnd);
+        player.addEventListener('animationend', onAnimationEnd);
+        this.animationTimer = setTimeout(finish, CONFIG.ANIMATION_DURATION_MS + 80);
+    }
+
+    finishAnimation(type, options = {}) {
+        const player = this.elements.player;
+        if (!player) return;
+
+        this.clearAnimationTimer();
+        player.classList.remove('expanding', 'collapsing', 'is-animating');
+        player.classList.toggle('minimized', type === 'collapse');
+        player.style.removeProperty('--player-open-height');
+        this.state.animating = false;
+        this.updateDisclosureUI();
+
+        if (options.immediate) {
+            player.classList.toggle('minimized', this.state.minimized);
+        }
+    }
+
+    clearAnimationTimer() {
+        if (this.animationTimer) {
+            clearTimeout(this.animationTimer);
+            this.animationTimer = null;
+        }
+        this.animationFinish = null;
+        this.animationCleanup?.();
+        this.animationCleanup = null;
+    }
+
+    setOpenHeight() {
+        const height = this.measureOpenHeight();
+        if (height > 0) {
+            this.elements.player.style.setProperty('--player-open-height', `${height}px`);
+        }
+    }
+
+    measureOpenHeight() {
+        const player = this.elements.player;
+        const wasMinimized = player.classList.contains('minimized');
+
+        if (wasMinimized) {
+            player.classList.add('measuring');
+            player.classList.remove('minimized');
+            void player.offsetHeight;
+        }
+
+        const height = player.scrollHeight || 0;
+
+        if (wasMinimized) {
+            player.classList.add('minimized');
+            player.classList.remove('measuring');
+        }
+
+        return height;
+    }
+
+    toggleMinimize() {
+        this.applyMinimizedState(!this.state.minimized);
+    }
+
+    updateDisclosureUI() {
+        const expanded = !this.state.minimized;
+        const label = expanded ? LABELS.collapse : LABELS.expand;
+
+        this.elements.player.setAttribute('aria-expanded', expanded.toString());
+        this.elements.player.dataset.state = expanded ? 'expanded' : 'minimized';
+        this.elements.toggleBtn.setAttribute('aria-expanded', expanded.toString());
+        this.elements.toggleBtn.setAttribute('aria-label', label);
+        this.elements.toggleBtn.title = label;
+        if (this.elements.header) this.elements.header.title = label;
+    }
+
+    handlePlayerSurfaceClick(event) {
+        if (this.state.minimized) {
+            if (!this.isInteractiveTarget(event.target)) {
+                event.preventDefault();
+                event.stopPropagation();
+                this.applyMinimizedState(false);
+            }
+            return;
+        }
+
+        if (!this.state.animating && !this.isInteractiveTarget(event.target)) {
+            event.preventDefault();
+            this.applyMinimizedState(true);
+        }
+        event.stopPropagation();
+    }
+
+    isInteractiveTarget(target) {
+        if (!(target instanceof Element)) return false;
+        return Boolean(target.closest(PLAYER_INTERACTIVE_SELECTOR));
+    }
+
+    renderPlaylist() {
+        const fragment = document.createDocumentFragment();
+
+        PLAYLIST.forEach((track, index) => {
+            const item = document.createElement('div');
+            item.className = 'playlist-item';
+            item.dataset.index = index.toString();
+            item.tabIndex = 0;
+            item.setAttribute('role', 'button');
+            item.setAttribute('aria-label', `${LABELS.playTrack} ${track.title}`);
+
+            const iconWrap = document.createElement('div');
+            iconWrap.className = 'playlist-item-icon';
+            const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            icon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            icon.setAttribute('fill', 'currentColor');
+            icon.setAttribute('viewBox', '0 0 24 24');
+            iconWrap.appendChild(icon);
+
+            const info = document.createElement('div');
+            info.className = 'playlist-item-info';
+            const title = document.createElement('div');
+            title.className = 'playlist-item-title';
+            title.textContent = track.title;
+            const artist = document.createElement('div');
+            artist.className = 'playlist-item-artist';
+            artist.textContent = track.artist;
+            info.append(title, artist);
+
+            const cover = document.createElement('div');
+            cover.className = 'playlist-item-cover';
+            const image = document.createElement('img');
+            image.src = track.cover;
+            image.alt = track.title;
+            image.loading = 'lazy';
+            cover.appendChild(image);
+
+            this.on(item, 'click', (event) => {
+                event.stopPropagation();
+                this.selectTrack(index, { toggleCurrent: true, keepPlaybackState: true });
+            });
+            this.on(item, 'keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                this.selectTrack(index, { toggleCurrent: true, keepPlaybackState: true });
+            });
+
+            item.append(iconWrap, info, cover);
+            fragment.appendChild(item);
+        });
+
+        this.elements.playlistContainer.replaceChildren(fragment);
+        this.updatePlaylistUI();
+    }
+
+    updatePlaylistUI() {
+        const items = this.elements.playlistContainer.querySelectorAll('.playlist-item');
+        items.forEach((item, index) => {
+            const active = index === this.state.currentTrackIndex;
+            item.classList.toggle('active', active);
+            item.setAttribute('aria-pressed', active.toString());
+
+            const icon = item.querySelector('.playlist-item-icon svg');
+            if (icon) setPlaylistItemIcon(icon, active);
+        });
+    }
+
+    syncTrackUI() {
+        const track = this.currentTrack();
+        this.elements.player.classList.remove('has-error');
+        this.elements.title.textContent = track.title;
+        this.elements.artist.textContent = track.artist;
+        this.updatePanelArtwork(track);
+        this.updateCoverArtwork(track);
+        this.updatePlayButtonUI();
+    }
+
+    updatePlayButtonUI() {
+        const use = this.elements.playBtn.querySelector('svg use');
+        if (use) use.setAttribute('href', this.state.playing ? '#icon-pause' : '#icon-play');
+        this.elements.playBtn.setAttribute('aria-pressed', this.state.playing.toString());
+        this.elements.playBtn.title = this.state.playing ? LABELS.pause : LABELS.play;
+    }
+
+    updatePanelArtwork(track) {
+        const player = this.elements.player;
+        if (!track.cover) {
+            player.classList.remove('has-panel-artwork');
+            player.style.removeProperty('--music-panel-cover');
+            delete player.dataset.panelTrack;
+            return;
+        }
+
+        player.style.setProperty('--music-panel-cover', `url("${sanitizeCssUrl(track.cover)}")`);
+        player.dataset.panelTrack = track.title;
+        player.classList.add('has-panel-artwork');
+    }
+
+    updateCoverArtwork(track) {
+        const cover = this.elements.cover;
+        cover.dataset.emoji = LABELS.musicNote;
+
+        cover.querySelectorAll('img').forEach((image) => image.remove());
+        cover.classList.toggle('has-cover', Boolean(this.state.playbackStarted && track.cover));
+
+        if (!this.state.playbackStarted || !track.cover) return;
+
         const image = document.createElement('img');
         image.src = track.cover;
         image.alt = track.title;
-        image.loading = 'lazy';
         cover.appendChild(image);
+    }
 
-        item.append(iconWrap, info, cover);
+    ensureProgressRing() {
+        let ring = this.elements.cover.querySelector('.player-progress-ring');
+        if (!ring) {
+            ring = document.createElement('span');
+            ring.className = 'player-progress-ring';
+            ring.setAttribute('aria-hidden', 'true');
+            this.elements.cover.prepend(ring);
+        }
+        this.elements.progressRing = ring;
+    }
 
-        // 点击切换歌曲 - 存储处理函数引用以便后续移除
-        const clickHandler = () => switchTrack(index);
-        const keyHandler = (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return;
-            event.preventDefault();
-            switchTrack(index);
+    restoreAudioSettings() {
+        const storedVolume = Number.parseFloat(
+            SafeStorage.getItem(CONFIG.SAVE_VOLUME_KEY, CONFIG.DEFAULT_VOLUME.toString())
+        );
+        this.audio.volume = Number.isFinite(storedVolume) ? clamp(storedVolume) : CONFIG.DEFAULT_VOLUME;
+        this.syncVolumeUI();
+    }
+
+    addIntroAnimation() {
+        const player = this.elements.player;
+        player.classList.add('intro');
+
+        let complete = false;
+        let timer = null;
+        const cleanup = () => {
+            if (complete) return;
+            complete = true;
+            clearTimeout(timer);
+            player.classList.remove('intro');
+            player.removeEventListener('animationend', handleEnd);
         };
-        playlistItemHandlers.set(item, clickHandler);
-        playlistItemKeyHandlers.set(item, keyHandler);
-        item.addEventListener('click', clickHandler);
-        item.addEventListener('keydown', keyHandler);
+        const handleEnd = (event) => {
+            if (event.target !== player || event.animationName !== 'slideInUp') return;
+            cleanup();
+        };
 
-        elements.playlistContainer.appendChild(item);
-    });
+        player.addEventListener('animationend', handleEnd);
+        timer = setTimeout(cleanup, CONFIG.ANIMATION_DURATION_MS + 80);
+        this.cleanups.push(cleanup);
+    }
 
-    console.log('[MusicPlayer] Playlist UI created');
+    currentTrack() {
+        return PLAYLIST[this.state.currentTrackIndex] || PLAYLIST[0];
+    }
+
+    clearCompletionTimer() {
+        if (!this.completionTimer) return;
+        clearTimeout(this.completionTimer);
+        this.completionTimer = null;
+    }
+
+    destroy() {
+        this.clearCompletionTimer();
+        this.clearAnimationTimer();
+        this.clearActiveDragListeners();
+
+        if (this.audio) {
+            this.audio.pause();
+            this.audio.currentTime = 0;
+        }
+
+        while (this.cleanups.length > 0) {
+            const cleanup = this.cleanups.pop();
+            cleanup();
+        }
+
+        this.elements.player?.classList.remove('playing', 'expanding', 'collapsing', 'is-animating', 'intro', 'is-loading', 'has-error');
+        this.elements.cover?.classList.remove('playing');
+        this.audio = null;
+        this.ready = false;
+        this.state.playing = false;
+        this.state.animating = false;
+        this.dragKind = null;
+    }
 }
 
-function setPlaylistItemIcon(icon, isActive) {
+function readStoredTrackIndex() {
+    return clampTrackIndex(
+        Number.parseInt(SafeStorage.getItem(CONFIG.SAVE_CURRENT_TRACK_KEY, '0'), 10)
+    );
+}
+
+function clampTrackIndex(index) {
+    if (!Number.isFinite(index)) return 0;
+    return Math.max(0, Math.min(PLAYLIST.length - 1, index));
+}
+
+function wrapIndex(index) {
+    return (index + PLAYLIST.length) % PLAYLIST.length;
+}
+
+function clamp(value) {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(1, value));
+}
+
+function getClientX(event) {
+    if (event.touches?.length) return event.touches[0].clientX;
+    if (event.changedTouches?.length) return event.changedTouches[0].clientX;
+    return event.clientX || 0;
+}
+
+function formatTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+function sanitizeCssUrl(url) {
+    return String(url).replace(/["\\\n\r\f]/g, '');
+}
+
+function setPlaylistItemIcon(icon, active) {
     icon.replaceChildren();
 
     const node = document.createElementNS(
         'http://www.w3.org/2000/svg',
-        isActive ? 'path' : 'circle'
+        active ? 'path' : 'circle'
     );
 
-    if (isActive) {
+    if (active) {
         node.setAttribute('d', 'M9.5 16.5v-9l7 4.5z');
     } else {
         node.setAttribute('cx', '12');
@@ -799,285 +910,31 @@ function setPlaylistItemIcon(icon, isActive) {
     icon.appendChild(node);
 }
 
-function switchTrack(index) {
-    clearCompletionTimer();
+export function initMusicPlayer() {
+    if (controller?.ready) return;
 
-    if (index === currentTrackIndex) {
-        // 点击当前歌曲，切换播放/暂停
-        togglePlay();
-        return;
-    }
-
-    // 记录之前是否在播放
-    const wasPlaying = isPlaying;
-
-    // 暂停当前播放
-    if (audio) {
-        audio.pause();
-        audio.currentTime = 0;
-    }
-
-    // 切换到新曲目
-    currentTrackIndex = index;
-    const nextTrack = PLAYLIST[currentTrackIndex];
-    SafeStorage.setItem(CONFIG.SAVE_CURRENT_TRACK_KEY, currentTrackIndex.toString());
-
-    // 加载新音频
-    audio.src = PLAYLIST[currentTrackIndex].path;
-    audio.src = nextTrack.path;
-    audio.load();
-    syncProgressUI(0);
-
-    // 更新UI
-    loadTrackInfo(nextTrack);
-    updatePlaylistUI();
-
-    // 如果之前在播放，自动播放新曲目
-    if (wasPlaying) {
-        audio.play().catch(err => {
-            console.error('[MusicPlayer] Auto-play failed:', err);
-        });
-    }
-
-    console.log('[MusicPlayer] Switched to track:', currentTrackIndex, PLAYLIST[currentTrackIndex].title);
-}
-
-function playPrevTrack() {
-    const prevIndex = (currentTrackIndex - 1 + PLAYLIST.length) % PLAYLIST.length;
-    switchTrack(prevIndex);
-
-    // 自动播放上一首
-    audio.play().catch(err => {
-        console.error('[MusicPlayer] Auto-play prev failed:', err);
-    });
-}
-
-function playNextTrack() {
-    const nextIndex = (currentTrackIndex + 1) % PLAYLIST.length;
-    switchTrack(nextIndex);
-
-    // 自动播放下一首
-    audio.play().catch(err => {
-        console.error('[MusicPlayer] Auto-play next failed:', err);
-    });
-}
-
-function updatePlaylistUI() {
-    if (!elements.playlistContainer) return;
-
-    const items = elements.playlistContainer.querySelectorAll('.playlist-item');
-    items.forEach((item, index) => {
-        const icon = item.querySelector('.playlist-item-icon svg');
-
-        if (index === currentTrackIndex) {
-            item.classList.add('active');
-            item.setAttribute('aria-pressed', 'true');
-            if (icon) {
-                setPlaylistItemIcon(icon, true);
-            }
-        } else {
-            item.classList.remove('active');
-            item.setAttribute('aria-pressed', 'false');
-            if (icon) {
-                setPlaylistItemIcon(icon, false);
-            }
-        }
-    });
-}
-
-function loadTrackInfo(track = getCurrentPlaybackTrack()) {
-    elements.title.textContent = track.title;
-    elements.artist.textContent = track.artist;
-    updatePanelArtwork(track);
-
-    // 设置emoji属性（始终显示在最上层）
-    elements.cover.setAttribute('data-emoji', '🎵');
-
-    // 清除旧的封面图片
-    const existingImg = elements.cover.querySelector('img');
-    if (existingImg) {
-        existingImg.remove();
-    }
-
-    // 只有在曾经播放过的情况下才显示封面图
-    // 初次加载时保持默认橙色圆环 + emoji，点击播放后才显示封面
-    if (hasEverPlayed && track.cover) {
-        // 创建封面图片元素
-        const img = document.createElement('img');
-        img.src = track.cover;
-        img.alt = track.title;
-        elements.cover.appendChild(img);
-        elements.cover.classList.add('has-cover');
-    } else {
-        // 初次加载或没有封面时，显示橙色圆环
-        elements.cover.classList.remove('has-cover');
-    }
-
-    console.log('[MusicPlayer] Track info loaded:', {
-        title: track.title,
-        artist: track.artist,
-        cover: track.cover,
-        hasEverPlayed: hasEverPlayed
-    });
-}
-
-function getCurrentPlaybackTrack() {
-    const sources = [audio?.src, audio?.currentSrc].filter(Boolean);
-
-    for (const source of sources) {
-        const matchingTrack = PLAYLIST.find(track => getAbsoluteUrl(track.path) === source);
-        if (matchingTrack) return matchingTrack;
-    }
-
-    return PLAYLIST[currentTrackIndex];
-}
-
-function getAbsoluteUrl(path) {
-    try {
-        return new URL(path, window.location.href).href;
-    } catch {
-        return path;
+    const nextController = new MusicPlayerController();
+    if (nextController.init()) {
+        controller = nextController;
     }
 }
 
-function updatePanelArtwork(track) {
-    if (!elements.player) return;
-
-    if (!track?.cover) {
-        elements.player.classList.remove('has-panel-artwork');
-        elements.player.style.removeProperty('--music-panel-cover');
-        delete elements.player.dataset.panelTrack;
-        return;
-    }
-
-    const safeCover = track.cover.replace(/["\\\n\r\f]/g, '');
-    elements.player.style.setProperty('--music-panel-cover', `url("${safeCover}")`);
-    elements.player.dataset.panelTrack = track.title;
-    elements.player.classList.add('has-panel-artwork');
-}
-
-function onMetadataLoaded() {
-    elements.totalTime.textContent = formatTime(audio.duration);
-    syncProgressUI();
-    console.log('[MusicPlayer] Audio duration:', audio.duration);
-}
-
-// ====================================================================
-// 工具函数
-// ====================================================================
-
-function formatTime(seconds) {
-    if (!isFinite(seconds)) return '0:00';
-
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-/**
- * 清理音乐播放器资源，移除所有事件监听器
- * 用于防止内存泄漏
- */
 export function destroyMusicPlayer() {
-    clearCompletionTimer();
-
-    // 停止音频播放
-    if (audio) {
-        audio.pause();
-        audio.currentTime = 0;
-
-        // 移除音频事件监听器
-        audio.removeEventListener('timeupdate', updateProgress);
-        audio.removeEventListener('loadedmetadata', onMetadataLoaded);
-        audio.removeEventListener('ended', onAudioEnded);
-        audio.removeEventListener('play', onPlay);
-        audio.removeEventListener('pause', onPause);
-
-        audio = null;
-    }
-
-    // 移除DOM事件监听器
-    if (elements.playBtn) {
-        elements.playBtn.removeEventListener('click', eventHandlers.playBtnClick);
-    }
-    if (elements.prevBtn) {
-        elements.prevBtn.removeEventListener('click', eventHandlers.prevBtnClick);
-    }
-    if (elements.nextBtn) {
-        elements.nextBtn.removeEventListener('click', eventHandlers.nextBtnClick);
-    }
-
-    // 移除进度条事件
-    if (elements.progressBar) {
-        elements.progressBar.removeEventListener('mousedown', eventHandlers.progressBarMouseDown);
-        elements.progressBar.removeEventListener('click', eventHandlers.progressBarClick);
-        elements.progressBar.removeEventListener('keydown', eventHandlers.progressBarKeydown);
-        elements.progressBar.removeEventListener('touchstart', eventHandlers.progressBarTouchStart);
-    }
-
-    // 移除音量控制事件
-    if (elements.volumeSlider) {
-        elements.volumeSlider.removeEventListener('mousedown', eventHandlers.volumeSliderMouseDown);
-        elements.volumeSlider.removeEventListener('click', eventHandlers.volumeSliderClick);
-        elements.volumeSlider.removeEventListener('keydown', eventHandlers.volumeSliderKeydown);
-        elements.volumeSlider.removeEventListener('touchstart', eventHandlers.volumeSliderTouchStart);
-    }
-
-    // 移除全局事件监听器
-    unbindDragListeners();
-
-    // 移除播放器相关事件
-    if (elements.toggleBtn) {
-        elements.toggleBtn.removeEventListener('click', eventHandlers.toggleBtnClick);
-    }
-    if (elements.header) {
-        elements.header.removeEventListener('click', eventHandlers.headerClick);
-    }
-    if (elements.player) {
-        elements.player.removeEventListener('click', eventHandlers.playerClick);
-    }
-    if (elements.cover) {
-        elements.cover.removeEventListener('click', eventHandlers.coverClick);
-    }
-
-    // 移除外部点击事件
-    document.removeEventListener('click', eventHandlers.outsideClick);
-
-    // 清空播放列表事件监听器 - 使用WeakMap中存储的处理函数引用
-    if (elements.playlistContainer) {
-        const items = elements.playlistContainer.querySelectorAll('.playlist-item');
-        items.forEach(item => {
-            const handler = playlistItemHandlers.get(item);
-            if (handler) {
-                item.removeEventListener('click', handler);
-                playlistItemHandlers.delete(item);
-            }
-            const keyHandler = playlistItemKeyHandlers.get(item);
-            if (keyHandler) {
-                item.removeEventListener('keydown', keyHandler);
-                playlistItemKeyHandlers.delete(item);
-            }
-        });
-    }
-
-    // 重置状态
-    isPlaying = false;
-    isDraggingProgress = false;
-    isDraggingVolume = false;
-    hasEverPlayed = false;
-    isAnimating = false;
-    isInitialized = false;
-
-    console.log('[MusicPlayer] Resources cleaned up and destroyed');
+    controller?.destroy();
+    controller = null;
 }
 
 export function toggleMusicPlayer() {
-    toggleMinimize();
+    controller?.toggleMinimize();
 }
 
-// ====================================================================
-// 导出
-// ====================================================================
+export function togglePlay() {
+    controller?.togglePlay();
+}
+
+export function toggleMinimize() {
+    controller?.toggleMinimize();
+}
 
 export default {
     init: initMusicPlayer,

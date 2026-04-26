@@ -2,8 +2,19 @@ const SUPPORTED_PLATFORMS = new Set(['douyu', 'bilibili', 'twitch', 'kick']);
 const STATUS_TIMEOUT_MS = 8000;
 const STATUS_CACHE_SECONDS = 20;
 const STATUS_CACHE_STALE_SECONDS = 40;
+const STATUS_STALE_CACHE_SECONDS = 300;
+const STATUS_NEGATIVE_CACHE_SECONDS = 8;
 const BATCH_LIMIT = 10;
 const BATCH_CONCURRENCY = 4;
+const MAX_BATCH_BODY_BYTES = 8192;
+const DIRECT_ATTEMPT_TIMEOUT_MS = 2500;
+const PROXY_HEDGE_DELAY_MS = 250;
+const PLATFORM_ID_RULES = {
+    douyu: { pattern: /^\d{1,10}$/, description: '1-10 digits' },
+    bilibili: { pattern: /^\d{1,15}$/, description: '1-15 digits' },
+    twitch: { pattern: /^[a-zA-Z0-9_]{1,25}$/, description: '1-25 letters, numbers, or underscores' },
+    kick: { pattern: /^[a-zA-Z0-9_]{1,25}$/, description: '1-25 letters, numbers, or underscores' }
+};
 const CODETABS_PROXY = {
     name: 'codetabs',
     url: targetUrl => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
@@ -227,14 +238,52 @@ function optionsResponse() {
     });
 }
 
-function cacheRequestFor(request, platform, id, fetchAvatar) {
+async function readBoundedJson(request, maxBytes) {
+    const rawLength = request.headers.get('content-length');
+    const contentLength = Number.parseInt(rawLength || '0', 10);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+        return {
+            ok: false,
+            error: 'payload_too_large',
+            status: 413,
+            limit: maxBytes
+        };
+    }
+
+    let text = '';
+    try {
+        text = await request.text();
+    } catch (_error) {
+        return { ok: false, error: 'invalid_json', status: 400 };
+    }
+
+    const byteLength = new TextEncoder().encode(text).byteLength;
+    if (byteLength > maxBytes) {
+        return {
+            ok: false,
+            error: 'payload_too_large',
+            status: 413,
+            limit: maxBytes
+        };
+    }
+
+    try {
+        return { ok: true, data: JSON.parse(text || 'null') };
+    } catch (_error) {
+        return { ok: false, error: 'invalid_json', status: 400 };
+    }
+}
+
+function cacheRequestFor(request, platform, id, fetchAvatar, variant = 'fresh') {
     const url = new URL(request.url);
     url.pathname = '/api/status';
-    url.search = new URLSearchParams({
+    const params = new URLSearchParams({
         platform,
         id: String(id),
         avatar: fetchAvatar ? '1' : '0'
-    }).toString();
+    });
+    if (variant !== 'fresh') params.set('variant', variant);
+    url.search = params.toString();
     return new Request(url.toString(), { method: 'GET' });
 }
 
@@ -249,21 +298,76 @@ async function readCachedStatus(context, platform, id, fetchAvatar) {
     if (!cached) return null;
 
     const payload = await cached.json();
+    if (!payload.status) return null;
     return {
         status: payload.status ?? null,
         cache: 'HIT'
     };
 }
 
+async function readStaleCachedStatus(context, platform, id, fetchAvatar) {
+    if (!canUseStatusCache()) return null;
+
+    const cached = await caches.default.match(cacheRequestFor(context.request, platform, id, fetchAvatar, 'stale'));
+    if (!cached) return null;
+
+    const payload = await cached.json();
+    if (!payload.status) return null;
+    return {
+        status: payload.status,
+        cache: 'STALE'
+    };
+}
+
+async function readNegativeCachedStatus(context, platform, id, fetchAvatar) {
+    if (!canUseStatusCache()) return null;
+
+    const cached = await caches.default.match(cacheRequestFor(context.request, platform, id, fetchAvatar, 'negative'));
+    if (!cached) return null;
+
+    return {
+        status: null,
+        cache: 'NEGATIVE_HIT',
+        error: 'fetch_failed'
+    };
+}
+
 function writeCachedStatus(context, platform, id, fetchAvatar, status) {
     if (!canUseStatusCache()) return;
 
-    const response = jsonResponse(statusPayload(platform, id, status), {
+    const freshResponse = jsonResponse(statusPayload(platform, id, status), {
         headers: {
             'Cache-Control': `public, max-age=${STATUS_CACHE_SECONDS}, stale-while-revalidate=${STATUS_CACHE_STALE_SECONDS}`
         }
     });
-    waitFor(context, caches.default.put(cacheRequestFor(context.request, platform, id, fetchAvatar), response));
+    const staleResponse = jsonResponse(statusPayload(platform, id, status, 'STALE'), {
+        headers: {
+            'Cache-Control': `public, max-age=${STATUS_STALE_CACHE_SECONDS}`
+        }
+    });
+
+    waitFor(context, Promise.all([
+        caches.default.put(cacheRequestFor(context.request, platform, id, fetchAvatar), freshResponse),
+        caches.default.put(cacheRequestFor(context.request, platform, id, fetchAvatar, 'stale'), staleResponse)
+    ]));
+}
+
+function writeNegativeCachedStatus(context, platform, id, fetchAvatar) {
+    if (!canUseStatusCache()) return;
+
+    const response = jsonResponse({
+        ok: false,
+        error: 'fetch_failed',
+        platform,
+        id: String(id),
+        source: 'cloudflare-pages-function'
+    }, {
+        headers: {
+            'Cache-Control': `public, max-age=${STATUS_NEGATIVE_CACHE_SECONDS}`
+        }
+    });
+
+    waitFor(context, caches.default.put(cacheRequestFor(context.request, platform, id, fetchAvatar, 'negative'), response));
 }
 
 function waitFor(context, promise) {
@@ -282,6 +386,29 @@ function normalizeId(rawId) {
     return String(rawId ?? '').trim();
 }
 
+function validatePlatformId(platform, id) {
+    const rule = PLATFORM_ID_RULES[platform];
+    if (!rule) return { ok: false, error: 'unsupported_platform' };
+    if (!id) return { ok: false, error: 'missing_id' };
+    if (!rule.pattern.test(id)) {
+        return {
+            ok: false,
+            error: 'invalid_id',
+            constraint: rule.description
+        };
+    }
+    return { ok: true };
+}
+
+function summarizeInvalidRoom(room, reason) {
+    return {
+        platform: room.platform || '',
+        id: String(room.id || '').slice(0, 64),
+        error: reason.error,
+        constraint: reason.constraint
+    };
+}
+
 function statusPayload(platform, id, status, cacheStatus = 'MISS') {
     return {
         ok: true,
@@ -297,11 +424,21 @@ async function fetchStatusDataWithCache(context, platform, id, fetchAvatar) {
     const cached = await readCachedStatus(context, platform, id, fetchAvatar);
     if (cached) return cached;
 
+    const negative = await readNegativeCachedStatus(context, platform, id, fetchAvatar);
+    if (negative) {
+        const stale = await readStaleCachedStatus(context, platform, id, fetchAvatar);
+        return stale ?? negative;
+    }
+
     const status = await getPlatformStatus(platform, id, { fetchAvatar, env: context.env ?? {} });
     if (!status) {
+        const stale = await readStaleCachedStatus(context, platform, id, fetchAvatar);
+        if (stale) return stale;
+        writeNegativeCachedStatus(context, platform, id, fetchAvatar);
         return {
             status: null,
-            cache: 'MISS'
+            cache: 'MISS',
+            error: 'fetch_failed'
         };
     }
 
@@ -328,21 +465,34 @@ export async function handleStatusRequest(context) {
     if (!isSupportedPlatform(platform)) {
         return jsonResponse({ ok: false, error: 'unsupported_platform' }, { status: 400 });
     }
-    if (!id) {
-        return jsonResponse({ ok: false, error: 'missing_id' }, { status: 400 });
+    const validation = validatePlatformId(platform, id);
+    if (!validation.ok) {
+        return jsonResponse({
+            ok: false,
+            error: validation.error,
+            platform,
+            id,
+            constraint: validation.constraint
+        }, { status: 400 });
     }
 
     const result = await fetchStatusDataWithCache(context, platform, id, fetchAvatar);
     if (!result.status) {
         return jsonResponse({ ok: false, error: 'fetch_failed', platform, id }, {
             status: 502,
-            headers: { 'Cache-Control': 'no-store' }
+            headers: {
+                'Cache-Control': result.cache === 'NEGATIVE_HIT'
+                    ? `public, max-age=${STATUS_NEGATIVE_CACHE_SECONDS}`
+                    : `public, max-age=${STATUS_NEGATIVE_CACHE_SECONDS}`
+            }
         });
     }
 
     return jsonResponse(statusPayload(platform, id, result.status, result.cache), {
         headers: {
-            'Cache-Control': result.cache === 'HIT'
+            'Cache-Control': result.cache === 'STALE'
+                ? `public, max-age=${STATUS_NEGATIVE_CACHE_SECONDS}`
+                : result.cache === 'HIT'
                 ? `public, max-age=${STATUS_CACHE_SECONDS}`
                 : `public, max-age=${STATUS_CACHE_SECONDS}, stale-while-revalidate=${STATUS_CACHE_STALE_SECONDS}`
         }
@@ -357,11 +507,15 @@ export async function handleBatchStatusRequest(context) {
     }
 
     let body = null;
-    try {
-        body = await request.json();
-    } catch (_error) {
-        return jsonResponse({ ok: false, error: 'invalid_json' }, { status: 400 });
+    const jsonResult = await readBoundedJson(request, MAX_BATCH_BODY_BYTES);
+    if (!jsonResult.ok) {
+        return jsonResponse({
+            ok: false,
+            error: jsonResult.error,
+            limit: jsonResult.limit
+        }, { status: jsonResult.status });
     }
+    body = jsonResult.data;
 
     const rooms = Array.isArray(body?.rooms) ? body.rooms : [];
     if (rooms.length === 0) {
@@ -377,9 +531,15 @@ export async function handleBatchStatusRequest(context) {
         fetchAvatar: room.fetchAvatar !== false && room.avatar !== false
     }));
 
-    const invalid = normalizedRooms.find(room => !isSupportedPlatform(room.platform) || !room.id);
+    const invalid = normalizedRooms
+        .map(room => ({ room, reason: validatePlatformId(room.platform, room.id) }))
+        .find(entry => !entry.reason.ok);
     if (invalid) {
-        return jsonResponse({ ok: false, error: 'invalid_room', room: invalid }, { status: 400 });
+        return jsonResponse({
+            ok: false,
+            error: 'invalid_room',
+            room: summarizeInvalidRoom(invalid.room, invalid.reason)
+        }, { status: 400 });
     }
 
     const results = new Array(normalizedRooms.length);
@@ -532,30 +692,47 @@ async function firstNonNull(promises) {
     }
 }
 
-async function fetchJsonFromCandidates(url, options = {}) {
-    const timeoutMs = options.timeoutMs ?? STATUS_TIMEOUT_MS;
-    const directHeaders = options.headers ?? {};
-    const proxyHeaders = options.proxyHeaders ?? {};
-    const proxies = options.proxies ?? [];
-    const attempts = [
-        { url, headers: directHeaders },
-        ...proxies.map(proxy => ({
-            url: proxy.url(url),
-            headers: proxyHeaders
-        }))
-    ];
-    const controllers = attempts.map(() => new AbortController());
+function sleep(ms, signal = null) {
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(new Error('aborted'));
+            return;
+        }
+        if (ms <= 0) {
+            resolve();
+            return;
+        }
 
+        const timer = setTimeout(resolve, ms);
+        signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new Error('aborted'));
+        }, { once: true });
+    });
+}
+
+async function fetchJsonCandidate(attempt, options, timeoutMs, externalSignal = null) {
+    const result = await fetchJsonResult(attempt.url, {
+        ...options,
+        timeoutMs,
+        headers: attempt.headers,
+        signal: externalSignal
+    });
+    if (result.ok && result.data) return result.data;
+    return null;
+}
+
+async function fetchJsonFromHedgedCandidates(attempts, options, timeoutMs) {
+    if (attempts.length === 0) return null;
+
+    const controllers = attempts.map(() => new AbortController());
     const requests = attempts.map((attempt, index) =>
-        fetchJsonResult(attempt.url, {
-            ...options,
-            timeoutMs,
-            headers: attempt.headers,
-            signal: controllers[index].signal
-        }).then(result => {
-            if (result.ok && result.data) return result.data;
-            throw new Error(result.error || 'fetch_failed');
-        })
+        sleep(index * PROXY_HEDGE_DELAY_MS, controllers[index].signal)
+            .then(() => fetchJsonCandidate(attempt, options, timeoutMs, controllers[index].signal))
+            .then(data => {
+                if (data) return data;
+                throw new Error('empty_result');
+            })
     );
 
     try {
@@ -565,6 +742,24 @@ async function fetchJsonFromCandidates(url, options = {}) {
     } finally {
         controllers.forEach(controller => controller.abort());
     }
+}
+
+async function fetchJsonFromCandidates(url, options = {}) {
+    const timeoutMs = options.timeoutMs ?? STATUS_TIMEOUT_MS;
+    const directHeaders = options.headers ?? {};
+    const proxyHeaders = options.proxyHeaders ?? {};
+    const proxies = options.proxies ?? [];
+    const directTimeoutMs = proxies.length > 0
+        ? Math.min(timeoutMs, options.directTimeoutMs ?? DIRECT_ATTEMPT_TIMEOUT_MS)
+        : timeoutMs;
+    const directData = await fetchJsonCandidate({ url, headers: directHeaders }, options, directTimeoutMs);
+    if (directData || proxies.length === 0) return directData;
+
+    const proxyAttempts = proxies.map(proxy => ({
+        url: proxy.url(url),
+        headers: proxyHeaders
+    }));
+    return fetchJsonFromHedgedCandidates(proxyAttempts, options, timeoutMs);
 }
 
 async function getPlatformStatus(platform, id, options) {

@@ -50,4 +50,34 @@ describe('music-player-loader', () => {
         expect(initMusicPlayer).toHaveBeenCalledTimes(1);
         expect(document.getElementById('music-player').hidden).toBe(false);
     });
+
+    it('does not defer default initialization to an idle callback', async () => {
+        vi.useFakeTimers();
+        const originalIdleCallback = window.requestIdleCallback;
+        window.requestIdleCallback = vi.fn();
+
+        try {
+            const initMusicPlayer = vi.fn();
+            const importer = vi.fn(async () => ({ initMusicPlayer }));
+
+            scheduleMusicPlayerInit({ importer });
+
+            expect(window.requestIdleCallback).not.toHaveBeenCalled();
+            expect(importer).not.toHaveBeenCalled();
+
+            await vi.runOnlyPendingTimersAsync();
+            await Promise.resolve();
+
+            expect(importer).toHaveBeenCalledTimes(1);
+            expect(initMusicPlayer).toHaveBeenCalledTimes(1);
+            expect(document.getElementById('music-player').hidden).toBe(false);
+        } finally {
+            if (typeof originalIdleCallback === 'undefined') {
+                delete window.requestIdleCallback;
+            } else {
+                window.requestIdleCallback = originalIdleCallback;
+            }
+            vi.useRealTimers();
+        }
+    });
 });

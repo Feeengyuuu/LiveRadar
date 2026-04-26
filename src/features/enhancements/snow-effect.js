@@ -33,22 +33,22 @@ function getPreferredSnowflakeCount() {
     const isLowPowerDevice = getDeviceMemory() <= 2 || getHardwareConcurrency() <= 2;
 
     if (prefersReducedMotion()) {
-        return isMobile ? 16 : 32;
+        return isMobile ? 12 : 24;
     }
 
     if (isLowPowerDevice) {
-        return isMobile ? 24 : 80;
+        return isMobile ? 16 : 48;
     }
 
     if (isMobile) {
-        return 40;
+        return 28;
     }
 
     if (viewportWidth < 1200) {
-        return 120;
+        return 80;
     }
 
-    return 220;
+    return 140;
 }
 
 // ========================================
@@ -57,8 +57,8 @@ function getPreferredSnowflakeCount() {
 const CONFIG = {
     ENABLED: isSnowEnabled(),        // 默认关闭，状态统一由 state.js 恢复
     COUNT: getPreferredSnowflakeCount(),
-    MAX_SIZE: 3.5,                  // Maximum size (pixels)
-    MIN_SIZE: 1,                    // Minimum size (pixels)
+    MAX_SIZE: 14,                   // Maximum logo size (pixels)
+    MIN_SIZE: 7,                    // Minimum logo size (pixels)
     MAX_SPEED: 1.2,                 // Maximum fall speed
     MIN_SPEED: 0.3,                 // Minimum fall speed
     MAX_ACCUMULATED: 12,            // Max accumulated snowflakes per card
@@ -67,6 +67,60 @@ const CONFIG = {
     COLLISION_OFFSET: 5,            // Collision detection offset (pixels)
     POSITION_UPDATE_INTERVAL: 100,  // Card position update interval (ms)
 };
+
+const PLATFORM_LOGO_MARKS = [
+    {
+        name: 'douyu',
+        facets: [
+            { fill: '#ff7a1a', points: [[-0.48, -0.1], [-0.12, -0.42], [0.34, -0.28], [0.48, 0.08], [0.1, 0.42], [-0.38, 0.32]] },
+            { fill: '#ff4f12', points: [[-0.48, -0.1], [-0.68, -0.34], [-0.58, 0.04], [-0.38, 0.32]] },
+            { fill: '#ff9b37', points: [[-0.12, -0.42], [0.34, -0.28], [0.08, -0.02], [-0.34, 0.02]] },
+            { fill: '#ffe4c3', points: [[0.18, -0.12], [0.31, -0.08], [0.27, 0.04], [0.14, 0.02]] }
+        ]
+    },
+    {
+        name: 'bilibili',
+        facets: [
+            { fill: '#fb7299', points: [[-0.48, -0.28], [0.48, -0.28], [0.42, 0.36], [-0.42, 0.36]] },
+            { fill: '#ff9fbe', points: [[-0.34, -0.42], [-0.18, -0.28], [-0.1, -0.28], [-0.26, -0.5]] },
+            { fill: '#ff9fbe', points: [[0.1, -0.28], [0.18, -0.28], [0.34, -0.42], [0.26, -0.5]] },
+            { fill: '#ffd5e3', points: [[-0.22, -0.04], [-0.06, -0.04], [-0.08, 0.1], [-0.24, 0.1]] },
+            { fill: '#ffd5e3', points: [[0.08, -0.04], [0.24, -0.04], [0.22, 0.1], [0.06, 0.1]] }
+        ]
+    },
+    {
+        name: 'twitch',
+        facets: [
+            { fill: '#9146ff', points: [[-0.46, -0.42], [0.5, -0.42], [0.5, 0.18], [0.14, 0.18], [-0.1, 0.44], [-0.1, 0.18], [-0.46, 0.18]] },
+            { fill: '#6d32c9', points: [[-0.32, -0.28], [0.36, -0.28], [0.36, 0.08], [-0.32, 0.08]] },
+            { fill: '#ffffff', points: [[-0.08, -0.18], [0.02, -0.18], [0.02, -0.02], [-0.08, -0.02]] },
+            { fill: '#ffffff', points: [[0.16, -0.18], [0.26, -0.18], [0.26, -0.02], [0.16, -0.02]] }
+        ]
+    },
+    {
+        name: 'kick',
+        facets: [
+            { fill: '#53fc18', points: [[-0.46, -0.42], [-0.18, -0.42], [-0.18, 0.42], [-0.46, 0.42]] },
+            { fill: '#39c90d', points: [[-0.14, -0.02], [0.22, -0.42], [0.52, -0.42], [0.16, 0.02]] },
+            { fill: '#7cff4d', points: [[-0.12, 0.04], [0.2, 0.42], [0.52, 0.42], [0.14, -0.02]] },
+            { fill: '#efffe8', points: [[-0.02, -0.08], [0.12, -0.02], [-0.02, 0.08], [-0.16, 0.02]] }
+        ]
+    }
+];
+
+function getRandomPlatformMark() {
+    return PLATFORM_LOGO_MARKS[Math.floor(Math.random() * PLATFORM_LOGO_MARKS.length)];
+}
+
+function drawPolygon(points) {
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i][0], points[i][1]);
+    }
+    ctx.closePath();
+    ctx.fill();
+}
 
 // ========================================
 // Spatial Partitioning System (Performance Optimization)
@@ -429,6 +483,7 @@ class Snowflake {
         this.opacity = Math.random() * 0.5 + 0.2;
         this.drift = Math.random() * 2 - 1;
         this.driftCycle = Math.random() * Math.PI * 2;
+        this.mark = getRandomPlatformMark();
 
         // Accumulation properties
         this.isAccumulated = false;
@@ -437,8 +492,8 @@ class Snowflake {
         this.accumulatedOffsetY = 0;
 
         // Visual effects
-        this.rotation = 0;
-        this.rotationSpeed = (Math.random() - 0.5) * 0.1;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.035;
         this.wobble = Math.random() * Math.PI * 2;
     }
 
@@ -579,22 +634,25 @@ class Snowflake {
     draw() {
         ctx.save();
         ctx.globalAlpha = this.opacity;
-        ctx.fillStyle = 'white';
+        const drawSize = this.isAccumulated
+            ? this.size * 0.88
+            : this.size;
+
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.scale(drawSize, drawSize);
+
+        for (const facet of this.mark.facets) {
+            ctx.fillStyle = facet.fill;
+            drawPolygon(facet.points);
+        }
 
         if (this.isAccumulated) {
             // Accumulated snow: ellipse (flattened) - 移除光晕效果以提升性能
+            ctx.globalAlpha *= 0.42;
+            ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.ellipse(
-                this.x, this.y,
-                this.size * 1.2,  // Wider horizontally
-                this.size * 0.8,  // Flatter vertically
-                0, 0, Math.PI * 2
-            );
-            ctx.fill();
-        } else {
-            // Falling snow: simple circle (移除rotation以减少transform操作)
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.ellipse(0, 0.28, 0.56, 0.16, 0, 0, Math.PI * 2);
             ctx.fill();
         }
 

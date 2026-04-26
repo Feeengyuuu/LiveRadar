@@ -4,6 +4,7 @@ import { handleBatchStatusRequest, handleStatusRequest, isSupportedPlatform, par
 describe('cloudflare platform status helpers', () => {
     afterEach(() => {
         vi.restoreAllMocks();
+        vi.unstubAllGlobals();
     });
 
     it('recognizes supported platforms', () => {
@@ -32,6 +33,22 @@ describe('cloudflare platform status helpers', () => {
         });
     });
 
+    it('rejects platform IDs that do not match server-side constraints', async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch');
+        const response = await handleStatusRequest({
+            request: new Request('https://liveradar.pages.dev/api/status?platform=douyu&id=not-a-room'),
+            env: {}
+        });
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toMatchObject({
+            ok: false,
+            error: 'invalid_id',
+            platform: 'douyu'
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it('rejects batch requests above the per-request stability limit', async () => {
         const rooms = Array.from({ length: 11 }, (_, index) => ({
             platform: 'douyu',
@@ -50,6 +67,23 @@ describe('cloudflare platform status helpers', () => {
             ok: false,
             error: 'too_many_rooms',
             limit: 10
+        });
+    });
+
+    it('rejects oversized batch request bodies before parsing JSON', async () => {
+        const response = await handleBatchStatusRequest({
+            request: new Request('https://liveradar.pages.dev/api/status/batch', {
+                method: 'POST',
+                body: 'x'.repeat(8193)
+            }),
+            env: {}
+        });
+
+        expect(response.status).toBe(413);
+        await expect(response.json()).resolves.toMatchObject({
+            ok: false,
+            error: 'payload_too_large',
+            limit: 8192
         });
     });
 
@@ -156,7 +190,7 @@ describe('cloudflare platform status helpers', () => {
                 avatar: 'https://example.com/200-face.jpg'
             }
         });
-        expect(fetchMock).toHaveBeenCalledTimes(6);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
     it('uses Douyu betard before the older ratestream fallback', async () => {
@@ -198,7 +232,79 @@ describe('cloudflare platform status helpers', () => {
                 heatValue: 12000
             }
         });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('tries a proxy candidate only after the direct candidate fails', async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+            const rawUrl = String(url);
+            if (rawUrl.startsWith('https://www.douyu.com/betard')) {
+                return new Response('{}', { status: 502 });
+            }
+            if (rawUrl.startsWith('https://api.codetabs.com/v1/proxy') && rawUrl.includes('betard')) {
+                return new Response(JSON.stringify({
+                    room: {
+                        videoLoop: 0,
+                        show_status: 1,
+                        room_name: 'Proxy Douyu Live',
+                        nickname: 'Proxy Anchor',
+                        online: '100',
+                        room_pic: 'https://example.com/proxy-douyu.jpg',
+                        owner_avatar: 'https://example.com/proxy-face.jpg',
+                        show_time: 1777041600
+                    }
+                }), { status: 200 });
+            }
+
+            throw new Error(`Unexpected fetch: ${rawUrl}`);
+        });
+
+        const response = await handleStatusRequest({
+            request: new Request('https://liveradar.pages.dev/api/status?platform=douyu&id=100'),
+            env: {}
+        });
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({
+            ok: true,
+            status: {
+                owner: 'Proxy Anchor'
+            }
+        });
         expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('short-caches failed status lookups to avoid repeated upstream misses', async () => {
+        const cacheStore = new Map();
+        vi.stubGlobal('caches', {
+            default: {
+                match: vi.fn(async request => cacheStore.get(request.url) ?? null),
+                put: vi.fn(async (request, response) => {
+                    cacheStore.set(request.url, response.clone());
+                })
+            }
+        });
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 502 }));
+
+        const firstWaits = [];
+        const firstResponse = await handleStatusRequest({
+            request: new Request('https://liveradar.pages.dev/api/status?platform=douyu&id=100'),
+            env: {},
+            waitUntil: promise => firstWaits.push(promise)
+        });
+        await Promise.all(firstWaits);
+
+        const firstCallCount = fetchMock.mock.calls.length;
+        expect(firstResponse.status).toBe(502);
+        expect(firstCallCount).toBeGreaterThan(0);
+
+        const secondResponse = await handleStatusRequest({
+            request: new Request('https://liveradar.pages.dev/api/status?platform=douyu&id=100'),
+            env: {}
+        });
+
+        expect(secondResponse.status).toBe(502);
+        expect(fetchMock).toHaveBeenCalledTimes(firstCallCount);
     });
 
     it('uses the official Kick API when a token is configured', async () => {
