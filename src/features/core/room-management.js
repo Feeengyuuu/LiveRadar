@@ -99,15 +99,20 @@ export function selectPlatform(value, color, label) {
     const select = getElement('platform-select');
     const labelEl = getElement('current-platform-label');
     const indicator = getElement('selected-indicator');
+    const trigger = getElement('selector-trigger');
+    const platformColor = color || '#ff5d23';
 
     if (select) select.value = value;
     if (labelEl) {
         labelEl.textContent = label;
-        labelEl.style.color = color;
+        labelEl.style.color = platformColor;
+    }
+    if (trigger) {
+        trigger.style.setProperty('--selected-platform-color', platformColor);
     }
     if (indicator) {
-        indicator.style.backgroundColor = color;
-        indicator.style.boxShadow = `0 0 8px ${color}`;
+        indicator.style.backgroundColor = platformColor;
+        indicator.style.boxShadow = `0 0 8px ${platformColor}`;
     }
 
     updatePlaceholder();
@@ -174,15 +179,18 @@ export function handleInput(e) {
     // 在移动端禁用历史记录功能
     if (DeviceDetector.isMobile()) return;
 
-    const value = e && e.target ? e.target.value : '';
-    renderHistory(value);
-
     const menu = getElement('history-dropdown');
     if (!menu) return;
 
-    if (menu.classList.contains('dropdown-enter')) {
-        setHistoryOpen(true);
+    const value = e && e.target ? e.target.value : '';
+    if (!value.trim()) {
+        renderHistory('');
+        setHistoryOpen(false);
+        return;
     }
+
+    renderHistory(value);
+    setHistoryOpen(true);
 }
 
 /**
@@ -200,8 +208,8 @@ export function handleAddInput() {
     saveSearchHistory(value);
     addRoom(value, platform);
     input.value = '';
+    setHistoryOpen(false);
     input.focus();
-    showHistory();
 }
 
 /**

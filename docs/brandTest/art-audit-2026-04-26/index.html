@@ -1,0 +1,1287 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LiveRadar 美术架构审核报告 - 2026-04-26</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #030405;
+        --bg-soft: #080a0d;
+        --panel: rgba(13, 15, 18, 0.76);
+        --panel-strong: rgba(8, 9, 12, 0.92);
+        --line: rgba(255, 255, 255, 0.1);
+        --line-strong: rgba(255, 255, 255, 0.18);
+        --text: #f4f4f2;
+        --muted: #aaa7a0;
+        --faint: #77736c;
+        --red: #ff3048;
+        --red-soft: rgba(255, 48, 72, 0.16);
+        --gold: #f2c85f;
+        --green: #18d38c;
+        --violet: #8f5cff;
+        --orange: #ff7a2f;
+        --blue: #4aa8ff;
+        --radius: 20px;
+        --radius-sm: 12px;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 18% 8%, rgba(255, 48, 72, 0.18), transparent 28rem),
+          radial-gradient(circle at 90% 10%, rgba(242, 200, 95, 0.1), transparent 26rem),
+          linear-gradient(135deg, #050607 0%, #0a0b0d 42%, #020303 100%);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "Microsoft YaHei", sans-serif;
+        letter-spacing: 0;
+      }
+
+      body::before {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        content: "";
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px);
+        background-size: 56px 56px;
+        mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent 78%);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+      }
+
+      .shell {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+      }
+
+      .hero {
+        position: relative;
+        padding: 56px 0 38px;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+        gap: 24px;
+        align-items: stretch;
+      }
+
+      .hero-main,
+      .hero-side,
+      .section,
+      .concept-card,
+      .audit-card,
+      .route-card {
+        border: 1px solid var(--line);
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.018)),
+          var(--panel);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .hero-main {
+        min-height: 520px;
+        padding: clamp(28px, 5vw, 54px);
+        border-radius: 28px;
+        overflow: hidden;
+      }
+
+      .hero-main::after {
+        position: absolute;
+        right: 6%;
+        bottom: 9%;
+        width: 250px;
+        height: 250px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 50%;
+        content: "";
+        opacity: 0.5;
+      }
+
+      .hero-side {
+        padding: 24px;
+        border-radius: 28px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .led {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--red);
+        box-shadow: 0 0 16px rgba(255, 48, 72, 0.9);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 840px;
+        font-size: clamp(42px, 7vw, 94px);
+        line-height: 0.93;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: clamp(26px, 4vw, 44px);
+        line-height: 1.05;
+        font-weight: 850;
+      }
+
+      h3 {
+        font-size: 19px;
+        line-height: 1.25;
+        font-weight: 820;
+      }
+
+      .hero-copy {
+        max-width: 760px;
+        margin-top: 26px;
+        color: var(--muted);
+        font-size: clamp(16px, 2vw, 20px);
+        line-height: 1.75;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 34px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        min-height: 42px;
+        padding: 0 16px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 760;
+      }
+
+      .button.primary {
+        border-color: rgba(255, 48, 72, 0.46);
+        background: linear-gradient(135deg, rgba(255, 48, 72, 0.22), rgba(255, 255, 255, 0.06));
+        box-shadow: 0 0 28px rgba(255, 48, 72, 0.18);
+      }
+
+      .status-stack {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .status-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 14px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .status-row:last-child {
+        border-bottom: 0;
+      }
+
+      .status-index {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        color: var(--gold);
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .status-title {
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .status-copy {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .score {
+        color: var(--red);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-top: 34px;
+      }
+
+      .meta-item {
+        min-height: 96px;
+        padding: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .meta-k {
+        color: var(--faint);
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .meta-v {
+        margin-top: 9px;
+        font-size: 16px;
+        font-weight: 850;
+        line-height: 1.35;
+      }
+
+      .notice {
+        margin-top: 22px;
+        padding: 16px 18px;
+        border: 1px solid rgba(255, 48, 72, 0.24);
+        border-radius: 16px;
+        background: var(--red-soft);
+        color: #ffd7dc;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .section {
+        margin: 24px 0;
+        padding: clamp(24px, 4vw, 38px);
+        border-radius: var(--radius);
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: minmax(0, 0.8fr) minmax(260px, 0.42fr);
+        gap: 22px;
+        align-items: end;
+        margin-bottom: 26px;
+      }
+
+      .section-copy {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.75;
+      }
+
+      .audit-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+
+      .audit-card {
+        padding: 18px;
+        border-radius: 16px;
+        box-shadow: none;
+      }
+
+      .audit-card strong {
+        display: block;
+        margin-bottom: 10px;
+        font-size: 15px;
+      }
+
+      .audit-card p {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.68;
+      }
+
+      .audit-card .tag {
+        display: inline-flex;
+        margin-top: 14px;
+        padding: 6px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 999px;
+        color: var(--gold);
+        font-size: 11px;
+        font-weight: 850;
+      }
+
+      .principles {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+
+      .principle {
+        padding: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .principle span {
+        display: block;
+        color: var(--red);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .principle strong {
+        display: block;
+        margin-top: 10px;
+        font-size: 15px;
+      }
+
+      .principle p {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .concept-grid {
+        display: grid;
+        gap: 22px;
+      }
+
+      .concept-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+        gap: 0;
+        overflow: hidden;
+        border-radius: var(--radius);
+      }
+
+      .concept-media {
+        position: relative;
+        min-height: 360px;
+        background: #050506;
+      }
+
+      .concept-media img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .concept-media::after {
+        position: absolute;
+        inset: 0;
+        content: "";
+        pointer-events: none;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+      }
+
+      .concept-body {
+        display: flex;
+        min-height: 360px;
+        flex-direction: column;
+        padding: clamp(22px, 3vw, 32px);
+        background:
+          radial-gradient(circle at 100% 0%, rgba(255, 48, 72, 0.08), transparent 18rem),
+          var(--panel-strong);
+      }
+
+      .concept-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+      }
+
+      .concept-number {
+        color: var(--faint);
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+      }
+
+      .concept-score {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 10px;
+        border: 1px solid rgba(255, 48, 72, 0.28);
+        border-radius: 999px;
+        background: rgba(255, 48, 72, 0.08);
+        color: #ffb6c0;
+        font-size: 12px;
+        font-weight: 850;
+        white-space: nowrap;
+      }
+
+      .concept-body h3 {
+        margin-top: 14px;
+        font-size: clamp(24px, 3vw, 34px);
+      }
+
+      .concept-intent {
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.75;
+      }
+
+      .concept-facts {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .fact {
+        min-height: 112px;
+        padding: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .fact b {
+        display: block;
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .fact span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .concept-footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: auto;
+        padding-top: 20px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 760;
+      }
+
+      .pill.cost-low {
+        color: #a6f0cb;
+      }
+
+      .pill.cost-mid {
+        color: #f6d680;
+      }
+
+      .pill.cost-high {
+        color: #ffb6c0;
+      }
+
+      .route-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+      }
+
+      .route-card {
+        padding: 20px;
+        border-radius: 16px;
+        box-shadow: none;
+      }
+
+      .route-card h3 {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .route-card h3::before {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--red);
+        box-shadow: 0 0 14px rgba(255, 48, 72, 0.8);
+        content: "";
+        flex: 0 0 auto;
+      }
+
+      .route-card p {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.68;
+      }
+
+      .matrix {
+        width: 100%;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 15px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--faint);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      td {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      td strong {
+        color: var(--text);
+      }
+
+      .footer {
+        padding: 26px 0 54px;
+        color: var(--faint);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      @media (max-width: 980px) {
+        .hero-grid,
+        .section-head,
+        .concept-card {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-main {
+          min-height: 0;
+        }
+
+        .meta-grid,
+        .principles {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .audit-grid,
+        .route-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .concept-media {
+          min-height: 48vw;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .shell {
+          width: min(100% - 24px, 1180px);
+        }
+
+        .hero {
+          padding-top: 18px;
+        }
+
+        .hero-main,
+        .hero-side,
+        .section,
+        .concept-card {
+          border-radius: 18px;
+        }
+
+        .hero-main,
+        .hero-side,
+        .section {
+          padding: 20px;
+        }
+
+        h1 {
+          font-size: clamp(38px, 13vw, 58px);
+        }
+
+        .hero-copy {
+          font-size: 15px;
+        }
+
+        .meta-grid,
+        .principles,
+        .concept-facts {
+          grid-template-columns: 1fr;
+        }
+
+        .concept-media {
+          min-height: 62vw;
+        }
+
+        .concept-body {
+          min-height: 0;
+        }
+
+        .matrix {
+          overflow-x: auto;
+        }
+
+        table {
+          min-width: 720px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="shell hero-grid">
+        <section class="hero-main">
+          <div class="eyebrow"><span class="led"></span>LiveRadar Art Architecture Audit</div>
+          <h1>美术架构审核报告</h1>
+          <p class="hero-copy">
+            这份报告以“行业网页 UI 架构审核团队”的视角审查当前 LiveRadar 主页，并输出 8
+            个未来主页美术方向。当前阶段只做审查、方向判断和概念截图，不修改正式主页代码。
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#concepts">查看 8 个方向</a>
+            <a class="button" href="#audit">当前页面审查</a>
+            <a class="button" href="#route">团队建议路线</a>
+          </div>
+          <div class="meta-grid" aria-label="报告元信息">
+            <div class="meta-item">
+              <div class="meta-k">Date</div>
+              <div class="meta-v">2026-04-26</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-k">Branch</div>
+              <div class="meta-v">brandTest</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-k">Scope</div>
+              <div class="meta-v">主页美术计划</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-k">Status</div>
+              <div class="meta-v">Concept Only</div>
+            </div>
+          </div>
+          <div class="notice">
+            注意：下面 8 张图片是 AI 主页概念截图，用于评审未来方向；它们不是当前已经实现的页面。
+            本报告保留 LiveRadar 的黑色基调、LED 红点、直播监控核心，不把产品转成营销落地页。
+          </div>
+        </section>
+
+        <aside class="hero-side">
+          <div class="eyebrow"><span class="led"></span>Review Team</div>
+          <div class="status-stack">
+            <div class="status-row">
+              <div class="status-index">01</div>
+              <div>
+                <div class="status-title">UI 架构负责人</div>
+                <div class="status-copy">审查控制区、信息层级、卡片系统和长期扩展性。</div>
+              </div>
+              <div class="score">High</div>
+            </div>
+            <div class="status-row">
+              <div class="status-index">02</div>
+              <div>
+                <div class="status-title">品牌系统设计</div>
+                <div class="status-copy">约束黑色、LED 红点、平台色、星系 logo 的使用边界。</div>
+              </div>
+              <div class="score">High</div>
+            </div>
+            <div class="status-row">
+              <div class="status-index">03</div>
+              <div>
+                <div class="status-title">动效与性能</div>
+                <div class="status-copy">判断 3D 卡片、空间化缩略图、Logo 轨道动效的节奏。</div>
+              </div>
+              <div class="score">Mid</div>
+            </div>
+            <div class="status-row">
+              <div class="status-index">04</div>
+              <div>
+                <div class="status-title">移动端体验</div>
+                <div class="status-copy">重点审核 iPhone 控制区换行、卡片比例和触屏动画降级。</div>
+              </div>
+              <div class="score">High</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="section" id="audit">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow"><span class="led"></span>Current Page Audit</div>
+            <h2>当前主页视觉架构判断</h2>
+          </div>
+          <p class="section-copy">
+            当前版本已经形成了明确的黑色监控台气质，问题不在“有没有设计感”，而在高密度控件、
+            动效、红色信号和平台标签同时出现时，视觉优先级会互相竞争。
+          </p>
+        </div>
+
+        <div class="audit-grid">
+          <article class="audit-card">
+            <strong>品牌一致性</strong>
+            <p>
+              黑色基底、星系 logo、LED 红点已经具备记忆点。建议继续把红色限定为“实时信号”，
+              避免在边框、按钮、背景和标题上同时大面积出现。
+            </p>
+            <span class="tag">保留核心，减少噪声</span>
+          </article>
+          <article class="audit-card">
+            <strong>顶部控制区</strong>
+            <p>
+              现在的顶部区域承载平台选择、输入、添加、刷新、导入导出、自动倒计时，桌面可用，
+              但移动端容易形成两到三层挤压。未来需要把“常用动作”和“低频动作”分层。
+            </p>
+            <span class="tag">需要信息架构重排</span>
+          </article>
+          <article class="audit-card">
+            <strong>状态与指标</strong>
+            <p>
+              Live / Offline / 最爱直播中是有效的监控指标，但当前视觉权重接近装饰条。
+              建议变成更像系统状态栏的轻量结构，并保留绿色只代表真实直播状态。
+            </p>
+            <span class="tag">语义优先</span>
+          </article>
+          <article class="audit-card">
+            <strong>直播卡片系统</strong>
+            <p>
+              卡片 3D 和空间化缩略图是当前最强体验资产。下一阶段应把卡片拆成稳定规范：
+              缩略图、平台、状态、标题、主播、收藏、删除各自有固定层级。
+            </p>
+            <span class="tag">值得产品化</span>
+          </article>
+          <article class="audit-card">
+            <strong>动效密度</strong>
+            <p>
+              动效已经从“装饰”进入“品牌体验”阶段，但刷新、加载、头像、卡片、Logo 同时动时会显得忙。
+              未来每个状态只保留一个主动画信号。
+            </p>
+            <span class="tag">克制比更多更高级</span>
+          </article>
+          <article class="audit-card">
+            <strong>移动端展示</strong>
+            <p>
+              iPhone 端真正的问题不是卡片，而是顶部控制区和统计条的节奏。建议采用移动优先的
+              sticky mini command bar，再把输入与低频工具放入展开层。
+            </p>
+            <span class="tag">需要专门布局</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow"><span class="led"></span>Visual Principles</div>
+            <h2>未来美术原则</h2>
+          </div>
+          <p class="section-copy">
+            这四条原则用于约束后续所有方向，避免每次局部优化后产生新的视觉冲突。
+          </p>
+        </div>
+        <div class="principles">
+          <div class="principle">
+            <span>01</span>
+            <strong>红色只做信号</strong>
+            <p>红色是直播状态、品牌红点和危险提醒，不是通用装饰色。</p>
+          </div>
+          <div class="principle">
+            <span>02</span>
+            <strong>黑色要有层次</strong>
+            <p>使用石墨黑、纯黑、玻璃黑、柔和边线建立空间，而不是单一黑色铺满。</p>
+          </div>
+          <div class="principle">
+            <span>03</span>
+            <strong>截图是主视觉</strong>
+            <p>LiveRadar 的核心不是按钮，而是直播画面监控；卡片缩略图必须占据足够权重。</p>
+          </div>
+          <div class="principle">
+            <span>04</span>
+            <strong>动效服务判断</strong>
+            <p>动效应帮助用户判断直播、刷新、收藏、平台来源，而不是不断争夺注意力。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="concepts">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow"><span class="led"></span>8 Directions</div>
+            <h2>八个主页美术优化方向</h2>
+          </div>
+          <p class="section-copy">
+            每个方向都以当前 LiveRadar 信息结构为基础，只探索未来视觉架构，不代表已经进入开发。
+            评分是本轮审核团队对“品牌适配度 + 可落地性 + 未来延展性”的综合判断。
+          </p>
+        </div>
+
+        <div class="concept-grid">
+          <article class="concept-card">
+            <div class="concept-media">
+              <img src="concepts/concept-01-noir-command-center.png" alt="Noir Command Center 主页概念截图" />
+            </div>
+            <div class="concept-body">
+              <div class="concept-top">
+                <div class="concept-number">DIRECTION 01</div>
+                <div class="concept-score">推荐 9.0 / 10</div>
+              </div>
+              <h3>Noir Command Center</h3>
+              <p class="concept-intent">
+                更克制的黑色指挥台布局，把 LiveRadar 变成“开机就能判断全局”的监控面板。
+                它适合当前单人高频巡检场景，重点是效率、稳定和视觉安静。
+              </p>
+              <div class="concept-facts">
+                <div class="fact"><b>适合保留</b><span>当前 3D 卡片、统一 5 分钟刷新、Live/Offline 指标、LED 红点。</span></div>
+                <div class="fact"><b>建议替换</b><span>过重红色边框、复杂刷新动效、移动端拥挤工具条。</span></div>
+                <div class="fact"><b>实施成本</b><span>中等。主要是 CSS 架构和顶部区域重排，逻辑改动较少。</span></div>
+                <div class="fact"><b>风险</b><span>过度克制后可能显得冷，需要用细微光感和状态色保持生命力。</span></div>
+              </div>
+              <div class="concept-footer">
+                <span class="pill cost-mid">成本：中</span>
+                <span class="pill">效率优先</span>
+                <span class="pill">主线候选</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="concept-card">
+            <div class="concept-media">
+              <img src="concepts/concept-02-orbital-live-system.png" alt="Orbital Live System 主页概念截图" />
+            </div>
+            <div class="concept-body">
+              <div class="concept-top">
+                <div class="concept-number">DIRECTION 02</div>
+                <div class="concept-score">推荐 8.6 / 10</div>
+              </div>
+              <h3>Orbital Live System</h3>
+              <p class="concept-intent">
+                围绕星系 logo 建立轨道式信息层级，让主播、平台、直播状态都像轨道节点一样被监控。
+                这是最能延展品牌世界观的方向。
+              </p>
+              <div class="concept-facts">
+                <div class="fact"><b>适合保留</b><span>当前星系 logo、平台颜色、收藏主播、卡片 3D 层次。</span></div>
+                <div class="fact"><b>建议替换</b><span>普通统计条可升级为轨道状态区，但不要牺牲扫描效率。</span></div>
+                <div class="fact"><b>实施成本</b><span>中高。需要新增轨道状态组件和更完整的品牌动效规范。</span></div>
+                <div class="fact"><b>风险</b><span>如果轨道元素过多，会从监控工具变成视觉展示页。</span></div>
+              </div>
+              <div class="concept-footer">
+                <span class="pill cost-high">成本：中高</span>
+                <span class="pill">品牌延展</span>
+                <span class="pill">Logo 体系</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="concept-card">
+            <div class="concept-media">
+              <img src="concepts/concept-03-glass-radar-deck.png" alt="Glass Radar Deck 主页概念截图" />
+            </div>
+            <div class="concept-body">
+              <div class="concept-top">
+                <div class="concept-number">DIRECTION 03</div>
+                <div class="concept-score">推荐 8.1 / 10</div>
+              </div>
+              <h3>Glass Radar Deck</h3>
+              <p class="concept-intent">
+                用透明玻璃面板和弱边框减少厚重感，让页面像一个低照度雷达桌面。
+                适合在不改变功能结构的前提下提升现代感。
+              </p>
+              <div class="concept-facts">
+                <div class="fact"><b>适合保留</b><span>当前黑色主调、卡片布局、空间化缩略图和平台标签。</span></div>
+                <div class="fact"><b>建议替换</b><span>强边框可改成玻璃边线，背景网格应更轻。</span></div>
+                <div class="fact"><b>实施成本</b><span>中。CSS 层面的面板、阴影、模糊和对比度重构。</span></div>
+                <div class="fact"><b>风险</b><span>玻璃感过多会降低文字可读性，需要控制透明度和背景复杂度。</span></div>
+              </div>
+              <div class="concept-footer">
+                <span class="pill cost-mid">成本：中</span>
+                <span class="pill">高级材质</span>
+                <span class="pill">轻量改造</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="concept-card">
+            <div class="concept-media">
+              <img src="concepts/concept-04-broadcast-terminal.png" alt="Broadcast Terminal 主页概念截图" />
+            </div>
+            <div class="concept-body">
+              <div class="concept-top">
+                <div class="concept-number">DIRECTION 04</div>
+                <div class="concept-score">推荐 8.4 / 10</div>
+              </div>
+              <h3>Broadcast Terminal</h3>
+              <p class="concept-intent">
+                专业直播监控终端方向，信息密度更高，适合未来主播列表继续扩大后进行快速筛查。
+                它是最偏工具效率的方案。
+              </p>
+              <div class="concept-facts">
+                <div class="fact"><b>适合保留</b><span>真实刷新状态、平台筛选、批量导入导出、离线列表。</span></div>
+                <div class="fact"><b>建议替换</b><span>大卡片可加入紧凑列表视图或分栏详情，而不是只靠两列卡片。</span></div>
+                <div class="fact"><b>实施成本</b><span>高。需要新增视图模式、密度切换和更强状态体系。</span></div>
+                <div class="fact"><b>风险</b><span>工具感会增强，但品牌情绪可能变弱；不适合一次性完全替换。</span></div>
+              </div>
+              <div class="concept-footer">
+                <span class="pill cost-high">成本：高</span>
+                <span class="pill">高密度</span>
+                <span class="pill">Power User</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="concept-card">
+            <div class="concept-media">
+              <img src="concepts/concept-05-minimal-led-pulse.png" alt="Minimal LED Pulse 主页概念截图" />
+            </div>
+            <div class="concept-body">
+              <div class="concept-top">
+                <div class="concept-number">DIRECTION 05</div>
+                <div class="concept-score">推荐 9.2 / 10</div>
+              </div>
+              <h3>Minimal LED Pulse</h3>
+              <p class="concept-intent">
+                极简黑灰 + 小面积红色 LED 信号。这个方向最符合“看久不累”的要求，
+                也最容易把当前过多红色元素收束成高级、稳定的品牌语言。
+              </p>
+              <div class="concept-facts">
+                <div class="fact"><b>适合保留</b><span>红点品牌锚点、绿色直播状态、卡片 hover、空间化缩略图。</span></div>
+                <div class="fact"><b>建议替换</b><span>大面积红光、按钮重色块、装饰线条、重复的状态强调。</span></div>
+                <div class="fact"><b>实施成本</b><span>低到中。主要是 token 收束、按钮体系和卡片边界重绘。</span></div>
+                <div class="fact"><b>风险</b><span>如果缩得太狠，可能失去“直播监控”的紧迫感，需要保留少量 LED 呼吸。</span></div>
+              </div>
+              <div class="concept-footer">
+                <span class="pill cost-low">成本：低中</span>
+                <span class="pill">近期首选</span>
+                <span class="pill">耐看</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="concept-card">
+            <div class="concept-media">
+              <img src="concepts/concept-06-cinematic-stream-wall.png" alt="Cinematic Stream Wall 主页概念截图" />
+            </div>
+            <div class="concept-body">
+              <div class="concept-top">
+                <div class="concept-number">DIRECTION 06</div>
+                <div class="concept-score">推荐 8.0 / 10</div>
+              </div>
+              <h3>Cinematic Stream Wall</h3>
+              <p class="concept-intent">
+                突出直播截图墙，让画面本身成为第一视觉资产。它能让页面一眼看上去更有冲击力，
+                但需要更严格地控制卡片文字和操作按钮。
+              </p>
+              <div class="concept-facts">
+                <div class="fact"><b>适合保留</b><span>当前直播截图、空间化图片、平台角标和在线时长。</span></div>
+                <div class="fact"><b>建议替换</b><span>卡片底部信息可更轻，操作按钮要进入悬浮或次级层。</span></div>
+                <div class="fact"><b>实施成本</b><span>中高。需要重做卡片比例、图片裁切和文字溢出策略。</span></div>
+                <div class="fact"><b>风险</b><span>截图质量不稳定时，整体美术质量会被低质量缩略图拉低。</span></div>
+              </div>
+              <div class="concept-footer">
+                <span class="pill cost-high">成本：中高</span>
+                <span class="pill">视觉冲击</span>
+                <span class="pill">截图优先</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="concept-card">
+            <div class="concept-media">
+              <img src="concepts/concept-07-platform-constellation.png" alt="Platform Constellation 主页概念截图" />
+            </div>
+            <div class="concept-body">
+              <div class="concept-top">
+                <div class="concept-number">DIRECTION 07</div>
+                <div class="concept-score">推荐 8.7 / 10</div>
+              </div>
+              <h3>Platform Constellation</h3>
+              <p class="concept-intent">
+                将斗鱼、B站、Twitch、Kick 的品牌色变成“星群式辅助编码”，让平台差异更自然地进入
+                LiveRadar 的星系世界观。
+              </p>
+              <div class="concept-facts">
+                <div class="fact"><b>适合保留</b><span>平台选择器、平台角标、Logo 轨道、收藏主播的视觉身份。</span></div>
+                <div class="fact"><b>建议替换</b><span>平台色不要变成大色块，应该是节点、细线、徽标和状态点。</span></div>
+                <div class="fact"><b>实施成本</b><span>中。需要建立平台色 token，并统一应用到选择器和卡片。</span></div>
+                <div class="fact"><b>风险</b><span>多平台色过多会破坏黑色主调，需要给每种颜色设最大占比。</span></div>
+              </div>
+              <div class="concept-footer">
+                <span class="pill cost-mid">成本：中</span>
+                <span class="pill">平台识别</span>
+                <span class="pill">品牌辅助线</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="concept-card">
+            <div class="concept-media">
+              <img src="concepts/concept-08-mobile-first-observatory.png" alt="Mobile First Observatory 主页概念截图" />
+            </div>
+            <div class="concept-body">
+              <div class="concept-top">
+                <div class="concept-number">DIRECTION 08</div>
+                <div class="concept-score">推荐 8.5 / 10</div>
+              </div>
+              <h3>Mobile First Observatory</h3>
+              <p class="concept-intent">
+                以 iPhone 访问体验为核心，重新安排顶部控制区、平台选择、输入、刷新状态和卡片节奏。
+                如果你经常在手机上看，这是最值得单独推进的方向。
+              </p>
+              <div class="concept-facts">
+                <div class="fact"><b>适合保留</b><span>两列或单列直播卡片、固定刷新、低强度动画、星系 logo。</span></div>
+                <div class="fact"><b>建议替换</b><span>桌面式全量工具条应拆成主操作栏 + 展开工具层。</span></div>
+                <div class="fact"><b>实施成本</b><span>中高。需要专门设计移动端断点，而不是让桌面自然挤压。</span></div>
+                <div class="fact"><b>风险</b><span>移动优先会影响桌面一致性，需要定义两个视口的共同组件骨架。</span></div>
+              </div>
+              <div class="concept-footer">
+                <span class="pill cost-high">成本：中高</span>
+                <span class="pill">iPhone 优先</span>
+                <span class="pill">控制区重排</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="route">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow"><span class="led"></span>Team Route</div>
+            <h2>审核团队推荐路线</h2>
+          </div>
+          <p class="section-copy">
+            不建议把 8 个方向混在一起。更合理的做法是选择一个主方向，再选择一个辅助语言，
+            形成统一的下一版美术架构。
+          </p>
+        </div>
+
+        <div class="route-grid">
+          <article class="route-card">
+            <h3>近期最稳路线</h3>
+            <p>
+              以 <strong>Minimal LED Pulse</strong> 作为主方向，叠加 <strong>Noir Command Center</strong>
+              的指挥台信息架构。它最适合当前项目：不大改功能，却能明显减少红色压力和动效噪声。
+            </p>
+          </article>
+          <article class="route-card">
+            <h3>品牌长期路线</h3>
+            <p>
+              以 <strong>Orbital Live System</strong> 作为品牌骨架，吸收
+              <strong>Platform Constellation</strong> 的平台色编码，让星系 logo 不只是图标，而是整个界面的组织原则。
+            </p>
+          </article>
+          <article class="route-card">
+            <h3>工具效率路线</h3>
+            <p>
+              当主播数量继续扩大时，推进 <strong>Broadcast Terminal</strong>，增加密度模式和列表模式。
+              这条路线更像专业控制台，适合未来监控对象变多后的增长。
+            </p>
+          </article>
+          <article class="route-card">
+            <h3>移动端补强路线</h3>
+            <p>
+              用 <strong>Mobile First Observatory</strong> 专门解决 iPhone 顶部控制区和卡片节奏问题。
+              它可以作为任何主方向的第二阶段，不必立刻改掉桌面体验。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow"><span class="led"></span>Decision Matrix</div>
+            <h2>八方向对比矩阵</h2>
+          </div>
+          <p class="section-copy">
+            这个矩阵用于你做评审取舍：先看主方向，再决定哪些元素进入下一阶段实现。
+          </p>
+        </div>
+
+        <div class="matrix">
+          <table>
+            <thead>
+              <tr>
+                <th>方向</th>
+                <th>最强价值</th>
+                <th>适合阶段</th>
+                <th>落地成本</th>
+                <th>主要风险</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Noir Command Center</strong></td>
+                <td>监控效率和视觉稳定性</td>
+                <td>下一版主框架</td>
+                <td>中</td>
+                <td>过于冷静，情绪不足</td>
+              </tr>
+              <tr>
+                <td><strong>Orbital Live System</strong></td>
+                <td>把 logo 扩展成界面语言</td>
+                <td>品牌系统升级</td>
+                <td>中高</td>
+                <td>轨道元素可能变成装饰负担</td>
+              </tr>
+              <tr>
+                <td><strong>Glass Radar Deck</strong></td>
+                <td>快速提升现代质感</td>
+                <td>视觉 polish</td>
+                <td>中</td>
+                <td>透明度影响可读性</td>
+              </tr>
+              <tr>
+                <td><strong>Broadcast Terminal</strong></td>
+                <td>更高信息密度和专业感</td>
+                <td>主播数量扩大后</td>
+                <td>高</td>
+                <td>品牌温度下降</td>
+              </tr>
+              <tr>
+                <td><strong>Minimal LED Pulse</strong></td>
+                <td>耐看、克制、降低红色压力</td>
+                <td>近期首选</td>
+                <td>低中</td>
+                <td>需要保留足够直播紧迫感</td>
+              </tr>
+              <tr>
+                <td><strong>Cinematic Stream Wall</strong></td>
+                <td>直播截图墙视觉冲击</td>
+                <td>卡片系统重构</td>
+                <td>中高</td>
+                <td>缩略图质量决定整体质感</td>
+              </tr>
+              <tr>
+                <td><strong>Platform Constellation</strong></td>
+                <td>平台识别和星系品牌统一</td>
+                <td>品牌辅助系统</td>
+                <td>中</td>
+                <td>多色会破坏黑色主调</td>
+              </tr>
+              <tr>
+                <td><strong>Mobile First Observatory</strong></td>
+                <td>修复 iPhone 控制区和浏览节奏</td>
+                <td>移动端专项</td>
+                <td>中高</td>
+                <td>桌面与移动组件需要统一骨架</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow"><span class="led"></span>Next Review Checklist</div>
+            <h2>进入实现前的检查清单</h2>
+          </div>
+          <p class="section-copy">
+            选定方向后，再进入正式主页实现。实现前建议用这组标准约束设计，防止局部优化相互打架。
+          </p>
+        </div>
+        <div class="audit-grid">
+          <article class="audit-card">
+            <strong>保留真实监控流程</strong>
+            <p>所有视觉改造都不能影响输入 ID、添加主播、5 分钟统一刷新、查看在线/离线结果。</p>
+          </article>
+          <article class="audit-card">
+            <strong>限制红色占比</strong>
+            <p>红色优先给品牌红点和真实信号，普通边框、按钮、背景尽量回到黑灰系统。</p>
+          </article>
+          <article class="audit-card">
+            <strong>绿色保持语义</strong>
+            <p>绿色只代表正在直播或成功状态，避免作为装饰色使用。</p>
+          </article>
+          <article class="audit-card">
+            <strong>每个状态一个主动画</strong>
+            <p>刷新、加载、头像、Logo、卡片 hover 不要同时抢注意力，动效需要分层。</p>
+          </article>
+          <article class="audit-card">
+            <strong>移动端专门验收</strong>
+            <p>至少检查 390、640、900、1100、1280、1440、1920 宽度，重点看控制区和卡片溢出。</p>
+          </article>
+          <article class="audit-card">
+            <strong>先定主方向</strong>
+            <p>推荐先选一个主方向和一个辅助方向，再进入 CSS token、组件和动效的实际改造。</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="shell footer">
+      LiveRadar Art Audit 2026-04-26. 本报告为 brandTest 分支的美术计划材料；概念图用于评审，不代表已上线 UI。
+    </footer>
+  </body>
+</html>

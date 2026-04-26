@@ -16,8 +16,8 @@
     --player-open-height: 408px;
     --player-open-padding: 14px;
     --player-panel-radius: 8px;
-    --player-anim-duration: 0.3s;
-    --player-anim-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --player-anim-duration: 0.42s;
+    --player-anim-ease: cubic-bezier(0.16, 1, 0.3, 1);
     --music-progress-angle-soft: 0deg;
     --music-progress-angle-mid: 0deg;
     --music-progress-angle: 0deg;
@@ -37,7 +37,10 @@
     border-radius: var(--player-panel-radius);
     padding: var(--player-open-padding);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    transition:
+        box-shadow 0.2s ease,
+        transform 0.2s ease,
+        border-color 0.2s ease;
     transform-origin: bottom left;
     display: flex;
     flex-direction: column;
@@ -112,7 +115,10 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    transition:
+        box-shadow 0.2s ease,
+        transform 0.2s ease,
+        border-color 0.2s ease;
 }
 
 .music-player.minimized::before,
@@ -194,6 +200,7 @@
 
 .music-player.is-animating {
     pointer-events: none;
+    will-change: width, height, padding, border-radius, transform;
 }
 
 .music-player.measuring {
@@ -207,6 +214,7 @@
     animation-duration: var(--player-anim-duration);
     animation-timing-function: var(--player-anim-ease);
     animation-fill-mode: both;
+    transform-origin: bottom left;
 }
 
 .music-player.expanding {
@@ -217,19 +225,21 @@
     animation-name: playerCollapse;
 }
 
-.music-player.expanding .player-content,
-.music-player.expanding .player-toggle,
-.music-player.expanding .player-controls,
-.music-player.expanding .player-progress,
-.music-player.expanding .volume-control,
-.music-player.expanding .playlist-section,
+.music-player.expanding .player-content {
+    animation: playerPanelFadeIn var(--player-anim-duration) var(--player-anim-ease) both;
+    pointer-events: none;
+}
+
+.music-player.expanding .player-info,
+.music-player.expanding .player-toggle {
+    animation: playerHeaderFadeIn 0.28s var(--player-anim-ease) 0.08s both;
+    pointer-events: none;
+}
+
 .music-player.collapsing .player-content,
-.music-player.collapsing .player-toggle,
-.music-player.collapsing .player-controls,
-.music-player.collapsing .player-progress,
-.music-player.collapsing .volume-control,
-.music-player.collapsing .playlist-section {
-    opacity: 0;
+.music-player.collapsing .player-info,
+.music-player.collapsing .player-toggle {
+    animation: playerPanelFadeOut 0.16s ease-out both;
     pointer-events: none;
 }
 
@@ -239,18 +249,31 @@
         height: var(--player-min-size);
         padding: 0;
         border-radius: 50%;
+        transform: translate3d(0, 0, 0) scale(0.98);
+        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.62);
     }
-    55% {
-        width: var(--player-min-size);
-        height: var(--player-open-height);
-        padding: 0;
-        border-radius: calc(var(--player-panel-radius) + 6px);
+    36% {
+        width: min(210px, var(--player-open-width));
+        height: 72px;
+        padding: 6px;
+        border-radius: 24px;
+        transform: translate3d(0, -2px, 0) scale(1.01);
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.66);
+    }
+    68% {
+        width: var(--player-open-width);
+        height: min(190px, var(--player-open-height));
+        padding: var(--player-open-padding);
+        border-radius: calc(var(--player-panel-radius) + 4px);
+        transform: translate3d(0, -1px, 0) scale(1);
     }
     100% {
         width: var(--player-open-width);
         height: var(--player-open-height);
         padding: var(--player-open-padding);
         border-radius: var(--player-panel-radius);
+        transform: translate3d(0, 0, 0) scale(1);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.55);
     }
 }
 
@@ -260,18 +283,61 @@
         height: var(--player-open-height);
         padding: var(--player-open-padding);
         border-radius: var(--player-panel-radius);
+        transform: translate3d(0, 0, 0) scale(1);
     }
-    45% {
-        width: var(--player-min-size);
-        height: var(--player-open-height);
-        padding: 0;
-        border-radius: calc(var(--player-panel-radius) + 6px);
+    32% {
+        width: var(--player-open-width);
+        height: min(190px, var(--player-open-height));
+        padding: var(--player-open-padding);
+        border-radius: calc(var(--player-panel-radius) + 4px);
+        transform: translate3d(0, -1px, 0) scale(1);
+    }
+    64% {
+        width: min(210px, var(--player-open-width));
+        height: 72px;
+        padding: 6px;
+        border-radius: 24px;
+        transform: translate3d(0, -2px, 0) scale(1.01);
     }
     100% {
         width: var(--player-min-size);
         height: var(--player-min-size);
         padding: 0;
         border-radius: 50%;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+@keyframes playerPanelFadeIn {
+    0%, 52% {
+        opacity: 0;
+        transform: translateY(8px) scale(0.985);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes playerHeaderFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(4px) scale(0.96);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes playerPanelFadeOut {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(5px) scale(0.985);
     }
 }
 
@@ -999,6 +1065,20 @@
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .music-player.expanding,
+    .music-player.collapsing,
+    .music-player.expanding .player-content,
+    .music-player.expanding .player-info,
+    .music-player.expanding .player-toggle,
+    .music-player.collapsing .player-content,
+    .music-player.collapsing .player-info,
+    .music-player.collapsing .player-toggle {
+        animation-duration: 1ms !important;
+        animation-delay: 0ms !important;
     }
 }
 

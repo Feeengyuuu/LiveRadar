@@ -219,10 +219,10 @@ export const APP_CONFIG = {
     THRESHOLD: 10,
   },
 
-  // Auto-refresh (优化：增加抖动延迟以分散请求，减少突发流量)
+  // Auto-refresh: unified sweep cadence with jitter on initial load to smooth bursts.
   AUTO_REFRESH: {
-    INTERVAL: 600, // seconds
-    JITTER_MAX_INITIAL: 3000,  // 优化：从2000ms增加到3000ms
+    INTERVAL: 300, // seconds
+    JITTER_MAX_INITIAL: 3000,
   },
 
   // Snow effect

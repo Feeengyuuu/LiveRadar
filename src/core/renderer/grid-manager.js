@@ -18,6 +18,30 @@ import { updateCard } from './card-renderer.js';
 // without a querySelectorAll on every render.
 const knownCardIds = new Set();
 let disposeRenderer = null;
+const VALUE_UPDATE_ANIMATION_MS = 560;
+
+function restartTransientClass(element, className, timeoutMs = VALUE_UPDATE_ANIMATION_MS) {
+    if (!element?.isConnected) return;
+
+    const timerKey = `_${className.replace(/-/g, '')}Timer`;
+    if (element[timerKey]) {
+        window.clearTimeout(element[timerKey]);
+    }
+
+    element.classList.remove(className);
+    void element.offsetWidth;
+    element.classList.add(className);
+    element[timerKey] = window.setTimeout(() => {
+        element.classList.remove(className);
+        element[timerKey] = null;
+    }, timeoutMs);
+}
+
+function setTextWithPulse(element, nextText) {
+    if (!element || element.textContent === nextText) return;
+    element.textContent = nextText;
+    restartTransientClass(element, 'value-updated');
+}
 
 export function initRenderer() {
     if (disposeRenderer) return disposeRenderer;
@@ -283,21 +307,15 @@ function renderAllImmediate() {
 
     if (cache.liveCount) {
         const nextCount = String(flags.liveCount);
-        if (cache.liveCount.textContent !== nextCount) {
-            cache.liveCount.textContent = nextCount;
-        }
+        setTextWithPulse(cache.liveCount, nextCount);
     }
     if (cache.offlineCount) {
         const nextCount = String(flags.offlineCount);
-        if (cache.offlineCount.textContent !== nextCount) {
-            cache.offlineCount.textContent = nextCount;
-        }
+        setTextWithPulse(cache.offlineCount, nextCount);
     }
     if (cache.loopCount) {
         const nextCount = String(flags.loopCount);
-        if (cache.loopCount.textContent !== nextCount) {
-            cache.loopCount.textContent = nextCount;
-        }
+        setTextWithPulse(cache.loopCount, nextCount);
     }
 
     const favoriteLiveCount = rooms.filter(room => {
@@ -306,9 +324,9 @@ function renderAllImmediate() {
         return !!data && !data.loading && !data.isError && !data._retryFailed && data.isLive === true;
     }).length;
     const offlineTotal = flags.offlineCount;
-    if (cache.metricLiveCount) cache.metricLiveCount.textContent = String(flags.liveCount);
-    if (cache.metricOfflineCount) cache.metricOfflineCount.textContent = String(offlineTotal);
-    if (cache.metricFavoriteCount) cache.metricFavoriteCount.textContent = String(favoriteLiveCount);
+    setTextWithPulse(cache.metricLiveCount, String(flags.liveCount));
+    setTextWithPulse(cache.metricOfflineCount, String(offlineTotal));
+    setTextWithPulse(cache.metricFavoriteCount, String(favoriteLiveCount));
 
     cache.zoneLive?.classList.toggle('active', flags.hasLive);
     cache.zoneOffline?.classList.toggle('active', flags.hasOffline);

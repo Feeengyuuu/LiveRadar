@@ -18,6 +18,7 @@
 import { ResourceManager } from '../utils/resource-manager.js';
 import { getDOMCache } from '../utils/dom-cache.js';
 import { PLACEHOLDERS } from '../config/ui-strings.js';
+import { PLATFORM_CONFIG } from '../config/constants.js';
 import { updateRoomDataCache } from './state.js';
 import { unlockAllAudio as unlockAllAudioManager } from '../features/audio/audio-manager.js';
 import { playYahahaSound } from '../features/audio/sound-effects.js';
@@ -54,6 +55,16 @@ function updatePlaceholder() {
     if (!cache.roomIdInput) return;
 
     cache.roomIdInput.placeholder = PLACEHOLDERS[p] || "输入 ID...";
+
+    const platformColor = PLATFORM_CONFIG[p]?.color || '#ff5d23';
+    cache.selectorTrigger?.style.setProperty('--selected-platform-color', platformColor);
+    if (cache.currentPlatformLabel) {
+        cache.currentPlatformLabel.style.color = platformColor;
+    }
+    if (cache.selectedIndicator) {
+        cache.selectedIndicator.style.backgroundColor = platformColor;
+        cache.selectedIndicator.style.boxShadow = `0 0 8px ${platformColor}`;
+    }
 }
 
 // ====================================================================
@@ -163,10 +174,10 @@ function setupSecretAudioButton() {
     ResourceManager.addEventListener(secretButton, 'click', (e) => {
         e.stopPropagation(); // Prevent event bubbling
 
-        // Visual feedback: scale animation
-        secretButton.style.transform = 'scale(1.5)';
+        // Visual feedback stays in CSS so the logo hover transform remains intact.
+        secretButton.classList.add('is-audio-pinging');
         const timerId = setTimeout(() => {
-            secretButton.style.transform = 'scale(1)';
+            secretButton.classList.remove('is-audio-pinging');
         }, 200);
         ResourceManager.addTimer(timerId);
 

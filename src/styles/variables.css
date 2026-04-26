@@ -11,28 +11,28 @@
   --twitch: #9146ff;
   --kick: #53fc18;
 
-  /* ===== Alyx-inspired Orange Console Theme ===== */
-  --alyx-orange: #f26a21;
-  --alyx-orange-hot: #ff8a3d;
-  --alyx-orange-deep: #b83f13;
-  --alyx-amber: #ffb15c;
-  --alyx-bg: #060504;
-  --alyx-panel: #11100e;
-  --alyx-panel-2: #181512;
-  --alyx-border: rgba(242, 106, 33, 0.36);
-  --alyx-border-soft: rgba(242, 106, 33, 0.18);
-  --alyx-grid: rgba(242, 106, 33, 0.055);
+  /* ===== Signal Core Red/Black Console Theme ===== */
+  --alyx-orange: #ff2738;
+  --alyx-orange-hot: #ff4d5c;
+  --alyx-orange-deep: #a60f1d;
+  --alyx-amber: #ff6f7b;
+  --alyx-bg: #020303;
+  --alyx-panel: #0c0d0f;
+  --alyx-panel-2: #111317;
+  --alyx-border: rgba(255, 39, 56, 0.36);
+  --alyx-border-soft: rgba(255, 39, 56, 0.18);
+  --alyx-grid: rgba(255, 39, 56, 0.055);
 
   /* ===== Status Colors ===== */
-  --live: #10b981;        /* Green - Live streaming */
+  --live: #17e899;        /* Green - Live streaming */
   --loop: #6366f1;        /* Indigo - Replay/Loop */
   --off: #6b7280;         /* Gray - Offline */
-  --weak: #eab308;        /* Yellow - Weak signal */
+  --weak: #ffe45e;        /* Yellow - Weak signal */
   --error: #ef4444;       /* Red - Error state */
 
   /* ===== UI Background Colors ===== */
-  --card-bg: #11100e;
-  --bg-dark: #060504;
+  --card-bg: #0c0d0f;
+  --bg-dark: #020303;
   --bg-darker: #000000;
   --bg-elevated: #1f1f1f;
   --bg-overlay: rgba(0, 0, 0, 0.8);

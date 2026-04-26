@@ -26,6 +26,40 @@ import { on, emit, Events } from './event-bus.js';
 // External dependencies (only callbacks need injection)
 let detectStatusChanges = null;
 let disposeRefreshManager = null;
+const REFRESH_VISUAL_SETTLE_MS = 960;
+let refreshVisualSettleTimer = null;
+
+function clearRefreshVisualState() {
+    if (typeof document === 'undefined') return;
+
+    if (refreshVisualSettleTimer) {
+        ResourceManager.clearTimer(refreshVisualSettleTimer);
+        refreshVisualSettleTimer = null;
+    }
+
+    document.documentElement.classList.remove('is-refreshing');
+}
+
+function setRefreshVisualState(isRefreshing) {
+    if (typeof document === 'undefined') return;
+
+    if (refreshVisualSettleTimer) {
+        ResourceManager.clearTimer(refreshVisualSettleTimer);
+        refreshVisualSettleTimer = null;
+    }
+
+    if (isRefreshing) {
+        document.documentElement.classList.add('is-refreshing');
+        return;
+    }
+
+    refreshVisualSettleTimer = ResourceManager.addTimer(
+        setTimeout(() => {
+            document.documentElement.classList.remove('is-refreshing');
+            refreshVisualSettleTimer = null;
+        }, REFRESH_VISUAL_SETTLE_MS)
+    );
+}
 
 /**
  * Initialize refresh manager with external dependencies
@@ -42,6 +76,7 @@ export function initRefreshManager(deps = {}) {
 
     disposeRefreshManager = () => {
         unsubscribeRefreshRequest();
+        clearRefreshVisualState();
         disposeRefreshManager = null;
     };
 
@@ -212,6 +247,7 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
         emit(Events.AUTO_REFRESH_RESET);
     }
 
+    setRefreshVisualState(true);
     updateRefreshStatus(true);
 
     const cache = getDOMCache();
@@ -334,6 +370,7 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
     } finally {
         // Cleanup work - execute regardless of success or failure
         updateRefreshStatus(false);
+        setRefreshVisualState(false);
         updateRefreshStatsDisplay();
 
         if (cache.globalRefreshBtn) cache.globalRefreshBtn.classList.remove('animate-spin');

@@ -63,7 +63,7 @@ let dragListenersBound = false;
 let isInitialized = false;
 let completionTimer = null;
 
-const ANIMATION_DURATION_MS = 300;
+const ANIMATION_DURATION_MS = 420;
 const TRACK_COMPLETE_HOLD_MS = 120;
 const PLAYER_INTERACTIVE_SELECTOR = [
     'button',

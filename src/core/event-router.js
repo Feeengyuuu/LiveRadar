@@ -138,9 +138,10 @@ function handleInputEvent(event) {
  * @param {Event} event - Focus event
  */
 function handleFocus(event) {
-    // Show history on room-id-input focus
     if (event.target.id === 'room-id-input') {
-        showHistory();
+        if (event.target.value.trim()) {
+            showHistory();
+        }
     }
 }
 

@@ -29,6 +29,12 @@ function formatCountdown(seconds) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+function formatIntervalLabel(seconds) {
+    if (seconds < 60) return `每${seconds}秒`;
+    if (seconds % 60 === 0) return `每${seconds / 60}分钟`;
+    return `每${formatCountdown(seconds)}`;
+}
+
 /**
  * Update auto-refresh button UI
  */
@@ -109,7 +115,7 @@ export function toggleAutoRefresh() {
 
     if (nextEnabled) {
         startAutoRefresh();
-        showToast("自动刷新已开启 (每10分钟)");
+        showToast(`自动刷新已开启 (${formatIntervalLabel(APP_CONFIG.AUTO_REFRESH.INTERVAL)})`);
     } else {
         stopAutoRefresh();
         showToast("自动刷新已关闭");

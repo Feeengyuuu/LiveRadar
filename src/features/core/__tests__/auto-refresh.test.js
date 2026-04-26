@@ -84,15 +84,15 @@ describe('auto-refresh', () => {
         initAutoRefresh();
 
         expect(document.getElementById('auto-refresh-btn').classList.contains('off')).toBe(false);
-        expect(document.getElementById('auto-refresh-label').textContent).toBe('自动: 10:00');
+        expect(document.getElementById('auto-refresh-label').textContent).toBe('自动: 5:00');
     });
 
     it('toggles persisted state and updates the button label', () => {
         toggleAutoRefresh();
 
         expect(mocks.updateAutoRefreshEnabled).toHaveBeenCalledWith(true);
-        expect(document.getElementById('auto-refresh-label').textContent).toBe('自动: 10:00');
-        expect(mocks.showToast).toHaveBeenCalledWith('自动刷新已开启 (每10分钟)');
+        expect(document.getElementById('auto-refresh-label').textContent).toBe('自动: 5:00');
+        expect(mocks.showToast).toHaveBeenCalledWith('自动刷新已开启 (每5分钟)');
 
         toggleAutoRefresh();
 
@@ -108,13 +108,13 @@ describe('auto-refresh', () => {
 
         resetAutoRefreshCountdown();
 
-        expect(document.getElementById('auto-refresh-label').textContent).toBe('自动: 10:00');
+        expect(document.getElementById('auto-refresh-label').textContent).toBe('自动: 5:00');
     });
 
     it('emits a refresh request when the countdown reaches zero', () => {
         startAutoRefresh();
 
-        vi.advanceTimersByTime(600000);
+        vi.advanceTimersByTime(300000);
 
         expect(mocks.emit).toHaveBeenCalledWith('refresh:request', false, true);
     });

@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LiveRadar brandTest - Main Page Color Directions</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --page-bg: #040404;
+        --page-ink: #f5f5f5;
+        --muted: #9ca3af;
+        --hairline: rgba(255, 255, 255, 0.12);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          linear-gradient(180deg, rgba(255, 42, 56, 0.08), transparent 360px),
+          var(--page-bg);
+        color: var(--page-ink);
+      }
+
+      .deck {
+        width: min(100% - 40px, 1680px);
+        margin: 0 auto;
+        padding: 42px 0 72px;
+      }
+
+      .deck-hero {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 28px;
+        align-items: end;
+        padding: 32px;
+        border: 1px solid var(--hairline);
+        border-radius: 18px;
+        background:
+          linear-gradient(135deg, rgba(255, 42, 56, 0.16), transparent 38%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+          #070707;
+      }
+
+      .eyebrow,
+      .variant-kicker {
+        margin: 0;
+        color: #ff3347;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 900px;
+        margin-bottom: 12px;
+        font-size: clamp(36px, 5vw, 78px);
+        line-height: 0.94;
+        letter-spacing: 0;
+      }
+
+      .deck-copy {
+        max-width: 780px;
+        margin-bottom: 0;
+        color: #c9c9c9;
+        font-size: 16px;
+        line-height: 1.7;
+      }
+
+      .rules {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .rules li {
+        min-height: 44px;
+        padding: 12px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.045);
+        color: #d8d8d8;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .variant-grid {
+        display: grid;
+        gap: 36px;
+        margin-top: 36px;
+      }
+
+      .shot {
+        --bg0: #030303;
+        --bg1: #0d0d0f;
+        --panel: rgba(18, 18, 20, 0.92);
+        --panel-2: rgba(11, 11, 12, 0.94);
+        --line: rgba(255, 255, 255, 0.12);
+        --line-hot: rgba(255, 49, 66, 0.64);
+        --accent: #ff3142;
+        --accent-soft: rgba(255, 49, 66, 0.16);
+        --accent-hard: rgba(255, 49, 66, 0.38);
+        --live: #19e28a;
+        --amber: #ffd166;
+        --ink: #f6f3f3;
+        --dim: #9b9b9b;
+        --shadow: rgba(0, 0, 0, 0.62);
+        overflow: hidden;
+        width: min(100%, 1440px);
+        margin: 0 auto;
+        border: 1px solid rgba(255, 255, 255, 0.11);
+        border-radius: 20px;
+        background: #080808;
+        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+      }
+
+      .shot-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: center;
+        padding: 18px 22px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background:
+          linear-gradient(90deg, rgba(255, 49, 66, 0.13), transparent 55%),
+          #080808;
+      }
+
+      .shot h2 {
+        margin: 4px 0 0;
+        font-size: 24px;
+        letter-spacing: 0;
+      }
+
+      .palette {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .swatch {
+        width: 28px;
+        height: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 50%;
+        background: var(--color);
+      }
+
+      .screen {
+        position: relative;
+        min-height: 900px;
+        padding: 34px;
+        background:
+          var(--texture),
+          radial-gradient(circle at 16% 12%, var(--accent-soft), transparent 27%),
+          linear-gradient(180deg, var(--bg1), var(--bg0) 68%);
+        color: var(--ink);
+      }
+
+      .screen::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: var(--grid-opacity, 0.16);
+        background-image:
+          linear-gradient(var(--grid-line, rgba(255, 255, 255, 0.08)) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid-line, rgba(255, 255, 255, 0.08)) 1px, transparent 1px);
+        background-size: var(--grid-size, 40px) var(--grid-size, 40px);
+        mask-image: linear-gradient(180deg, #000, transparent 80%);
+      }
+
+      .product {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        gap: 18px;
+        max-width: 1290px;
+        margin: 0 auto;
+      }
+
+      .product-header,
+      .toolbar,
+      .metric-strip,
+      .content-panel {
+        border: 1px solid var(--line);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.018)),
+          var(--panel);
+        box-shadow: 0 22px 58px var(--shadow);
+      }
+
+      .product-header {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 18px;
+        align-items: center;
+        min-height: 86px;
+        padding: 17px 20px;
+        border-radius: var(--radius, 16px);
+      }
+
+      .brand {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        min-width: 275px;
+      }
+
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 48px;
+        height: 48px;
+        border: 1px solid var(--line-hot);
+        border-radius: var(--mark-radius, 15px);
+        background:
+          radial-gradient(circle at 68% 30%, var(--accent), transparent 10px),
+          linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(0, 0, 0, 0.24));
+        box-shadow:
+          0 0 0 4px rgba(255, 49, 66, 0.08),
+          0 0 28px var(--accent-hard);
+      }
+
+      .mark svg {
+        width: 34px;
+        height: 34px;
+      }
+
+      .wordmark {
+        display: grid;
+        gap: 3px;
+      }
+
+      .wordmark strong {
+        color: var(--accent);
+        font-size: 22px;
+        line-height: 1;
+      }
+
+      .wordmark span {
+        color: var(--dim);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .search-shell {
+        display: grid;
+        grid-template-columns: 150px 1fr 140px;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .select,
+      .input,
+      .button,
+      .mini-button,
+      .metric,
+      .status,
+      .card,
+      .platform,
+      .chip {
+        border: 1px solid var(--line);
+        border-radius: var(--control-radius, 12px);
+        background: var(--panel-2);
+      }
+
+      .select,
+      .input,
+      .button {
+        height: 44px;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .select {
+        justify-content: space-between;
+      }
+
+      .select i,
+      .live-dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 16px var(--accent);
+      }
+
+      .select b {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+      }
+
+      .input {
+        color: #777;
+        font-weight: 600;
+      }
+
+      .button {
+        justify-content: center;
+        border-color: var(--line-hot);
+        background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 76%, black));
+        box-shadow: 0 0 24px var(--accent-hard);
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: flex-end;
+        min-height: 56px;
+        padding: 10px;
+        border-radius: var(--radius, 16px);
+      }
+
+      .mini-button,
+      .status {
+        min-height: 36px;
+        padding: 0 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #d8d8d8;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .status {
+        min-width: 112px;
+        color: var(--live);
+        border-color: color-mix(in srgb, var(--live) 40%, transparent);
+        background: color-mix(in srgb, var(--live) 10%, transparent);
+      }
+
+      .metric-strip {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        overflow: hidden;
+        min-height: 58px;
+        border-radius: var(--radius, 16px);
+      }
+
+      .metric {
+        display: grid;
+        place-items: center;
+        border-width: 0 1px 0 0;
+        border-radius: 0;
+        color: var(--dim);
+        font-weight: 800;
+      }
+
+      .metric:last-child {
+        border-right: 0;
+      }
+
+      .metric strong {
+        color: var(--accent);
+        font-size: 30px;
+        margin-left: 8px;
+      }
+
+      .metric.favorite strong {
+        color: var(--amber);
+      }
+
+      .content-panel {
+        min-height: 565px;
+        padding: 22px;
+        border-top: 2px solid var(--accent);
+        border-radius: var(--radius, 16px);
+      }
+
+      .section-title {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .section-title h3 {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin: 0;
+        font-size: 24px;
+      }
+
+      .count {
+        display: inline-grid;
+        place-items: center;
+        min-width: 34px;
+        height: 30px;
+        padding: 0 8px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--live) 18%, transparent);
+        color: var(--live);
+      }
+
+      .tag {
+        flex: 0 0 auto;
+        padding: 7px 10px;
+        border: 1px solid color-mix(in srgb, var(--live) 34%, transparent);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--live) 9%, transparent);
+        color: var(--live);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+      }
+
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+
+      .card {
+        overflow: hidden;
+        min-height: 246px;
+        border-color: var(--card-line, var(--line));
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015)),
+          var(--card-bg, var(--panel-2));
+        box-shadow: 0 18px 38px rgba(0, 0, 0, 0.36);
+      }
+
+      .thumb {
+        position: relative;
+        height: 132px;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 42%),
+          radial-gradient(circle at 72% 35%, var(--accent-soft), transparent 35%),
+          linear-gradient(145deg, #161616, #050505);
+      }
+
+      .thumb::before {
+        content: "";
+        position: absolute;
+        inset: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        background:
+          linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent),
+          repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 16px);
+      }
+
+      .platform,
+      .chip {
+        position: absolute;
+        z-index: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 30px;
+        padding: 0 12px;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .platform {
+        top: 12px;
+        left: 12px;
+        color: #fff;
+        border-color: var(--line-hot);
+        background: var(--accent);
+      }
+
+      .chip {
+        right: 12px;
+        bottom: 12px;
+        color: var(--live);
+        border-color: color-mix(in srgb, var(--live) 45%, transparent);
+        background: rgba(0, 0, 0, 0.72);
+      }
+
+      .card-body {
+        display: grid;
+        grid-template-columns: 54px 1fr;
+        gap: 12px;
+        padding: 16px;
+      }
+
+      .avatar {
+        width: 54px;
+        height: 54px;
+        border: 2px solid var(--line-hot);
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.55), transparent 18%),
+          linear-gradient(135deg, var(--accent), #171717 62%);
+      }
+
+      .card-copy {
+        min-width: 0;
+      }
+
+      .card-title {
+        overflow: hidden;
+        margin: 0 0 8px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 18px;
+        line-height: 1.18;
+        font-weight: 950;
+      }
+
+      .owner {
+        margin: 0;
+        color: var(--dim);
+        font-size: 12px;
+      }
+
+      .logo-note {
+        display: grid;
+        grid-template-columns: 70px 1fr;
+        gap: 16px;
+        align-items: center;
+        margin-top: 22px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius, 16px);
+        background: rgba(0, 0, 0, 0.36);
+      }
+
+      .logo-note .mark {
+        width: 58px;
+        height: 58px;
+      }
+
+      .logo-note p {
+        margin: 0;
+        color: #c8c8c8;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .v-signal-core {
+        --bg0: #020303;
+        --bg1: #0c0d0f;
+        --panel: rgba(12, 13, 15, 0.9);
+        --panel-2: rgba(4, 5, 6, 0.86);
+        --accent: #ff2738;
+        --accent-soft: rgba(255, 39, 56, 0.14);
+        --accent-hard: rgba(255, 39, 56, 0.34);
+        --live: #17e899;
+        --amber: #ffe45e;
+        --line: rgba(255, 255, 255, 0.12);
+        --line-hot: rgba(255, 39, 56, 0.66);
+        --grid-line: rgba(255, 39, 56, 0.11);
+        --grid-opacity: 0.18;
+        --grid-size: 36px;
+        --radius: 16px;
+        --control-radius: 12px;
+        --texture: linear-gradient(90deg, rgba(255, 39, 56, 0.06), transparent 42%);
+      }
+
+      .v-led-noir {
+        --bg0: #030303;
+        --bg1: #111111;
+        --panel: rgba(16, 16, 17, 0.94);
+        --panel-2: rgba(3, 3, 3, 0.9);
+        --accent: #ff0044;
+        --accent-soft: rgba(255, 0, 68, 0.13);
+        --accent-hard: rgba(255, 0, 68, 0.34);
+        --live: #f4f4f5;
+        --amber: #ffb703;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-hot: rgba(255, 0, 68, 0.58);
+        --grid-line: rgba(255, 255, 255, 0.065);
+        --grid-opacity: 0.13;
+        --radius: 10px;
+        --control-radius: 8px;
+        --mark-radius: 8px;
+        --texture: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 9px);
+      }
+
+      .v-infra-glass {
+        --bg0: #04070b;
+        --bg1: #10151d;
+        --panel: rgba(18, 24, 34, 0.74);
+        --panel-2: rgba(3, 7, 12, 0.62);
+        --accent: #ff3b57;
+        --accent-soft: rgba(255, 59, 87, 0.12);
+        --accent-hard: rgba(255, 59, 87, 0.28);
+        --live: #66f6ff;
+        --amber: #fcd34d;
+        --line: rgba(196, 226, 255, 0.17);
+        --line-hot: rgba(255, 59, 87, 0.54);
+        --grid-line: rgba(102, 246, 255, 0.07);
+        --grid-opacity: 0.2;
+        --radius: 20px;
+        --control-radius: 14px;
+        --texture: linear-gradient(120deg, rgba(102, 246, 255, 0.055), transparent 40%);
+      }
+
+      .v-radar-command {
+        --bg0: #030706;
+        --bg1: #07110f;
+        --panel: rgba(7, 18, 16, 0.92);
+        --panel-2: rgba(2, 8, 7, 0.88);
+        --accent: #ff3333;
+        --accent-soft: rgba(255, 51, 51, 0.13);
+        --accent-hard: rgba(255, 51, 51, 0.28);
+        --live: #32d583;
+        --amber: #facc15;
+        --line: rgba(88, 255, 190, 0.13);
+        --line-hot: rgba(255, 51, 51, 0.58);
+        --grid-line: rgba(50, 213, 131, 0.12);
+        --grid-opacity: 0.18;
+        --grid-size: 32px;
+        --radius: 8px;
+        --control-radius: 6px;
+        --mark-radius: 50%;
+        --texture: radial-gradient(circle at 50% 50%, transparent 0 21%, rgba(50, 213, 131, 0.045) 21% 22%, transparent 22% 42%);
+      }
+
+      .v-carbon-pulse {
+        --bg0: #050403;
+        --bg1: #12100f;
+        --panel: rgba(18, 16, 15, 0.94);
+        --panel-2: rgba(6, 5, 4, 0.9);
+        --accent: #ff421f;
+        --accent-soft: rgba(255, 66, 31, 0.16);
+        --accent-hard: rgba(255, 66, 31, 0.36);
+        --live: #ffd166;
+        --amber: #ffea7a;
+        --line: rgba(255, 216, 166, 0.12);
+        --line-hot: rgba(255, 66, 31, 0.62);
+        --grid-line: rgba(255, 66, 31, 0.07);
+        --grid-opacity: 0.16;
+        --radius: 14px;
+        --control-radius: 12px;
+        --texture:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.028) 25%, transparent 25% 50%, rgba(255, 255, 255, 0.028) 50% 75%, transparent 75%);
+        --grid-size: 48px;
+      }
+
+      .v-minimal-led {
+        --bg0: #000;
+        --bg1: #050506;
+        --panel: rgba(9, 9, 10, 0.96);
+        --panel-2: rgba(0, 0, 0, 0.96);
+        --accent: #ff2334;
+        --accent-soft: rgba(255, 35, 52, 0.1);
+        --accent-hard: rgba(255, 35, 52, 0.2);
+        --live: #e4e4e7;
+        --amber: #a1a1aa;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-hot: rgba(255, 35, 52, 0.52);
+        --grid-opacity: 0;
+        --radius: 4px;
+        --control-radius: 4px;
+        --mark-radius: 4px;
+        --texture: linear-gradient(180deg, transparent, transparent);
+      }
+
+      .v-crimson-studio {
+        --bg0: #050204;
+        --bg1: #14070b;
+        --panel: rgba(24, 8, 12, 0.9);
+        --panel-2: rgba(9, 3, 5, 0.86);
+        --accent: #e11d48;
+        --accent-soft: rgba(225, 29, 72, 0.16);
+        --accent-hard: rgba(225, 29, 72, 0.34);
+        --live: #fb7185;
+        --amber: #f97316;
+        --line: rgba(255, 184, 196, 0.12);
+        --line-hot: rgba(225, 29, 72, 0.62);
+        --grid-line: rgba(255, 113, 133, 0.07);
+        --grid-opacity: 0.16;
+        --radius: 18px;
+        --control-radius: 14px;
+        --texture: linear-gradient(135deg, rgba(225, 29, 72, 0.12), transparent 44%);
+      }
+
+      .v-red-terminal {
+        --bg0: #010202;
+        --bg1: #050707;
+        --panel: rgba(3, 8, 8, 0.92);
+        --panel-2: rgba(1, 3, 3, 0.92);
+        --accent: #ff1744;
+        --accent-soft: rgba(255, 23, 68, 0.12);
+        --accent-hard: rgba(255, 23, 68, 0.3);
+        --live: #8bffcf;
+        --amber: #ffe66d;
+        --line: rgba(139, 255, 207, 0.13);
+        --line-hot: rgba(255, 23, 68, 0.6);
+        --grid-line: rgba(139, 255, 207, 0.1);
+        --grid-opacity: 0.22;
+        --grid-size: 28px;
+        --radius: 2px;
+        --control-radius: 2px;
+        --mark-radius: 2px;
+        --texture: repeating-linear-gradient(0deg, rgba(139, 255, 207, 0.035) 0 1px, transparent 1px 6px);
+      }
+
+      .v-led-noir .wordmark strong,
+      .v-minimal-led .wordmark strong,
+      .v-red-terminal .wordmark strong {
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+
+      .v-radar-command .product,
+      .v-red-terminal .product {
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      }
+
+      .v-minimal-led .product-header,
+      .v-minimal-led .toolbar,
+      .v-minimal-led .metric-strip,
+      .v-minimal-led .content-panel,
+      .v-red-terminal .product-header,
+      .v-red-terminal .toolbar,
+      .v-red-terminal .metric-strip,
+      .v-red-terminal .content-panel {
+        box-shadow: none;
+      }
+
+      .v-infra-glass .product-header,
+      .v-infra-glass .toolbar,
+      .v-infra-glass .metric-strip,
+      .v-infra-glass .content-panel {
+        backdrop-filter: blur(18px);
+      }
+
+      @media (max-width: 980px) {
+        .deck {
+          width: min(100% - 24px, 1680px);
+          padding-top: 20px;
+        }
+
+        .deck-hero,
+        .product-header,
+        .search-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .screen {
+          min-height: auto;
+          padding: 18px;
+        }
+
+        .metric-strip,
+        .card-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .toolbar {
+          flex-wrap: wrap;
+          justify-content: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <header class="deck-hero">
+        <div>
+          <p class="eyebrow">brandTest / future art plan</p>
+          <h1>LiveRadar Black/Red LED Brand Direction Board</h1>
+          <p class="deck-copy">
+            Static art plan only. This board does not change current page content,
+            data structure, refresh behavior, or production UI code. The 8 directions
+            explore black/red LED color, material, border, density, and logo usage.
+          </p>
+        </div>
+        <ul class="rules" aria-label="Design rules">
+          <li>Logo core: radar arc + live LED dot + compact LR monogram.</li>
+          <li>Brand core: deep black as the space, LED red as signal and action.</li>
+          <li>Page content stays consistent; only future visual direction changes.</li>
+        </ul>
+      </header>
+
+      <div id="variant-grid" class="variant-grid"></div>
+    </main>
+
+    <script>
+      const ui = {
+        brandCn: "\u76f4\u64ad\u76d1\u63a7\u5ba4",
+        platform: "\u6597\u9c7c",
+        input: "\u8f93\u5165\u623f\u95f4\u53f7...",
+        add: "\u6dfb\u52a0\u4e3b\u64ad",
+        auto: "\u81ea\u52a8: 5min",
+        export: "\u5bfc\u51fa",
+        import: "\u5bfc\u5165",
+        refresh: "\u6b63\u5728\u5237\u65b0",
+        favorite: "\u6700\u7231\u76f4\u64ad\u4e2d",
+        sectionPrefix: "\u76ee\u524d\u6709",
+        sectionSuffix: "\u4e2a\u4e3b\u64ad\u6b63\u5728\u76f4\u64ad",
+        live: "\u76f4\u64ad\u4e2d",
+        douyuTitle: "\u6e38\u620f\u6392\u4f4d\u548c\u5b9e\u65f6\u5f39\u5e55\u89c2\u5bdf",
+        biliTitle: "\u6df1\u591c\u76f4\u64ad\u72b6\u6001\u76d1\u63a7",
+      };
+
+      const mark = `
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="32" r="25" fill="none" stroke="currentColor" stroke-width="4" opacity="0.34"></circle>
+          <path d="M14 33a18 18 0 0 1 36-1" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"></path>
+          <circle cx="46" cy="18" r="5" fill="var(--accent)"></circle>
+          <text x="32" y="42" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="950" fill="var(--ink)">LR</text>
+        </svg>
+      `;
+
+      const variants = [
+        {
+          id: "variant-01",
+          className: "v-signal-core",
+          kicker: "01 / default candidate",
+          title: "Signal Core - Default Candidate",
+          palette: ["#020303", "#0c0d0f", "#ff2738", "#17e899"],
+          wordmark: "cn",
+          submark: "LiveRadar",
+          note: "Recommended main line. The black field gives the interface space, the red LED dot marks live detection, and the radar arc directly expresses streamer discovery.",
+        },
+        {
+          id: "variant-02",
+          className: "v-led-noir",
+          kicker: "02 / premium noir",
+          title: "LED Noir - Premium Black Field",
+          palette: ["#030303", "#111111", "#ff0044", "#f4f4f5"],
+          wordmark: "LiveRadar",
+          submark: "live monitor",
+          note: "More international and mature. Red appears only in brand-critical places and primary actions, which makes it suitable for a long-term polished product skin.",
+        },
+        {
+          id: "variant-03",
+          className: "v-infra-glass",
+          kicker: "03 / translucent system",
+          title: "Infrared Glass - Red Infrared Glass",
+          palette: ["#04070b", "#10151d", "#ff3b57", "#66f6ff"],
+          wordmark: "cn",
+          submark: "LiveRadar",
+          note: "A lighter modern surface. Glass layers support floating cards, while red stays focused as signal instead of turning the whole page into neon.",
+        },
+        {
+          id: "variant-04",
+          className: "v-radar-command",
+          kicker: "04 / ops console",
+          title: "Radar Command - Monitoring Console",
+          palette: ["#030706", "#07110f", "#ff3333", "#32d583"],
+          wordmark: "LiveRadar",
+          submark: "stream scan",
+          note: "More tool-like and reliable. This fits the extreme refresh and true-state detection goal, but should avoid becoming too tactical or military.",
+        },
+        {
+          id: "variant-05",
+          className: "v-carbon-pulse",
+          kicker: "05 / warm technical",
+          title: "Carbon Pulse - Carbon Black Pulse",
+          palette: ["#050403", "#12100f", "#ff421f", "#ffd166"],
+          wordmark: "cn",
+          submark: "LiveRadar",
+          note: "Closer to the current orange-red history, so migration cost is lower. Useful as a transition style before tightening the brand into true LED red.",
+        },
+        {
+          id: "variant-06",
+          className: "v-minimal-led",
+          kicker: "06 / minimal product",
+          title: "Minimal LED - Strict Black and Red",
+          palette: ["#000000", "#050506", "#ff2334", "#e4e4e7"],
+          wordmark: "LiveRadar",
+          submark: "monitoring room",
+          note: "The most timeless and Apple-like direction. It is quiet and durable, but needs excellent motion and status design so the product does not feel flat.",
+        },
+        {
+          id: "variant-07",
+          className: "v-crimson-studio",
+          kicker: "07 / creator studio",
+          title: "Crimson Studio - Deep Red Creator Tool",
+          palette: ["#050204", "#14070b", "#e11d48", "#fb7185"],
+          wordmark: "cn",
+          submark: "LiveRadar",
+          note: "Softer and more creator-oriented. Better if the product later expands into streamer management, favorites, grouping, and operational workflows.",
+        },
+        {
+          id: "variant-08",
+          className: "v-red-terminal",
+          kicker: "08 / hard technical",
+          title: "Red Terminal - Technical Scanner",
+          palette: ["#010202", "#050707", "#ff1744", "#8bffcf"],
+          wordmark: "LR_SCAN",
+          submark: "LiveRadar",
+          note: "Strongest technical identity. It communicates backend scanning clearly, but can become noisy if terminal styling spreads to every surface.",
+        },
+      ];
+
+      function wordmark(value) {
+        return value === "cn" ? ui.brandCn : value;
+      }
+
+      function swatches(colors) {
+        return colors.map((color) => `<span class="swatch" style="--color: ${color}"></span>`).join("");
+      }
+
+      function card(platform, title, owner) {
+        return `
+          <div class="card">
+            <div class="thumb">
+              <span class="platform">${platform}</span>
+              <span class="chip">${ui.live}</span>
+            </div>
+            <div class="card-body">
+              <div class="avatar"></div>
+              <div class="card-copy">
+                <p class="card-title">${title}</p>
+                <p class="owner">${owner}</p>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function variantTemplate(variant) {
+        return `
+          <article id="${variant.id}" class="shot ${variant.className}">
+            <div class="shot-header">
+              <div>
+                <p class="variant-kicker">${variant.kicker}</p>
+                <h2>${variant.title}</h2>
+              </div>
+              <div class="palette" aria-label="palette">${swatches(variant.palette)}</div>
+            </div>
+            <div class="screen">
+              <div class="product">
+                <div class="product-header">
+                  <div class="brand">
+                    <div class="mark">${mark}</div>
+                    <div class="wordmark"><strong>${wordmark(variant.wordmark)}</strong><span>${variant.submark}</span></div>
+                  </div>
+                  <div class="search-shell">
+                    <div class="select"><b><i></i>${ui.platform}</b><span>&#8964;</span></div>
+                    <div class="input">${ui.input}</div>
+                    <div class="button">${ui.add}</div>
+                  </div>
+                  <div class="status"><span class="live-dot"></span>&nbsp; 52/64</div>
+                </div>
+                <div class="toolbar">
+                  <div class="mini-button">${ui.auto}</div>
+                  <div class="mini-button">${ui.export}</div>
+                  <div class="mini-button">${ui.import}</div>
+                  <div class="status">${ui.refresh}</div>
+                </div>
+                <div class="metric-strip">
+                  <div class="metric">Live <strong>6</strong></div>
+                  <div class="metric">Offline <strong>49</strong></div>
+                  <div class="metric favorite">${ui.favorite} <strong>0</strong></div>
+                </div>
+                <div class="content-panel">
+                  <div class="section-title">
+                    <h3><span class="live-dot"></span>${ui.sectionPrefix} <span class="count">6</span> ${ui.sectionSuffix}</h3>
+                    <span class="tag">LIVE NOW</span>
+                  </div>
+                  <div class="card-grid">
+                    ${card("Twitch", "LIVE HERE - WICKED DRAMA NEWS", "xqc #xqc")}
+                    ${card("Douyu", ui.douyuTitle, "room 552421")}
+                    ${card("Bilibili", ui.biliTitle, "uid 90421")}
+                  </div>
+                  <div class="logo-note">
+                    <div class="mark">${mark}</div>
+                    <p><strong>Logo direction:</strong> ${variant.note}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+        `;
+      }
+
+      document.getElementById("variant-grid").innerHTML = variants.map(variantTemplate).join("");
+    </script>
+  </body>
+</html>
