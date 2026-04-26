@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LiveRadar iPhone Promo</title>
+    <style>
+      :root {
+        --paper: #f6f1e7;
+        --ink: #171717;
+        --muted: #6f6a61;
+        --line: rgba(23, 23, 23, 0.16);
+        --red: #e5362e;
+        --green: #00c78a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        margin: 0;
+        overflow: hidden;
+        background: var(--paper);
+        color: var(--ink);
+        font-family:
+          "Yu Gothic",
+          "Hiragino Sans GB",
+          "Microsoft YaHei",
+          "Noto Sans CJK SC",
+          system-ui,
+          sans-serif;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, rgba(23, 23, 23, 0.025) 1px, transparent 1px),
+          linear-gradient(0deg, rgba(23, 23, 23, 0.02) 1px, transparent 1px);
+        background-size: 48px 48px;
+        opacity: 0.72;
+      }
+
+      .poster {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        padding: 76px 96px;
+      }
+
+      .edge-line {
+        position: absolute;
+        inset: 54px 64px;
+        border: 1px solid var(--line);
+        pointer-events: none;
+      }
+
+      .brand {
+        position: absolute;
+        top: 96px;
+        left: 112px;
+        display: flex;
+        align-items: center;
+        gap: 26px;
+      }
+
+      .brand-mark {
+        width: 142px;
+        height: 142px;
+        object-fit: contain;
+        filter: drop-shadow(0 18px 26px rgba(229, 54, 46, 0.14));
+      }
+
+      .brand-name {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+
+      .brand-name strong {
+        font-size: 36px;
+        line-height: 1;
+        font-weight: 800;
+      }
+
+      .brand-name span {
+        font-size: 18px;
+        line-height: 1;
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .headline {
+        position: absolute;
+        left: 122px;
+        top: 350px;
+        width: 790px;
+      }
+
+      .headline h1 {
+        margin: 0;
+        font-size: 104px;
+        line-height: 1.18;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .headline-rule {
+        width: 270px;
+        height: 1px;
+        margin: 54px 0 0;
+        background: var(--ink);
+      }
+
+      .meta {
+        position: absolute;
+        left: 122px;
+        bottom: 104px;
+        display: grid;
+        gap: 18px;
+        color: var(--muted);
+        font-size: 20px;
+        line-height: 1.35;
+        font-weight: 600;
+      }
+
+      .meta-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .live-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 18px rgba(0, 199, 138, 0.68);
+      }
+
+      .site-url {
+        margin-top: 14px;
+        color: var(--ink);
+        font-size: 28px;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .stamp {
+        position: absolute;
+        right: 586px;
+        top: 118px;
+        width: 124px;
+        height: 124px;
+        border: 2px solid rgba(229, 54, 46, 0.72);
+        border-radius: 50%;
+        color: var(--red);
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        line-height: 1.12;
+        font-weight: 800;
+        text-align: center;
+        transform: rotate(-9deg);
+      }
+
+      .phone-shadow {
+        position: absolute;
+        right: 222px;
+        bottom: 64px;
+        width: 560px;
+        height: 930px;
+        border-radius: 72px;
+        background: rgba(23, 23, 23, 0.09);
+        filter: blur(28px);
+        transform: translate(16px, 22px);
+      }
+
+      .phone {
+        position: absolute;
+        right: 270px;
+        bottom: 88px;
+        width: 458px;
+        height: 958px;
+        padding: 22px;
+        border-radius: 68px;
+        background:
+          linear-gradient(145deg, #202020, #050505 54%, #1d1d1d);
+        box-shadow:
+          inset 0 0 0 2px rgba(255, 255, 255, 0.08),
+          inset 0 0 0 8px #050505,
+          0 42px 72px rgba(23, 23, 23, 0.22);
+      }
+
+      .phone::before {
+        content: "";
+        position: absolute;
+        top: 17px;
+        left: 50%;
+        width: 142px;
+        height: 31px;
+        border-radius: 999px;
+        background: #050505;
+        transform: translateX(-50%);
+        z-index: 3;
+      }
+
+      .screen {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border-radius: 50px;
+        background: #050505;
+      }
+
+      .screen img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .side-note {
+        position: absolute;
+        right: 102px;
+        bottom: 104px;
+        writing-mode: vertical-rl;
+        color: rgba(23, 23, 23, 0.44);
+        font-size: 17px;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .accent-red {
+        position: absolute;
+        left: 86px;
+        top: 337px;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: var(--red);
+      }
+
+      .thin-orbit {
+        position: absolute;
+        right: 114px;
+        top: 126px;
+        width: 730px;
+        height: 730px;
+        border: 1px solid rgba(23, 23, 23, 0.1);
+        border-radius: 50%;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="poster" aria-label="LiveRadar promotional poster">
+      <div class="edge-line"></div>
+      <div class="thin-orbit"></div>
+      <div class="accent-red"></div>
+
+      <section class="brand">
+        <img class="brand-mark" src="../public/brand-galaxy-logo-web.png" alt="LiveRadar galaxy logo" />
+        <div class="brand-name">
+          <strong>直播监控室</strong>
+          <span>LiveRadar</span>
+        </div>
+      </section>
+
+      <section class="headline">
+        <h1>一眼知道，<br />谁在开播。</h1>
+        <div class="headline-rule"></div>
+      </section>
+
+      <section class="meta" aria-label="product metadata">
+        <div class="meta-row"><span class="live-dot"></span><span>LIVE STATUS · MULTI PLATFORM</span></div>
+        <div>Douyu · Bilibili · Twitch · Kick</div>
+        <div class="site-url">liveradar.pages.dev</div>
+      </section>
+
+      <div class="stamp">LIVE<br />NOW</div>
+      <div class="phone-shadow"></div>
+      <figure class="phone" aria-label="iPhone screenshot of LiveRadar">
+        <div class="screen">
+          <img src="liveradar-iphone-page.png" alt="LiveRadar mobile page screenshot" />
+        </div>
+      </figure>
+
+      <div class="side-note">LIVE / RADAR / NOW</div>
+    </main>
+  </body>
+</html>
