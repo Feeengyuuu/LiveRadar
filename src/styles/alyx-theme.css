@@ -5215,7 +5215,6 @@ html.perf-lite .room-card.is-tilting .card-actions {
 
 .brand-backdrop-logo-orbit {
     z-index: 1;
-    will-change: transform;
 }
 
 .brand-backdrop-logo-orbit::before,
@@ -5260,7 +5259,7 @@ html.perf-lite .room-card.is-tilting .card-actions {
 }
 
 .brand-backdrop-logo-orbit-outer {
-    animation: lr-logo-orbit-clockwise 34s linear infinite;
+    animation: none;
 }
 
 .brand-backdrop-logo-orbit-outer::before {
@@ -5277,7 +5276,6 @@ html.perf-lite .room-card.is-tilting .card-actions {
 }
 
 .brand-backdrop-logo-orbit-inner {
-    animation: lr-logo-orbit-counter 46s linear infinite;
     opacity: 0.82;
 }
 
@@ -5614,5 +5612,27 @@ body .app-header .command-actions #refresh-stats {
         left: 7px !important;
         width: 5px !important;
         height: 5px !important;
+    }
+}
+
+/* Mobile rubber-band overscroll: keep the ambient field extending beyond the viewport. */
+@media (max-width: 768px) {
+    html,
+    body {
+        background:
+            linear-gradient(var(--signal-noir-grid) 1px, transparent 1px),
+            linear-gradient(90deg, var(--signal-noir-grid) 1px, transparent 1px),
+            var(--signal-noir-bg) !important;
+        background-size: 18px 18px, 18px 18px, auto !important;
+        background-position: 0 0, 0 0, 0 0 !important;
+    }
+
+    body::before {
+        inset: -72vh -12vw -42vh;
+        background:
+            radial-gradient(ellipse at 50% 72vh, rgba(92, 10, 18, 0.08), transparent 48vh),
+            radial-gradient(ellipse at 18% 78vh, rgba(255, 39, 56, 0.035), transparent 34vh),
+            linear-gradient(180deg, rgba(96, 10, 18, 0.026), rgba(6, 7, 9, 0.13) 54vh, rgba(0, 0, 0, 0.34));
+        transform: translate3d(0, 0, 0);
     }
 }

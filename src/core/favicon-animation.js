@@ -1,6 +1,10 @@
 let animationTimer = null;
 let initialized = false;
 
+const FRAME_INTERVAL_MS = 1400;
+const IDLE_STOP_DELAY_MS = 30000;
+const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+
 function makeFrameUrl(color, coreRadius, coreOpacity, glowRadius, glowOpacity) {
     const svg =
         `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>` +
@@ -42,6 +46,7 @@ export function initFaviconAnimation() {
 
     let index = 0;
     let direction = 1;
+    let idleTimer = null;
 
     const tick = () => {
         favicon.href = frames[index];
@@ -53,7 +58,7 @@ export function initFaviconAnimation() {
     const startAnimation = () => {
         if (animationTimer) return;
         tick();
-        animationTimer = setInterval(tick, 260);
+        animationTimer = setInterval(tick, FRAME_INTERVAL_MS);
     };
 
     const stopAnimation = () => {
@@ -62,16 +67,37 @@ export function initFaviconAnimation() {
         animationTimer = null;
     };
 
+    const clearIdleTimer = () => {
+        if (!idleTimer) return;
+        clearTimeout(idleTimer);
+        idleTimer = null;
+    };
+
+    const markActive = () => {
+        if (document.hidden) return;
+        startAnimation();
+        clearIdleTimer();
+        idleTimer = setTimeout(() => {
+            idleTimer = null;
+            stopAnimation();
+        }, IDLE_STOP_DELAY_MS);
+    };
+
+    ACTIVITY_EVENTS.forEach((eventName) => {
+        window.addEventListener(eventName, markActive, { passive: true });
+    });
+
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
+            clearIdleTimer();
             stopAnimation();
         } else {
-            startAnimation();
+            markActive();
         }
     });
 
     if (!document.hidden) {
-        startAnimation();
+        markActive();
     }
 
     initialized = true;
