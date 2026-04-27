@@ -78,6 +78,7 @@ describe('music-player', () => {
         expect(document.querySelectorAll('.playlist-item')).toHaveLength(2);
         expect(document.querySelector('.playlist-item.active .playlist-item-title').textContent).toBe("Travelers' Encore");
         expect(document.querySelector('.player-progress-ring')).toBeTruthy();
+        expect(document.querySelector('.player-corner-toggle')).toBeTruthy();
         expect(document.getElementById('music-volume-slider').getAttribute('aria-valuenow')).toBe('70');
     });
 
@@ -129,6 +130,7 @@ describe('music-player', () => {
 
         expect(audioInstances[0].currentTime).toBe(120);
         expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('100');
+        expect(document.querySelector('.player-progress-ring').style.getPropertyValue('--music-progress-angle')).toBe('360deg');
         expect(audioInstances[0].volume).toBe(0);
         expect(document.getElementById('music-volume-slider').getAttribute('aria-valuenow')).toBe('0');
         expect(localStorage.getItem('music_player_volume')).toBe('0');
@@ -154,6 +156,64 @@ describe('music-player', () => {
         expect(player.dataset.state).toBe('minimized');
         expect(player.getAttribute('aria-expanded')).toBe('false');
         expect(localStorage.getItem('music_player_minimized')).toBe('true');
+    });
+
+    it('keeps internal blank clicks open and only collapses from outside clicks', async () => {
+        localStorage.setItem('music_player_minimized', 'false');
+        importedModule = await import('../music-player.js');
+        importedModule.initMusicPlayer();
+        const player = document.getElementById('music-player');
+
+        player.querySelector('.player-content').dispatchEvent(
+            new MouseEvent('click', { bubbles: true, cancelable: true })
+        );
+        vi.advanceTimersByTime(320);
+
+        expect(player.classList.contains('minimized')).toBe(false);
+        expect(player.dataset.state).toBe('expanded');
+        expect(localStorage.getItem('music_player_minimized')).toBe('false');
+
+        player.querySelector('.player-header').dispatchEvent(
+            new MouseEvent('click', { bubbles: true, cancelable: true })
+        );
+        vi.advanceTimersByTime(320);
+
+        expect(player.classList.contains('minimized')).toBe(false);
+        expect(player.dataset.state).toBe('expanded');
+
+        document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        vi.advanceTimersByTime(320);
+
+        expect(player.classList.contains('minimized')).toBe(true);
+        expect(player.dataset.state).toBe('minimized');
+        expect(localStorage.getItem('music_player_minimized')).toBe('true');
+    });
+
+    it('uses the lower-left corner toggle for repeated disclosure', async () => {
+        importedModule = await import('../music-player.js');
+        importedModule.initMusicPlayer();
+        const player = document.getElementById('music-player');
+        const cornerToggle = document.querySelector('.player-corner-toggle');
+
+        expect(cornerToggle).toBeTruthy();
+
+        player.click();
+        vi.advanceTimersByTime(320);
+
+        expect(player.classList.contains('minimized')).toBe(false);
+        expect(cornerToggle.getAttribute('aria-expanded')).toBe('true');
+
+        cornerToggle.click();
+        vi.advanceTimersByTime(320);
+
+        expect(player.classList.contains('minimized')).toBe(true);
+        expect(cornerToggle.getAttribute('aria-expanded')).toBe('false');
+
+        player.click();
+        vi.advanceTimersByTime(320);
+
+        expect(player.classList.contains('minimized')).toBe(false);
+        expect(player.dataset.state).toBe('expanded');
     });
 });
 

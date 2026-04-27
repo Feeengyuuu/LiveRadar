@@ -560,18 +560,20 @@ html.large-list-mode .monitor-grid .room-card {
 }
 
 .app-header [data-action="add-room"]::before {
-    content: '+';
+    content: '';
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 16px;
     height: 16px;
+    flex: 0 0 16px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.18);
+    background:
+        linear-gradient(currentColor, currentColor) center / 8px 2px no-repeat,
+        linear-gradient(currentColor, currentColor) center / 2px 8px no-repeat,
+        rgba(255, 255, 255, 0.18);
     color: #fffaf4;
-    font-size: 15px;
-    font-weight: 900;
-    line-height: 1;
+    box-sizing: border-box;
 }
 
 .app-header [data-action="add-room"]::after {
@@ -2643,6 +2645,29 @@ footer {
         height: 38px !important;
         padding: 0 12px !important;
     }
+
+    .is-live-card .avatar-stack::after {
+        content: none !important;
+        animation: none !important;
+    }
+
+    .is-live-card .avatar-stack .u-avatar,
+    .is-live-card .avatar-stack .skeleton-avatar {
+        border-color: rgba(93, 242, 178, 0.74) !important;
+        box-shadow:
+            0 0 12px rgba(93, 242, 178, 0.32),
+            inset 0 0 6px rgba(93, 242, 178, 0.12);
+        animation: lr-live-avatar-mobile-glow 2.8s ease-in-out infinite;
+    }
+
+    .room-card.is-favorite.is-live-card .avatar-stack .u-avatar,
+    .room-card.is-favorite.is-live-card .avatar-stack .skeleton-avatar {
+        border-color: rgba(255, 228, 94, 0.86) !important;
+        box-shadow:
+            0 0 12px rgba(255, 228, 94, 0.34),
+            inset 0 0 6px rgba(255, 228, 94, 0.12);
+        animation-name: lr-live-avatar-mobile-favorite-glow;
+    }
 }
 
 /* ====================================================================
@@ -2708,6 +2733,41 @@ footer {
         transform: scale(0.82);
         opacity: 0.72;
         box-shadow: 0 0 0 5px rgba(196, 255, 227, 0), 0 0 16px rgba(93, 242, 178, 0.9);
+    }
+}
+
+@keyframes lr-live-avatar-breathe {
+    0%, 100% {
+        opacity: 0.58;
+    }
+    50% {
+        opacity: 0.96;
+    }
+}
+
+@keyframes lr-live-avatar-mobile-glow {
+    0%, 100% {
+        box-shadow:
+            0 0 10px rgba(93, 242, 178, 0.28),
+            inset 0 0 5px rgba(93, 242, 178, 0.1);
+    }
+    50% {
+        box-shadow:
+            0 0 18px rgba(93, 242, 178, 0.42),
+            inset 0 0 7px rgba(93, 242, 178, 0.14);
+    }
+}
+
+@keyframes lr-live-avatar-mobile-favorite-glow {
+    0%, 100% {
+        box-shadow:
+            0 0 10px rgba(255, 228, 94, 0.3),
+            inset 0 0 5px rgba(255, 228, 94, 0.1);
+    }
+    50% {
+        box-shadow:
+            0 0 18px rgba(255, 228, 94, 0.44),
+            inset 0 0 7px rgba(255, 228, 94, 0.14);
     }
 }
 
@@ -2943,12 +3003,12 @@ body .app-header .command-actions #global-refresh-btn.animate-spin::after {
 .avatar-stack::after {
     content: '';
     position: absolute;
-    inset: -4px;
+    inset: 0;
+    box-sizing: border-box;
     border-radius: 50%;
     pointer-events: none;
     border: 1px solid transparent;
     opacity: 0;
-    transform: none;
     transition:
         opacity 180ms ease,
         border-color 180ms ease,
@@ -2959,17 +3019,15 @@ body .app-header .command-actions #global-refresh-btn.animate-spin::after {
     opacity: 0.72;
     border-color: rgba(93, 242, 178, 0.42);
     box-shadow:
-        0 0 0 3px rgba(93, 242, 178, 0.055),
         0 0 14px rgba(93, 242, 178, 0.22),
         inset 0 0 7px rgba(93, 242, 178, 0.08);
-    animation: none !important;
+    animation: lr-live-avatar-breathe 2.8s ease-in-out infinite;
 }
 
 .room-card.is-live-card:hover .avatar-stack::after {
     opacity: 0.9;
     border-color: rgba(93, 242, 178, 0.56);
     box-shadow:
-        0 0 0 4px rgba(93, 242, 178, 0.07),
         0 0 18px rgba(93, 242, 178, 0.3),
         inset 0 0 9px rgba(93, 242, 178, 0.1);
 }
@@ -2978,7 +3036,6 @@ body .app-header .command-actions #global-refresh-btn.animate-spin::after {
     opacity: 0.84;
     border-color: rgba(255, 228, 94, 0.62);
     box-shadow:
-        0 0 0 3px rgba(255, 228, 94, 0.075),
         0 0 15px rgba(255, 228, 94, 0.26),
         inset 0 0 8px rgba(255, 228, 94, 0.1);
 }
@@ -2987,7 +3044,6 @@ body .app-header .command-actions #global-refresh-btn.animate-spin::after {
     opacity: 0.96;
     border-color: rgba(255, 228, 94, 0.78);
     box-shadow:
-        0 0 0 4px rgba(255, 228, 94, 0.09),
         0 0 20px rgba(255, 228, 94, 0.34),
         inset 0 0 10px rgba(255, 228, 94, 0.12);
 }
@@ -3094,6 +3150,8 @@ html.perf-lite .room-card.is-tilting .card-thumbnail.loaded {
     .monitor-grid .room-card,
     .is-live-card .status-chip::before,
     .is-live-card .avatar-stack::after,
+    .is-live-card .avatar-stack .u-avatar,
+    .is-live-card .avatar-stack .skeleton-avatar,
     .metric-value.value-updated,
     .zone-title-count.value-updated,
     body .app-header .command-actions #global-refresh-btn.animate-spin::before,
@@ -4187,7 +4245,10 @@ html.ambient-pointer-active body::after {
 
 .app-header [data-action="add-room"]::before {
     color: var(--signal-led-red) !important;
-    background: rgba(255, 39, 56, 0.08) !important;
+    background:
+        linear-gradient(currentColor, currentColor) center / 8px 2px no-repeat,
+        linear-gradient(currentColor, currentColor) center / 2px 8px no-repeat,
+        rgba(255, 39, 56, 0.08) !important;
     border: 1px solid rgba(255, 39, 56, 0.18);
     box-shadow: 0 0 10px rgba(255, 39, 56, 0.16);
 }
@@ -5389,7 +5450,7 @@ body .app-header .command-actions #global-refresh-btn:focus-visible {
 .app-header [data-action="add-room"] {
     border-color: rgba(255, 255, 255, 0.11) !important;
     background:
-        radial-gradient(circle at 18% 50%, rgba(255, 39, 56, 0.08), transparent 34%),
+        radial-gradient(circle at var(--add-room-glow-x, 18%) 50%, rgba(255, 39, 56, 0.08), transparent 34%),
         linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.006)),
         rgba(2, 3, 4, 0.94) !important;
     box-shadow:
@@ -5403,9 +5464,42 @@ body .app-header .command-actions #global-refresh-btn:focus-visible {
 .app-header [data-action="add-room"]:focus-visible {
     border-color: rgba(255, 255, 255, 0.17) !important;
     background:
-        radial-gradient(circle at 18% 50%, rgba(255, 39, 56, 0.11), transparent 34%),
+        radial-gradient(circle at var(--add-room-glow-x, 18%) 50%, rgba(255, 39, 56, 0.11), transparent 34%),
         linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.01)),
         rgba(6, 7, 9, 0.96) !important;
+}
+
+@media (max-width: 640px) {
+    .app-header .command-search [data-action="add-room"] {
+        --add-room-glow-x: 50%;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.006)),
+            rgba(2, 3, 4, 0.94) !important;
+    }
+
+    .app-header .command-search [data-action="add-room"]::before {
+        box-shadow:
+            0 0 0 1px rgba(255, 39, 56, 0.24),
+            0 0 11px rgba(255, 39, 56, 0.28),
+            0 0 24px rgba(255, 39, 56, 0.16);
+    }
+
+    .app-header .command-search [data-action="add-room"]:hover,
+    .app-header .command-search [data-action="add-room"]:active,
+    .app-header .command-search [data-action="add-room"]:focus-visible {
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.01)),
+            rgba(6, 7, 9, 0.96) !important;
+    }
+
+    .app-header .command-search [data-action="add-room"]:hover::before,
+    .app-header .command-search [data-action="add-room"]:active::before,
+    .app-header .command-search [data-action="add-room"]:focus-visible::before {
+        box-shadow:
+            0 0 0 1px rgba(255, 39, 56, 0.3),
+            0 0 13px rgba(255, 39, 56, 0.34),
+            0 0 28px rgba(255, 39, 56, 0.2);
+    }
 }
 
 #selector-menu,

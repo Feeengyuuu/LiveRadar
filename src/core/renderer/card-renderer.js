@@ -295,12 +295,14 @@ export function updateCard(card, roomInfo, data, cardState) {
     });
 
     const avatarSkeleton = avt.nextElementSibling;
+    const avatarFallbackSrc = data.cover || data._coverFallback || data._coverFallbackHD || '';
+    const avatarImageSrc = newAvatarSrc || avatarFallbackSrc;
     setImageSource({
         imgElement: avt,
-        newSrc: newAvatarSrc,
+        newSrc: avatarImageSrc,
         skeletonElement: avatarSkeleton,
         fallbacks: {
-            standard: data.cover && data.cover !== newAvatarSrc ? data.cover : ''
+            standard: avatarFallbackSrc && avatarFallbackSrc !== avatarImageSrc ? avatarFallbackSrc : ''
         },
         hideOnError: true
     });

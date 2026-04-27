@@ -82,6 +82,7 @@ class MusicPlayerController {
         this.audio.preload = 'metadata';
 
         this.ensureProgressRing();
+        this.ensureCornerToggle();
         this.restoreAudioSettings();
         this.renderPlaylist();
         this.syncTrackUI();
@@ -118,6 +119,7 @@ class MusicPlayerController {
             artist: document.getElementById('music-artist'),
             cover: document.getElementById('music-cover'),
             playlistContainer: document.getElementById('music-playlist-items'),
+            cornerToggleBtn: null,
             progressRing: null,
         };
 
@@ -172,11 +174,16 @@ class MusicPlayerController {
             this.toggleMinimize();
         });
 
-        this.on(this.elements.header, 'click', (event) => {
-            if (this.state.minimized || this.state.animating || this.isInteractiveTarget(event.target)) return;
+        this.on(this.elements.cornerToggleBtn, 'click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            this.applyMinimizedState(true);
+            event.stopImmediatePropagation();
+            this.toggleMinimize();
+        });
+
+        this.on(this.elements.header, 'click', (event) => {
+            if (this.state.animating || this.isInteractiveTarget(event.target)) return;
+            event.stopPropagation();
         });
 
         this.on(this.elements.player, 'click', (event) => {
@@ -191,8 +198,7 @@ class MusicPlayerController {
         });
 
         this.on(document, 'click', (event) => {
-            const { player } = this.elements;
-            if (!this.state.minimized && player && !player.contains(event.target)) {
+            if (!this.state.minimized && !this.isInsidePlayerSurface(event)) {
                 this.applyMinimizedState(true);
             }
         });
@@ -638,6 +644,11 @@ class MusicPlayerController {
         this.elements.toggleBtn.setAttribute('aria-expanded', expanded.toString());
         this.elements.toggleBtn.setAttribute('aria-label', label);
         this.elements.toggleBtn.title = label;
+        if (this.elements.cornerToggleBtn) {
+            this.elements.cornerToggleBtn.setAttribute('aria-expanded', expanded.toString());
+            this.elements.cornerToggleBtn.setAttribute('aria-label', label);
+            this.elements.cornerToggleBtn.title = label;
+        }
         if (this.elements.header) this.elements.header.title = label;
     }
 
@@ -653,9 +664,16 @@ class MusicPlayerController {
 
         if (!this.state.animating && !this.isInteractiveTarget(event.target)) {
             event.preventDefault();
-            this.applyMinimizedState(true);
         }
         event.stopPropagation();
+    }
+
+    isInsidePlayerSurface(event) {
+        const { player } = this.elements;
+        if (!player) return false;
+
+        const path = typeof event.composedPath === 'function' ? event.composedPath() : null;
+        return path ? path.includes(player) : player.contains(event.target);
     }
 
     isInteractiveTarget(target) {
@@ -785,6 +803,18 @@ class MusicPlayerController {
             this.elements.cover.prepend(ring);
         }
         this.elements.progressRing = ring;
+    }
+
+    ensureCornerToggle() {
+        let toggle = this.elements.player.querySelector('.player-corner-toggle');
+        if (!toggle) {
+            toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'player-corner-toggle';
+            toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 7v9h9" /><path d="M8 16l8-8" /></svg>';
+            this.elements.player.appendChild(toggle);
+        }
+        this.elements.cornerToggleBtn = toggle;
     }
 
     restoreAudioSettings() {

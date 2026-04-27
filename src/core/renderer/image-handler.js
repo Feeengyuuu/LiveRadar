@@ -149,7 +149,7 @@ export function setImageSource(config) {
 
     imgElement.referrerPolicy = 'no-referrer';
     imgElement.decoding = 'async';
-    imgElement.loading = 'lazy';
+    imgElement.loading = hideOnError ? 'eager' : 'lazy';
 
     // Clear image if no new source
     if (!requestedSrc) {
@@ -194,6 +194,7 @@ export function setImageSource(config) {
     // Prepare for loading
     if (loadedClass) imgElement.classList.remove(loadedClass);
     if (loaderElement) loaderElement.classList.remove('hidden');
+    if (hideOnError) imgElement.classList.remove('hidden');
     imgElement.dataset.lrSrc = requestedSrc;
 
     const applyLoadedState = () => {

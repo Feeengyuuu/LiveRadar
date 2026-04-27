@@ -244,4 +244,18 @@ describe('Image Handler - setImageSource', () => {
     expect(img.src).toBe('https://cdn.example.com/avatar.jpg');
     expect(img.dataset.lrSrc).toBe('https://cdn.example.com/avatar.jpg');
   });
+
+  it('starts avatar loading while visible instead of keeping a hidden lazy image', () => {
+    const img = document.createElement('img');
+    img.classList.add('hidden');
+
+    setImageSource({
+      imgElement: img,
+      newSrc: 'https://example.com/avatar.jpg',
+      hideOnError: true
+    });
+
+    expect(img.classList.contains('hidden')).toBe(false);
+    expect(img.loading).toBe('eager');
+  });
 });
