@@ -4070,13 +4070,15 @@ html.ambient-pointer-active body::after {
 }
 
 .brand-primary {
-    color: #f3f5f7 !important;
-    text-shadow: none !important;
+    color: #f2e9e4 !important;
+    text-shadow:
+        0 0 7px color-mix(in srgb, var(--signal-led-red) 20%, transparent),
+        0 0 20px color-mix(in srgb, var(--signal-led-red) 8%, transparent) !important;
 }
 
 .brand-secondary {
-    color: #9da3ad !important;
-    text-shadow: none !important;
+    color: color-mix(in srgb, var(--signal-muted) 78%, var(--signal-led-red) 22%) !important;
+    text-shadow: 0 0 8px color-mix(in srgb, var(--signal-led-red) 6%, transparent) !important;
 }
 
 .app-header > div:nth-child(2),
@@ -5083,7 +5085,186 @@ html.perf-lite .room-card.is-tilting .card-actions {
     z-index: 3;
 }
 
+.brand-backdrop-logo {
+    --brand-backdrop-size: clamp(3000px, 260vw, 5200px);
+    --brand-backdrop-center-x: calc(clamp(88px, 5vw, 108px) + 39px);
+    --brand-backdrop-center-y: 80px;
+    --brand-backdrop-ring-width: 2.6px;
+    --brand-backdrop-satellite-size: 9px;
+    width: var(--brand-backdrop-size);
+    height: var(--brand-backdrop-size);
+    position: fixed;
+    top: var(--brand-backdrop-center-y);
+    left: var(--brand-backdrop-center-x);
+    z-index: 9;
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.14;
+    filter: blur(1.45px) saturate(0.78) brightness(1.08);
+    mix-blend-mode: screen;
+    contain: layout paint style;
+    transform: translate3d(-50%, -50%, 0);
+    mask-image: radial-gradient(circle at 50% 50%, #000 0 14%, rgba(0, 0, 0, 0.46) 32%, transparent 58%);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 14%, rgba(0, 0, 0, 0.46) 32%, transparent 58%);
+}
+
+.brand-backdrop-logo::before {
+    content: '';
+    position: absolute;
+    width: 5.4%;
+    height: 5.4%;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 43% 36%, rgba(255, 255, 255, 0.14), transparent 24%),
+        radial-gradient(circle, rgba(255, 39, 56, 0.2), transparent 68%);
+    filter: blur(30px);
+    opacity: 0.72;
+}
+
+.brand-backdrop-logo-stack,
+.brand-backdrop-logo-orbit,
+.brand-backdrop-logo-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+    transform-origin: 50% 50%;
+    backface-visibility: hidden;
+}
+
+.brand-backdrop-logo-stack {
+    filter:
+        drop-shadow(0 0 18px rgba(255, 255, 255, 0.06))
+        drop-shadow(0 0 38px rgba(255, 39, 56, 0.08));
+}
+
+.brand-backdrop-logo-image {
+    object-fit: contain;
+}
+
+.brand-backdrop-logo-orbit > .brand-backdrop-logo-image {
+    opacity: 0;
+}
+
+.brand-backdrop-logo-orbit {
+    z-index: 1;
+    will-change: transform;
+}
+
+.brand-backdrop-logo-orbit::before,
+.brand-backdrop-logo-orbit::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+}
+
+.brand-backdrop-logo-orbit::before {
+    border-radius: 50%;
+    background:
+        conic-gradient(
+            from -32deg,
+            transparent 0deg 14deg,
+            rgba(238, 244, 249, 0.36) 14deg 72deg,
+            transparent 72deg 105deg,
+            rgba(238, 244, 249, 0.22) 105deg 176deg,
+            transparent 176deg 221deg,
+            rgba(238, 244, 249, 0.28) 221deg 318deg,
+            transparent 318deg 360deg
+        );
+    -webkit-mask-image: radial-gradient(
+        farthest-side,
+        transparent calc(100% - var(--brand-backdrop-ring-width) - 1px),
+        #000 calc(100% - var(--brand-backdrop-ring-width)),
+        #000 100%
+    );
+    mask-image: radial-gradient(
+        farthest-side,
+        transparent calc(100% - var(--brand-backdrop-ring-width) - 1px),
+        #000 calc(100% - var(--brand-backdrop-ring-width)),
+        #000 100%
+    );
+}
+
+.brand-backdrop-logo-orbit::after {
+    width: var(--brand-backdrop-satellite-size);
+    height: var(--brand-backdrop-satellite-size);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.brand-backdrop-logo-orbit-outer {
+    animation: lr-logo-orbit-clockwise 34s linear infinite;
+}
+
+.brand-backdrop-logo-orbit-outer::before {
+    inset: 0;
+}
+
+.brand-backdrop-logo-orbit-outer::after {
+    left: 26.11%;
+    top: 19.89%;
+    background: rgba(255, 39, 56, 0.68);
+    box-shadow:
+        0 0 6px rgba(255, 39, 56, 0.32),
+        0 0 14px rgba(255, 39, 56, 0.14);
+}
+
+.brand-backdrop-logo-orbit-inner {
+    animation: lr-logo-orbit-counter 46s linear infinite;
+    opacity: 0.82;
+}
+
+.brand-backdrop-logo-orbit-inner::before {
+    inset: 27.8%;
+    background:
+        conic-gradient(
+            from 18deg,
+            rgba(238, 244, 249, 0.22) 0deg 56deg,
+            transparent 56deg 97deg,
+            rgba(238, 244, 249, 0.26) 97deg 184deg,
+            transparent 184deg 246deg,
+            rgba(238, 244, 249, 0.18) 246deg 330deg,
+            transparent 330deg 360deg
+        );
+}
+
+.brand-backdrop-logo-orbit-inner::after {
+    width: calc(var(--brand-backdrop-satellite-size) * 0.74);
+    height: calc(var(--brand-backdrop-satellite-size) * 0.74);
+    left: 63.1%;
+    top: 26.7%;
+    background: rgba(238, 244, 249, 0.48);
+    box-shadow: 0 0 8px rgba(238, 244, 249, 0.16);
+}
+
+.brand-backdrop-logo-center {
+    width: 10%;
+    height: 10%;
+    inset: 45%;
+    z-index: 3;
+    opacity: 0.86;
+    filter: blur(0.35px) grayscale(0.15);
+}
+
 @media (max-width: 768px) {
+    .brand-backdrop-logo {
+        --brand-backdrop-size: 2550px;
+        --brand-backdrop-center-x: 52px;
+        --brand-backdrop-center-y: 68px;
+        --brand-backdrop-ring-width: 1.8px;
+        --brand-backdrop-satellite-size: 6px;
+        opacity: 0.1;
+        filter: blur(1.65px) saturate(0.7) brightness(1.02);
+        mask-image: radial-gradient(circle at 50% 50%, #000 0 11%, rgba(0, 0, 0, 0.36) 27%, transparent 52%);
+        -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 11%, rgba(0, 0, 0, 0.36) 27%, transparent 52%);
+    }
+
     header.app-header > .brand-cluster:first-child,
     .app-header > .brand-cluster:first-child {
         grid-template-columns: 38px minmax(0, 1fr) 38px !important;
@@ -5117,6 +5298,7 @@ html.perf-lite .room-card.is-tilting .card-actions {
 @media (prefers-reduced-motion: reduce) {
     .brand-galaxy-logo-orbit-outer::after,
     .brand-cluster #secret-audio-button.brand-galaxy-logo-button.is-audio-pinging,
+    .brand-backdrop-logo-orbit,
     .brand-galaxy-logo-orbit {
         animation: none !important;
     }
