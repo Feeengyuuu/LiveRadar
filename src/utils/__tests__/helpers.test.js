@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { formatHeat, parseHeatValue, debounce, getRoomCacheKey, getCardId } from '../helpers.js';
+import { formatHeat, parseHeatValue, debounce, getRoomCacheKey, getCardId, normalizeRoomId } from '../helpers.js';
 
 describe('Utility Helpers - Number Formatting', () => {
   describe('formatHeat', () => {
@@ -108,6 +108,19 @@ describe('Utility Helpers - ID Generation', () => {
       expect(getCardId('douyu', '123456')).toBe('card-douyu-123456');
       expect(getCardId('bilibili', '789')).toBe('card-bilibili-789');
       expect(getCardId('twitch', 'ninja')).toBe('card-twitch-ninja');
+    });
+  });
+
+  describe('normalizeRoomId', () => {
+    it('should normalize Picarto channel URLs', () => {
+      expect(normalizeRoomId('picarto', 'https://picarto.tv/SomeArtist?ref=home')).toBe('SomeArtist');
+      expect(normalizeRoomId('picarto', '@SomeArtist')).toBe('SomeArtist');
+    });
+
+    it('should normalize SOOP channel URLs', () => {
+      expect(normalizeRoomId('soop', 'https://play.sooplive.co.kr/SomeBJ?from=home')).toBe('somebj');
+      expect(normalizeRoomId('soop', '@SomeBJ')).toBe('somebj');
+      expect(normalizeRoomId('soop', 'https://www.afreecatv.com/SomeBJ')).toBe('somebj');
     });
   });
 });

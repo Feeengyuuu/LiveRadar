@@ -1,6 +1,73 @@
 import { defineConfig } from 'vite';
+import { handleBatchStatusRequest, handleStatusRequest } from './functions/_shared/platform-status.js';
+
+async function readRequestBody(req) {
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+function createWebRequest(req) {
+  const host = req.headers.host || '127.0.0.1:3000';
+  const url = `http://${host}${req.url}`;
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (Array.isArray(value)) {
+      headers.set(key, value.join(', '));
+    } else if (value !== undefined) {
+      headers.set(key, value);
+    }
+  }
+
+  return { url, headers };
+}
+
+async function sendWebResponse(res, response) {
+  res.statusCode = response.status;
+  response.headers.forEach((value, key) => res.setHeader(key, value));
+  const body = Buffer.from(await response.arrayBuffer());
+  res.end(body);
+}
+
+async function handleDevStatusRequest(req, res, next) {
+  const { url, headers } = createWebRequest(req);
+  const pathname = new URL(url).pathname;
+  const isStatus = pathname === '/api/status';
+  const isBatch = pathname === '/api/status/batch';
+  if (!isStatus && !isBatch) {
+    next();
+    return;
+  }
+
+  try {
+    const body = isBatch ? await readRequestBody(req) : undefined;
+    const request = new Request(url, {
+      method: req.method,
+      headers,
+      body
+    });
+    const response = isBatch
+      ? await handleBatchStatusRequest({ request, env: {} })
+      : await handleStatusRequest({ request, env: {} });
+    await sendWebResponse(res, response);
+  } catch (error) {
+    next(error);
+  }
+}
+
+function devStatusApiPlugin() {
+  return {
+    name: 'liveradar-dev-status-api',
+    configureServer(server) {
+      server.middlewares.use(handleDevStatusRequest);
+    },
+  };
+}
 
 export default defineConfig({
+  plugins: [devStatusApiPlugin()],
   base: './', // Support both root and subdirectory deployment
   build: {
     outDir: 'dist',

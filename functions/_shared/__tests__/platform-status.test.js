@@ -10,6 +10,8 @@ describe('cloudflare platform status helpers', () => {
     it('recognizes supported platforms', () => {
         expect(isSupportedPlatform('douyu')).toBe(true);
         expect(isSupportedPlatform('bilibili')).toBe(true);
+        expect(isSupportedPlatform('picarto')).toBe(true);
+        expect(isSupportedPlatform('soop')).toBe(true);
         expect(isSupportedPlatform('unknown')).toBe(false);
     });
 
@@ -177,7 +179,8 @@ describe('cloudflare platform status helpers', () => {
             status: {
                 isLive: true,
                 owner: 'Anchor 100',
-                avatar: 'https://example.com/100-face.jpg'
+                avatar: 'https://example.com/100-face.jpg',
+                cover: 'https://example.com/100-live.jpg'
             }
         });
         expect(payload.results[1]).toMatchObject({
@@ -351,6 +354,91 @@ describe('cloudflare platform status helpers', () => {
                 owner: 'xqc',
                 heatValue: 321,
                 avatar: 'https://example.com/kick-face.jpg'
+            }
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('maps Picarto public channel data to the shared status shape', async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+            const rawUrl = String(url);
+            if (rawUrl.includes('api.picarto.tv/api/v1/channel/name/artist')) {
+                return new Response(JSON.stringify({
+                    name: 'artist',
+                    title: 'Drawing live',
+                    avatar: 'https://example.com/picarto-face.jpg',
+                    online: true,
+                    viewers: 42,
+                    thumbnails: {
+                        web_large: 'https://example.com/picarto-live.jpg'
+                    }
+                }), { status: 200 });
+            }
+
+            throw new Error(`Unexpected fetch: ${rawUrl}`);
+        });
+
+        const response = await handleStatusRequest({
+            request: new Request('https://liveradar.pages.dev/api/status?platform=picarto&id=artist'),
+            env: {}
+        });
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({
+            ok: true,
+            platform: 'picarto',
+            status: {
+                isLive: true,
+                isReplay: false,
+                title: 'Drawing live',
+                owner: 'artist',
+                heatValue: 42,
+                avatar: 'https://example.com/picarto-face.jpg',
+                cover: 'https://example.com/picarto-live.jpg'
+            }
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('maps SOOP player live data to the shared status shape', async () => {
+        vi.spyOn(Date, 'now').mockReturnValue(1777045200000);
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
+            const rawUrl = String(url);
+            if (rawUrl.includes('player_live_api.php')) {
+                expect(options.method).toBe('POST');
+                expect(String(options.body)).toContain('bid=somebj');
+                return new Response(JSON.stringify({
+                    CHANNEL: {
+                        RESULT: 1,
+                        BNO: '123456789',
+                        TITLE: 'SOOP Live',
+                        BJNICK: 'SOOP Anchor',
+                        BTIME: 600,
+                        VIEW_CNT: 77
+                    }
+                }), { status: 200 });
+            }
+
+            throw new Error(`Unexpected fetch: ${rawUrl}`);
+        });
+
+        const response = await handleStatusRequest({
+            request: new Request('https://liveradar.pages.dev/api/status?platform=soop&id=somebj'),
+            env: {}
+        });
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({
+            ok: true,
+            platform: 'soop',
+            status: {
+                isLive: true,
+                isReplay: false,
+                title: 'SOOP Live',
+                owner: 'SOOP Anchor',
+                heatValue: 77,
+                cover: 'https://liveimg.sooplive.com/m/123456789',
+                startTime: 1777044600000
             }
         });
         expect(fetchMock).toHaveBeenCalledTimes(1);

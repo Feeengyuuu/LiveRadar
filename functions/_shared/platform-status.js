@@ -1,4 +1,4 @@
-const SUPPORTED_PLATFORMS = new Set(['douyu', 'bilibili', 'twitch', 'kick']);
+const SUPPORTED_PLATFORMS = new Set(['douyu', 'bilibili', 'twitch', 'kick', 'picarto', 'soop']);
 const STATUS_TIMEOUT_MS = 8000;
 const STATUS_CACHE_SECONDS = 20;
 const STATUS_CACHE_STALE_SECONDS = 40;
@@ -13,7 +13,9 @@ const PLATFORM_ID_RULES = {
     douyu: { pattern: /^\d{1,10}$/, description: '1-10 digits' },
     bilibili: { pattern: /^\d{1,15}$/, description: '1-15 digits' },
     twitch: { pattern: /^[a-zA-Z0-9_]{1,25}$/, description: '1-25 letters, numbers, or underscores' },
-    kick: { pattern: /^[a-zA-Z0-9_]{1,25}$/, description: '1-25 letters, numbers, or underscores' }
+    kick: { pattern: /^[a-zA-Z0-9_]{1,25}$/, description: '1-25 letters, numbers, or underscores' },
+    picarto: { pattern: /^[a-zA-Z0-9_-]{1,64}$/, description: '1-64 letters, numbers, underscores, or hyphens' },
+    soop: { pattern: /^[a-zA-Z0-9_]{1,32}$/, description: '1-32 letters, numbers, or underscores' }
 };
 const CODETABS_PROXY = {
     name: 'codetabs',
@@ -48,6 +50,23 @@ const KICK_HEADERS = {
     Accept: 'application/json, text/plain, */*',
     Referer: 'https://kick.com/',
     Origin: 'https://kick.com'
+};
+const PICARTO_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36 LiveRadar/3.1',
+    Accept: 'application/json, text/plain, */*',
+    Referer: 'https://picarto.tv/',
+    Origin: 'https://picarto.tv'
+};
+const SOOP_PLAYER_ENDPOINTS = [
+    'https://live.sooplive.co.kr/afreeca/player_live_api.php',
+    'https://live.sooplive.com/afreeca/player_live_api.php'
+];
+const SOOP_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36 LiveRadar/3.1',
+    Accept: 'application/json, text/plain, */*',
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    Referer: 'https://play.sooplive.co.kr/',
+    Origin: 'https://play.sooplive.co.kr'
 };
 
 let twitchTokenCache = {
@@ -772,6 +791,10 @@ async function getPlatformStatus(platform, id, options) {
             return getTwitchStatus(id, options.fetchAvatar, options.env);
         case 'kick':
             return getKickStatus(id, options.env);
+        case 'picarto':
+            return getPicartoStatus(id, options.fetchAvatar);
+        case 'soop':
+            return getSoopStatus(id, options.fetchAvatar);
         default:
             return null;
     }
@@ -983,7 +1006,7 @@ function applyBilibiliBaseInfo(status, data) {
     status.owner = data.uname || status.owner;
     status.heatValue = parseHeatValue(data.online || 0);
     status.startTime = status.isLive ? parseTimestamp(data.live_time, '+08:00') : null;
-    status.cover = data.cover || data.user_cover || data.keyframe || status.cover;
+    status.cover = selectBilibiliCover(status, data);
     status._uid = data.uid ? String(data.uid) : '';
 }
 
@@ -1016,7 +1039,7 @@ function applyBilibiliInfo(status, data) {
     status.title = data.title || status.title;
     status.heatValue = parseHeatValue(data.online || 0);
     status.startTime = status.isLive ? parseTimestamp(data.live_time, '+08:00') : null;
-    status.cover = data.keyframe || data.user_cover || status.cover;
+    status.cover = selectBilibiliCover(status, data);
     status._uid = data.uid ? String(data.uid) : '';
 }
 
@@ -1028,12 +1051,36 @@ function applyBilibiliUidInfo(status, data, fetchAvatar) {
     status.owner = data.uname || status.owner;
     status.heatValue = parseHeatValue(data.online ?? status.heatValue);
     status.startTime = status.isLive ? parseTimestamp(data.live_time, '+08:00') : null;
-    status.cover = data.keyframe || data.cover_from_user || status.cover;
+    status.cover = selectBilibiliCover(status, data);
 
     if (fetchAvatar !== false) {
         status.avatar = data.face || status.avatar;
         status._profileFetched = !!status.avatar || status._profileFetched;
     }
+}
+
+function selectBilibiliCover(status, data) {
+    if (status.isLive) {
+        return data.keyframe ||
+            data.cover ||
+            data.user_cover ||
+            data.cover_from_user ||
+            status.cover;
+    }
+
+    if (status.isReplay) {
+        return data.user_cover ||
+            data.cover_from_user ||
+            data.cover ||
+            data.keyframe ||
+            status.cover;
+    }
+
+    return data.cover ||
+        data.user_cover ||
+        data.cover_from_user ||
+        data.keyframe ||
+        status.cover;
 }
 
 async function getTwitchStatus(id, fetchAvatar, env) {
@@ -1314,4 +1361,214 @@ function applyKickOfficialStatus(status, channel) {
             status.avatar ||
             status.cover;
     }
+}
+
+async function getPicartoStatus(id, fetchAvatar) {
+    const status = createDefaultStatus('picarto', id);
+    const channelName = encodeURIComponent(id);
+    const data = await fetchJsonFromCandidates(`https://api.picarto.tv/api/v1/channel/name/${channelName}`, {
+        timeoutMs: 6500,
+        headers: PICARTO_HEADERS,
+        proxyHeaders: {
+            Accept: 'application/json, text/plain, */*'
+        },
+        proxies: [
+            CODETABS_PROXY,
+            ALLORIGINS_RAW_PROXY
+        ]
+    });
+
+    if (!data || data.error) return null;
+
+    applyPicartoStatus(status, data, fetchAvatar);
+    return status;
+}
+
+function firstString(...values) {
+    for (const value of values) {
+        if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return '';
+}
+
+function coerceBoolean(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value > 0;
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        return normalized === 'true' || normalized === '1' || normalized === 'online' || normalized === 'live';
+    }
+    return false;
+}
+
+function selectPicartoThumbnail(data, isLive) {
+    const thumbnails = data.thumbnails ?? data.thumbnail ?? {};
+    const channel = data.channel ?? {};
+    const liveThumb = firstString(
+        typeof data.thumbnail === 'string' ? data.thumbnail : '',
+        thumbnails.web_large,
+        thumbnails.web,
+        thumbnails.tablet,
+        thumbnails.mobile,
+        data.thumbnail_url,
+        data.preview,
+        data.preview_url,
+        data.image
+    );
+    const offlineThumb = firstString(
+        data.offline_image,
+        data.offline_image_url,
+        channel.offline_image,
+        channel.offline_image_url,
+        data.avatar,
+        data.avatar_url,
+        channel.avatar
+    );
+
+    return isLive ? (liveThumb || offlineThumb) : (offlineThumb || liveThumb);
+}
+
+function applyPicartoStatus(status, data, fetchAvatar) {
+    const channel = data.channel ?? {};
+    const isLive = coerceBoolean(
+        data.online ??
+        data.is_online ??
+        data.live ??
+        data.is_live ??
+        channel.online ??
+        channel.is_online
+    );
+
+    status.isLive = isLive;
+    status.isReplay = false;
+    status.title = firstString(data.title, data.channel_title, data.stream_title, channel.title, channel.stream_name);
+    status.owner = firstString(data.name, data.channel, data.channel_name, channel.name, channel.channel_name, status.owner);
+    status.heatValue = parseHeatValue(data.viewers ?? data.channel_viewers ?? data.viewers_total ?? data.viewer_count ?? 0);
+    status.cover = selectPicartoThumbnail(data, isLive);
+
+    if (fetchAvatar !== false) {
+        status.avatar = firstString(data.avatar, data.avatar_url, channel.avatar, channel.avatar_url, status.avatar);
+        status._profileFetched = !!status.avatar;
+    }
+}
+
+async function getSoopStatus(id, _fetchAvatar) {
+    const status = createDefaultStatus('soop', id);
+    const data = await fetchSoopLiveData(id);
+    if (!data || data.error) return null;
+
+    applySoopStatus(status, data);
+
+    if (!status.isLive || !status.owner || status.owner === String(id) || !status.title) {
+        const stationData = await fetchSoopStationData(id);
+        if (stationData) applySoopStationProfile(status, stationData);
+    }
+
+    return status;
+}
+
+function buildSoopLiveBody(id) {
+    const params = new URLSearchParams();
+    params.set('bid', id);
+    params.set('bno', 'null');
+    params.set('type', 'live');
+    params.set('pwd', '');
+    params.set('player_type', 'html5');
+    params.set('stream_type', 'common');
+    params.set('quality', 'HD');
+    params.set('mode', 'landing');
+    params.set('from_api', '0');
+    params.set('is_revive', 'false');
+    return params;
+}
+
+async function fetchSoopLiveData(id) {
+    for (const endpoint of SOOP_PLAYER_ENDPOINTS) {
+        const result = await fetchJsonResult(endpoint, {
+            method: 'POST',
+            body: buildSoopLiveBody(id),
+            timeoutMs: 6500,
+            headers: SOOP_HEADERS
+        });
+        if (result.ok) return result.data;
+    }
+    return null;
+}
+
+async function fetchSoopStationData(id) {
+    const stationUrl = `https://st.sooplive.co.kr/api/get_station_status.php?szBjid=${encodeURIComponent(id)}`;
+    return fetchJsonFromCandidates(stationUrl, {
+        timeoutMs: 4500,
+        headers: SOOP_HEADERS,
+        proxyHeaders: {
+            Accept: 'application/json, text/plain, */*'
+        },
+        proxies: [
+            CODETABS_PROXY,
+            ALLORIGINS_RAW_PROXY
+        ]
+    });
+}
+
+function normalizeExternalUrl(url) {
+    const value = firstString(url);
+    if (!value) return '';
+    if (value.startsWith('//')) return `https:${value}`;
+    if (/^https?:\/\//i.test(value)) return value;
+    return '';
+}
+
+function selectSoopCover(channel, isLive) {
+    const explicit = normalizeExternalUrl(
+        channel.broad_thumb ||
+        channel.BROAD_THUMB ||
+        channel.thumb ||
+        channel.THUMB ||
+        channel.thumbnail ||
+        channel.THUMBNAIL
+    );
+    if (explicit) return explicit;
+
+    const bno = firstString(channel.BNO, channel.bno, channel.broad_no, channel.BROAD_NO);
+    if (isLive && bno) return `https://liveimg.sooplive.com/m/${encodeURIComponent(bno)}`;
+    return '';
+}
+
+function applySoopStatus(status, data) {
+    const channel = data.CHANNEL ?? data.channel ?? data;
+    const resultCode = Number.parseInt(channel.RESULT ?? channel.result ?? '0', 10);
+    const bno = firstString(channel.BNO, channel.bno);
+    const btime = Number.parseInt(channel.BTIME ?? channel.btime ?? '0', 10);
+    const isLive = resultCode === 1 || resultCode === -6 || parseHeatValue(bno) > 0;
+
+    status.isLive = isLive;
+    status.isReplay = false;
+    status.title = firstString(channel.TITLE, channel.title, status.title);
+    status.owner = firstString(channel.BJNICK, channel.bjnick, channel.BJID, channel.bjid, status.owner);
+    status.heatValue = parseHeatValue(
+        channel.VIEW_CNT ??
+        channel.view_cnt ??
+        channel.TOTAL_VIEW_CNT ??
+        channel.total_view_cnt ??
+        channel.total_view_count ??
+        0
+    );
+    status.cover = selectSoopCover(channel, isLive) || status.cover;
+
+    if (isLive && Number.isFinite(btime) && btime > 0) {
+        status.startTime = Date.now() - (btime * 1000);
+    }
+}
+
+function applySoopStationProfile(status, data) {
+    const profile = data.DATA ?? data.data ?? {};
+    status.owner = firstString(profile.user_nick, profile.USER_NICK, profile.nickname, status.owner);
+    status.title = status.title || firstString(profile.station_name, profile.station_title, profile.STATION_NAME, profile.STATION_TITLE);
+    status.avatar = normalizeExternalUrl(
+        profile.profile_img ||
+        profile.profile_image ||
+        profile.user_profile_img ||
+        profile.USER_PROFILE_IMG
+    ) || status.avatar;
+    if (status.avatar) status._profileFetched = true;
 }

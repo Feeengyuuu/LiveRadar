@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="LiveRadar card states">
+  <rect width="1200" height="720" rx="34" fill="#f8fafc"/>
+  <text x="70" y="92" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="800">Card States</text>
+  <text x="72" y="132" fill="#64748b" font-family="Inter, Arial, sans-serif" font-size="22">Clean state labels for dense monitoring.</text>
+  <g font-family="Inter, Arial, sans-serif" filter="drop-shadow(0 18px 24px rgba(15,23,42,.14))">
+    <rect x="75" y="200" width="240" height="320" rx="24" fill="#0f172a"/>
+    <rect x="360" y="200" width="240" height="320" rx="24" fill="#0f172a"/>
+    <rect x="645" y="200" width="240" height="320" rx="24" fill="#0f172a"/>
+    <rect x="930" y="200" width="195" height="320" rx="24" fill="#0f172a"/>
+    <circle cx="118" cy="248" r="14" fill="#22c55e"/>
+    <circle cx="403" cy="248" r="14" fill="#94a3b8"/>
+    <circle cx="688" cy="248" r="14" fill="#f97316"/>
+    <circle cx="973" cy="248" r="14" fill="#eab308"/>
+    <text x="102" y="312" fill="#f8fafc" font-size="30" font-weight="800">LIVE</text>
+    <text x="388" y="312" fill="#f8fafc" font-size="30" font-weight="800">OFFLINE</text>
+    <text x="673" y="312" fill="#f8fafc" font-size="30" font-weight="800">REPLAY</text>
+    <text x="958" y="312" fill="#f8fafc" font-size="30" font-weight="800">STAR</text>
+    <rect x="105" y="360" width="150" height="14" rx="7" fill="#334155"/>
+    <rect x="105" y="394" width="110" height="14" rx="7" fill="#334155"/>
+    <rect x="390" y="360" width="150" height="14" rx="7" fill="#334155"/>
+    <rect x="390" y="394" width="110" height="14" rx="7" fill="#334155"/>
+    <rect x="675" y="360" width="150" height="14" rx="7" fill="#334155"/>
+    <rect x="675" y="394" width="110" height="14" rx="7" fill="#334155"/>
+    <rect x="960" y="360" width="120" height="14" rx="7" fill="#334155"/>
+    <rect x="960" y="394" width="90" height="14" rx="7" fill="#334155"/>
+    <rect x="105" y="455" width="82" height="24" rx="12" fill="#22c55e"/>
+    <rect x="390" y="455" width="82" height="24" rx="12" fill="#64748b"/>
+    <rect x="675" y="455" width="82" height="24" rx="12" fill="#f97316"/>
+    <rect x="960" y="455" width="82" height="24" rx="12" fill="#eab308"/>
+  </g>
+  <path d="M76 594 H1124" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="76" y="640" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="22">Live status, replay status, favorite status and offline state stay visually separate.</text>
+</svg>

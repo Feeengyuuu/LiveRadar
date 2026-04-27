@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_CONFIG } from '../../config/constants.js';
 
 const mocks = vi.hoisted(() => {
     const mockState = {
@@ -66,6 +67,10 @@ describe('status-fetcher', () => {
         initStatusFetcher({});
     });
 
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     it('does not write late results for rooms that were removed mid-request', async () => {
         let resolveFetch;
         mocks.fetchPlatformStatus.mockImplementation(() => new Promise(resolve => {
@@ -109,6 +114,140 @@ describe('status-fetcher', () => {
 
         expect(mocks.updateRoomCache).toHaveBeenCalledTimes(1);
         expect(mocks.updateRoomCache.mock.calls[0][0]).toBe('douyu-100');
+    });
+
+    it('formats Picarto live counts as real viewers', async () => {
+        const room = { id: 'artist', platform: 'picarto', isFav: false };
+        mocks.mockState.rooms = [room];
+        mocks.fetchPlatformStatus.mockResolvedValue({
+            isLive: true,
+            isReplay: false,
+            title: 'Mock Picarto Live',
+            owner: 'Mock Artist',
+            cover: 'https://example.com/live.jpg',
+            avatar: 'https://example.com/avatar.jpg',
+            heatValue: 321,
+            isError: false,
+            startTime: null
+        });
+
+        await fetchRoomStatus(room);
+
+        const updateData = mocks.updateRoomCache.mock.calls[0][1];
+        expect(mocks.updateRoomCache.mock.calls[0][0]).toBe('picarto-artist');
+        expect(updateData.viewers).toBe('在线 321人');
+        expect(updateData.platform).toBe('picarto');
+    });
+
+    it('keeps SOOP counts in the shared live status format', async () => {
+        const room = { id: 'somebj', platform: 'soop', isFav: false };
+        mocks.mockState.rooms = [room];
+        mocks.fetchPlatformStatus.mockResolvedValue({
+            isLive: true,
+            isReplay: false,
+            title: 'SOOP Live',
+            owner: 'SOOP Anchor',
+            cover: 'https://liveimg.sooplive.com/m/123456789',
+            avatar: '',
+            heatValue: 77,
+            isError: false,
+            startTime: null
+        });
+
+        await fetchRoomStatus(room);
+
+        const updateData = mocks.updateRoomCache.mock.calls[0][1];
+        expect(mocks.updateRoomCache.mock.calls[0][0]).toBe('soop-somebj');
+        expect(updateData.viewers).toBe('在线 77');
+        expect(updateData.platform).toBe('soop');
+    });
+
+    it('keeps duplicate live cover URLs inside the current platform bucket', async () => {
+        const room = { id: '100', platform: 'twitch', isFav: false };
+        const interval = APP_CONFIG.CACHE.LIVE_IMAGE_REFRESH_INTERVALS.INTERNATIONAL;
+        const bucketStart = 5666666 * interval;
+        const now = bucketStart + 60 * 1000;
+        const bucket = Math.floor(now / interval);
+        const baseCover = 'https://example.com/live.jpg';
+        const previousCover = `${baseCover}?t=${bucket}`;
+
+        vi.spyOn(Date, 'now').mockReturnValue(now);
+        mocks.mockState.rooms = [room];
+        mocks.mockState.cache = {
+            'twitch-100': {
+                isLive: true,
+                isReplay: false,
+                title: 'online',
+                owner: 'streamer',
+                cover: previousCover,
+                avatar: 'https://example.com/avatar.jpg',
+                heatValue: 1000,
+                isError: false,
+                loading: false,
+                lastCoverUpdate: bucketStart
+            }
+        };
+        mocks.fetchPlatformStatus.mockResolvedValue({
+            isLive: true,
+            isReplay: false,
+            title: 'online',
+            owner: 'streamer',
+            cover: baseCover,
+            avatar: 'https://example.com/avatar.jpg',
+            heatValue: 1000,
+            isError: false,
+            startTime: null
+        });
+
+        await fetchRoomStatus(room);
+
+        const updateData = mocks.updateRoomCache.mock.calls[0][1];
+        expect(updateData.cover).toBe(previousCover);
+        expect(updateData.lastCoverUpdate).toBe(bucketStart);
+    });
+
+    it('updates live cover timestamps when the platform bucket changes', async () => {
+        const room = { id: '100', platform: 'twitch', isFav: false };
+        const interval = APP_CONFIG.CACHE.LIVE_IMAGE_REFRESH_INTERVALS.INTERNATIONAL;
+        const bucketStart = 5666666 * interval;
+        const now = bucketStart + 6 * 60 * 1000;
+        const previousBucket = Math.floor(bucketStart / interval);
+        const nextBucket = Math.floor(now / interval);
+        const baseCover = 'https://example.com/live.jpg';
+
+        vi.spyOn(Date, 'now').mockReturnValue(now);
+        mocks.mockState.rooms = [room];
+        mocks.mockState.cache = {
+            'twitch-100': {
+                isLive: true,
+                isReplay: false,
+                title: 'online',
+                owner: 'streamer',
+                cover: `${baseCover}?t=${previousBucket}`,
+                avatar: 'https://example.com/avatar.jpg',
+                heatValue: 1000,
+                isError: false,
+                loading: false,
+                lastCoverUpdate: bucketStart
+            }
+        };
+        mocks.fetchPlatformStatus.mockResolvedValue({
+            isLive: true,
+            isReplay: false,
+            title: 'online',
+            owner: 'streamer',
+            cover: baseCover,
+            avatar: 'https://example.com/avatar.jpg',
+            heatValue: 1000,
+            isError: false,
+            startTime: null
+        });
+
+        await fetchRoomStatus(room);
+
+        const updateData = mocks.updateRoomCache.mock.calls[0][1];
+        expect(updateData.cover).toBe(`${baseCover}?t=${nextBucket}`);
+        expect(updateData.lastCoverUpdate).toBe(now);
     });
 
     it('keeps the original in-flight request deduped when a room is re-added', async () => {

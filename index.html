@@ -20,7 +20,7 @@
                style-src 'self' 'unsafe-inline';
                img-src 'self' data: https: blob:;
                media-src 'self' data: blob:;
-               connect-src 'self' https://www.douyu.com https://m.douyu.com https://live.bilibili.com https://api.bilibili.com https://api.live.bilibili.com https://api.twitch.tv https://gql.twitch.tv https://kick.com https://decapi.me https://static-cdn.jtvnw.net https://api.codetabs.com https://api.allorigins.win https://cors-proxy.htmldriven.com https://corsproxy.io https://whateverorigin.herokuapp.com;
+               connect-src 'self' https://www.douyu.com https://m.douyu.com https://live.bilibili.com https://api.bilibili.com https://api.live.bilibili.com https://api.twitch.tv https://gql.twitch.tv https://kick.com https://decapi.me https://static-cdn.jtvnw.net https://api.picarto.tv https://picarto.tv https://www.picarto.tv https://live.sooplive.co.kr https://live.sooplive.com https://st.sooplive.co.kr https://play.sooplive.co.kr https://play.sooplive.com https://api.codetabs.com https://api.allorigins.win https://cors-proxy.htmldriven.com https://corsproxy.io https://whateverorigin.herokuapp.com;
                font-src 'self' data:;
                object-src 'none';
                base-uri 'self';
@@ -276,6 +276,36 @@
                 >Kick</span
               >
             </div>
+            <div
+              data-action="select-platform"
+              data-platform="picarto"
+              data-color="#22c55e"
+              data-label="Picarto"
+              role="option"
+              tabindex="-1"
+              aria-selected="false"
+              class="cursor-pointer px-5 py-3 hover:bg-[#262626] transition-colors border-b border-white/5 flex items-center justify-between group"
+            >
+              <span
+                class="text-[#22c55e] font-bold text-sm group-hover:drop-shadow-[0_0_6px_#22c55e]"
+                >Picarto</span
+              >
+            </div>
+            <div
+              data-action="select-platform"
+              data-platform="soop"
+              data-color="#00e0a4"
+              data-label="SOOP"
+              role="option"
+              tabindex="-1"
+              aria-selected="false"
+              class="cursor-pointer px-5 py-3 hover:bg-[#262626] transition-colors border-b border-white/5 flex items-center justify-between group"
+            >
+              <span
+                class="text-[#00e0a4] font-bold text-sm group-hover:drop-shadow-[0_0_6px_#00e0a4]"
+                >SOOP</span
+              >
+            </div>
           </div>
         </div>
         <input
@@ -365,7 +395,7 @@
           accept=".json,.liveradar"
           style="display: none"
         />
-        <span id="refresh-stats" class="refresh-stats hidden">--</span>
+        <span id="refresh-stats" class="refresh-stats hidden" role="status" aria-live="polite" aria-atomic="true">--</span>
         <button
           type="button"
           data-action="refresh-all"
@@ -485,7 +515,7 @@
               class="w-8 h-8 border-2 border-white/20 border-t-red-500 rounded-full animate-spin"
             ></div>
           </div>
-          <img class="card-thumbnail" src="" alt="" loading="lazy" />
+          <img class="card-thumbnail" src="" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
           <div class="thumb-scrim"></div>
           <div class="thumb-meta-bar">
             <div class="viewer-pill">
@@ -498,7 +528,7 @@
         <span class="status-chip chip-off"><span class="status-text">加载中</span></span>
         <div class="card-info">
           <div class="avatar-stack">
-            <img class="u-avatar hidden" src="" alt="" />
+            <img class="u-avatar hidden" src="" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
             <div class="w-14 h-14 rounded-full bg-[#262626] flex-shrink-0 skeleton-avatar"></div>
           </div>
           <div class="meta-text">

@@ -19,6 +19,15 @@ import { updateCard } from './card-renderer.js';
 const knownCardIds = new Set();
 let disposeRenderer = null;
 const VALUE_UPDATE_ANIMATION_MS = 560;
+const LIVE_THUMBNAIL_REFRESH_PLATFORMS = new Set(['twitch', 'kick', 'picarto', 'soop']);
+
+function syncLargeListMode(roomCount) {
+    if (typeof document === 'undefined') return;
+
+    const { LARGE_LIST_THRESHOLD, VERY_LARGE_LIST_THRESHOLD } = APP_CONFIG.PERFORMANCE;
+    document.documentElement.classList.toggle('large-list-mode', roomCount >= LARGE_LIST_THRESHOLD);
+    document.documentElement.classList.toggle('very-large-list-mode', roomCount >= VERY_LARGE_LIST_THRESHOLD);
+}
 
 function restartTransientClass(element, className, timeoutMs = VALUE_UPDATE_ANIMATION_MS) {
     if (!element?.isConnected) return;
@@ -47,7 +56,9 @@ export function initRenderer() {
     if (disposeRenderer) return disposeRenderer;
 
     const unsubscribeRooms = subscribeToState('rooms', () => {
-        console.log('[Renderer] Rooms changed, auto-rendering...');
+        if (APP_CONFIG.DEBUG.LOG_RENDER) {
+            console.log('[Renderer] Rooms changed, auto-rendering...');
+        }
         debouncedRenderAll();
     });
 
@@ -60,7 +71,9 @@ export function initRenderer() {
         disposeRenderer = null;
     };
 
-    console.log('[Renderer] Initialized with state subscriptions');
+    if (APP_CONFIG.DEBUG.LOG_RENDER) {
+        console.log('[Renderer] Initialized with state subscriptions');
+    }
     return disposeRenderer;
 }
 
@@ -144,7 +157,7 @@ function shouldUpdateCard(card, roomInfo, data, cardState) {
     const platformChip = card._domRefs?.platformChip || card.querySelector('.platform-chip');
     const platformChromeNeedsUpdate = !!platformChip && platformChip.textContent.trim() === '平台';
     const isLiveThumbnail = cardState === 'live'
-        && (roomInfo.platform === 'twitch' || roomInfo.platform === 'kick');
+        && LIVE_THUMBNAIL_REFRESH_PLATFORMS.has(roomInfo.platform);
 
     return data._hasChanges !== false
         || data._stale === true
@@ -228,6 +241,8 @@ function renderEmptyState(cache, grids, zones) {
 
 function renderAllImmediate() {
     const rooms = getRooms();
+    syncLargeListMode(rooms.length);
+
     const roomDataCache = getRoomDataCache();
     const cache = getDOMCache();
     const grids = {
@@ -250,7 +265,7 @@ function renderAllImmediate() {
     const sortedRooms = favorites.concat(others);
 
     const presentCardIds = new Set();
-    const flags = { hasLive: false, hasOffline: false, hasLoop: false, liveCount: 0, offlineCount: 0, loopCount: 0 };
+    const flags = { hasLive: false, hasOffline: false, hasLoop: false, liveCount: 0, offlineCount: 0, loopCount: 0, favoriteLiveCount: 0 };
     const gridPositions = { live: 0, offline: 0, loop: 0 };
     const newCardsByGrid = { live: [], offline: [], loop: [] };
 
@@ -262,6 +277,9 @@ function renderAllImmediate() {
         const cardId = getCardId(roomInfo.platform, roomInfo.id);
         presentCardIds.add(cardId);
         const data = roomDataCache[getRoomCacheKey(roomInfo.platform, roomInfo.id)] || { loading: true };
+        if (roomInfo.isFav && !data.loading && !data.isError && !data._retryFailed && data.isLive === true) {
+            flags.favoriteLiveCount++;
+        }
 
         let card = document.getElementById(cardId);
         const previousZone = getPreviousZone(card);
@@ -318,15 +336,10 @@ function renderAllImmediate() {
         setTextWithPulse(cache.loopCount, nextCount);
     }
 
-    const favoriteLiveCount = rooms.filter(room => {
-        if (!room.isFav) return false;
-        const data = roomDataCache[getRoomCacheKey(room.platform, room.id)];
-        return !!data && !data.loading && !data.isError && !data._retryFailed && data.isLive === true;
-    }).length;
     const offlineTotal = flags.offlineCount;
     setTextWithPulse(cache.metricLiveCount, String(flags.liveCount));
     setTextWithPulse(cache.metricOfflineCount, String(offlineTotal));
-    setTextWithPulse(cache.metricFavoriteCount, String(favoriteLiveCount));
+    setTextWithPulse(cache.metricFavoriteCount, String(flags.favoriteLiveCount));
 
     cache.zoneLive?.classList.toggle('active', flags.hasLive);
     cache.zoneOffline?.classList.toggle('active', flags.hasOffline);

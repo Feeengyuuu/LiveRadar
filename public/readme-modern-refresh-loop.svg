@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="LiveRadar refresh loop">
+  <rect width="1200" height="720" rx="34" fill="#f8fafc"/>
+  <text x="90" y="100" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="800">Refresh Loop</text>
+  <g fill="#ffffff" stroke="#e2e8f0" stroke-width="2" filter="drop-shadow(0 18px 24px rgba(15,23,42,.12))">
+    <rect x="100" y="215" width="205" height="160" rx="26"/>
+    <rect x="365" y="215" width="205" height="160" rx="26"/>
+    <rect x="630" y="215" width="205" height="160" rx="26"/>
+    <rect x="895" y="215" width="205" height="160" rx="26"/>
+    <rect x="365" y="455" width="470" height="120" rx="26"/>
+  </g>
+  <g font-family="Inter, Arial, sans-serif" font-weight="800" font-size="26">
+    <text x="150" y="290" fill="#0f172a">QUEUE</text>
+    <text x="414" y="290" fill="#0f172a">FETCH</text>
+    <text x="682" y="290" fill="#0f172a">MERGE</text>
+    <text x="947" y="290" fill="#0f172a">RENDER</text>
+    <text x="500" y="525" fill="#0f172a">NOTIFY ONCE</text>
+  </g>
+  <g fill="#94a3b8">
+    <rect x="145" y="320" width="110" height="12" rx="6"/>
+    <rect x="410" y="320" width="110" height="12" rx="6"/>
+    <rect x="675" y="320" width="110" height="12" rx="6"/>
+    <rect x="940" y="320" width="110" height="12" rx="6"/>
+    <rect x="455" y="545" width="290" height="12" rx="6"/>
+  </g>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M315 295 H355" stroke="#2563eb" stroke-width="5"/>
+    <path d="M580 295 H620" stroke="#2563eb" stroke-width="5"/>
+    <path d="M845 295 H885" stroke="#2563eb" stroke-width="5"/>
+    <path d="M997 386 C997 455 845 514 845 514" stroke="#22c55e" stroke-width="5" stroke-dasharray="10 14"/>
+    <path d="M355 514 C205 514 202 395 202 395" stroke="#f97316" stroke-width="5" stroke-dasharray="10 14"/>
+  </g>
+  <g fill="#2563eb">
+    <circle cx="202" cy="245" r="14"/>
+    <circle cx="467" cy="245" r="14"/>
+    <circle cx="732" cy="245" r="14"/>
+    <circle cx="997" cy="245" r="14"/>
+  </g>
+</svg>

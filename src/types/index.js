@@ -22,7 +22,7 @@
 
 /**
  * Platform identifiers
- * @typedef {'douyu' | 'bilibili' | 'twitch' | 'kick'} Platform
+ * @typedef {'douyu' | 'bilibili' | 'twitch' | 'kick' | 'picarto' | 'soop'} Platform
  */
 
 /**

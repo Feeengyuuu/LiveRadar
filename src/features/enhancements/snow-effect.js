@@ -57,8 +57,8 @@ function getPreferredSnowflakeCount() {
 const CONFIG = {
     ENABLED: isSnowEnabled(),        // 默认关闭，状态统一由 state.js 恢复
     COUNT: getPreferredSnowflakeCount(),
-    MAX_SIZE: 14,                   // Maximum logo size (pixels)
-    MIN_SIZE: 7,                    // Minimum logo size (pixels)
+    MAX_SIZE: 28,                   // Maximum logo size (pixels)
+    MIN_SIZE: 14,                   // Minimum logo size (pixels)
     MAX_SPEED: 1.2,                 // Maximum fall speed
     MIN_SPEED: 0.3,                 // Minimum fall speed
     MAX_ACCUMULATED: 12,            // Max accumulated snowflakes per card
@@ -104,6 +104,24 @@ const PLATFORM_LOGO_MARKS = [
             { fill: '#39c90d', points: [[-0.14, -0.02], [0.22, -0.42], [0.52, -0.42], [0.16, 0.02]] },
             { fill: '#7cff4d', points: [[-0.12, 0.04], [0.2, 0.42], [0.52, 0.42], [0.14, -0.02]] },
             { fill: '#efffe8', points: [[-0.02, -0.08], [0.12, -0.02], [-0.02, 0.08], [-0.16, 0.02]] }
+        ]
+    },
+    {
+        name: 'picarto',
+        facets: [
+            { fill: '#22c55e', points: [[-0.48, -0.3], [0.1, -0.46], [0.48, -0.08], [0.24, 0.4], [-0.36, 0.34]] },
+            { fill: '#16a34a', points: [[-0.48, -0.3], [-0.62, 0.0], [-0.36, 0.34], [-0.18, 0.02]] },
+            { fill: '#86efac', points: [[-0.14, -0.16], [0.12, -0.24], [0.28, -0.06], [0.02, 0.06]] },
+            { fill: '#ecfdf5', points: [[-0.04, 0.12], [0.14, 0.08], [0.08, 0.24], [-0.1, 0.26]] }
+        ]
+    },
+    {
+        name: 'soop',
+        facets: [
+            { fill: '#00e0a4', points: [[-0.52, -0.18], [-0.14, -0.48], [0.36, -0.34], [0.56, 0.04], [0.24, 0.4], [-0.28, 0.34]] },
+            { fill: '#00a978', points: [[-0.52, -0.18], [-0.66, 0.12], [-0.28, 0.34], [-0.1, 0.02]] },
+            { fill: '#63f5ce', points: [[-0.1, -0.24], [0.22, -0.22], [0.34, 0.02], [0.02, 0.08]] },
+            { fill: '#ecfdf8', points: [[-0.16, 0.12], [0.16, 0.08], [0.1, 0.24], [-0.18, 0.26]] }
         ]
     }
 ];
@@ -206,10 +224,13 @@ let hoveredCard = null;
 const accumulatedCountMap = new Map();
 const cardDataMap = new Map();
 const VIEWPORT_MARGIN = 120;
+const TARGET_FRAME_MS = 1000 / 60;
+const MAX_FRAME_SCALE = 2.5;
 
 // Performance monitoring
 let frameCount = 0;
 let lastFpsCheck = Date.now();
+let lastFrameTime = 0;
 
 const runtimeHandlers = {
     resize: () => resize(),
@@ -341,13 +362,15 @@ function unbindRuntimeListeners() {
 
 function startAnimation() {
     if (!snowEnabled || !ctx || animationId) return;
-    loop();
+    lastFrameTime = 0;
+    animationId = requestAnimationFrame(loop);
 }
 
 function stopAnimation() {
     if (!animationId) return;
     cancelAnimationFrame(animationId);
     animationId = null;
+    lastFrameTime = 0;
 }
 
 function resetRuntimeState() {
@@ -360,6 +383,7 @@ function resetRuntimeState() {
     hoveredCard = null;
     frameCount = 0;
     lastFpsCheck = Date.now();
+    lastFrameTime = 0;
     spatialPartition.clear();
     accumulatedCountMap.clear();
     cardDataMap.clear();
@@ -470,10 +494,10 @@ class Snowflake {
         if (this.isAccumulated && this.accumulatedOn) {
             decrementAccumulated(this.accumulatedOn);
         }
-        this.x = Math.random() * width;
-        this.y = initial ? Math.random() * height : -10 - Math.random() * 50;
         this.size = Math.random() * (CONFIG.MAX_SIZE - CONFIG.MIN_SIZE) + CONFIG.MIN_SIZE;
         this.baseSize = this.size;
+        this.x = Math.random() * width;
+        this.y = initial ? Math.random() * height : -this.size - 12 - Math.random() * 50;
 
         // 确保速度重置为基础速度
         const newSpeed = Math.random() * (CONFIG.MAX_SPEED - CONFIG.MIN_SPEED) + CONFIG.MIN_SPEED;
@@ -500,11 +524,11 @@ class Snowflake {
     /**
      * Update snowflake state
      */
-    update() {
+    update(frameScale = 1) {
         if (this.isAccumulated) {
             this.updateAccumulated();
         } else {
-            this.updateFalling();
+            this.updateFalling(frameScale);
         }
     }
 
@@ -538,14 +562,14 @@ class Snowflake {
     /**
      * Update falling snowflake
      */
-    updateFalling() {
+    updateFalling(frameScale = 1) {
         // Update position
-        this.y += this.speed;
-        this.driftCycle += 0.02;
-        this.x += Math.sin(this.driftCycle) * 0.5 + this.drift * 0.1;
+        this.y += this.speed * frameScale;
+        this.driftCycle += 0.02 * frameScale;
+        this.x += (Math.sin(this.driftCycle) * 0.5 + this.drift * 0.1) * frameScale;
 
         // Update rotation
-        this.rotation += this.rotationSpeed;
+        this.rotation += this.rotationSpeed * frameScale;
 
         // 🔥 Performance: O(1) spatial partition lookup (was O(n) filter)
         // Converts 9000 operations/sec (150 snowflakes × 60fps) to constant time
@@ -567,7 +591,8 @@ class Snowflake {
         }
 
         // Reset if out of bounds
-        if (this.y > height + 10 || this.x < -10 || this.x > width + 10) {
+        const resetMargin = Math.max(10, this.size * 1.4);
+        if (this.y > height + resetMargin || this.x < -resetMargin || this.x > width + resetMargin) {
             this.reset();
         }
     }
@@ -705,11 +730,15 @@ function checkPerformance() {
 /**
  * Animation loop
  */
-function loop() {
+function loop(timestamp = performance.now()) {
     if (!snowEnabled) {
         resetRuntimeState();
         return;
     }
+
+    const elapsed = lastFrameTime ? timestamp - lastFrameTime : TARGET_FRAME_MS;
+    lastFrameTime = timestamp;
+    const frameScale = Math.min(MAX_FRAME_SCALE, Math.max(0.25, elapsed / TARGET_FRAME_MS));
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -719,7 +748,7 @@ function loop() {
 
     // Update and draw all snowflakes
     snowflakes.forEach(flake => {
-        flake.update();
+        flake.update(frameScale);
         flake.draw();
     });
 

@@ -59,6 +59,16 @@ export const API_ENDPOINTS = {
     API_V2: 'https://kick.com/api/v2/channels',
     ROOM_URL: 'https://kick.com',
   },
+  PICARTO: {
+    CHANNEL_BY_NAME: 'https://api.picarto.tv/api/v1/channel/name',
+    CHANNEL_BY_ID: 'https://api.picarto.tv/api/v1/channel/id',
+    ROOM_URL: 'https://picarto.tv',
+  },
+  SOOP: {
+    PLAYER_LIVE: 'https://live.sooplive.co.kr/afreeca/player_live_api.php',
+    STATION_STATUS: 'https://st.sooplive.co.kr/api/get_station_status.php',
+    ROOM_URL: 'https://play.sooplive.co.kr',
+  },
 };
 
 // ====================================================================
@@ -100,6 +110,22 @@ export const PLATFORM_CONFIG = {
     idPattern: /^[a-zA-Z0-9_]+$/,
     idPlaceholder: '频道名 (英文/数字)',
     maxIdLength: 25,
+  },
+  picarto: {
+    name: 'Picarto',
+    color: '#22C55E',
+    icon: 'ART',
+    idPattern: /^[a-zA-Z0-9_-]+$/,
+    idPlaceholder: 'Channel name',
+    maxIdLength: 64,
+  },
+  soop: {
+    name: 'SOOP',
+    color: '#00E0A4',
+    icon: 'SOOP',
+    idPattern: /^[a-zA-Z0-9_]+$/,
+    idPlaceholder: 'BJ ID',
+    maxIdLength: 32,
   },
 };
 
@@ -179,7 +205,10 @@ export const APP_CONFIG = {
   CACHE: {
     DEBOUNCE_DELAY: 500,
     AVATAR_UPDATE_INTERVAL: 14 * 24 * 60 * 60 * 1000, // 14 days
-    IMAGE_TIMESTAMP_INTERVAL: 1800000, // 优化：从5分钟(300000)改为30分钟(1800000)
+    LIVE_IMAGE_REFRESH_INTERVALS: {
+      INTERNATIONAL: 5 * 60 * 1000,
+      DOMESTIC: 10 * 60 * 1000,
+    },
   },
 
   // UI configuration
@@ -231,8 +260,8 @@ export const APP_CONFIG = {
       typeof window !== 'undefined' &&
       window.innerWidth >= 768,
     COUNT: 500,
-    MAX_SIZE: 3.5,
-    MIN_SIZE: 1,
+    MAX_SIZE: 7,
+    MIN_SIZE: 2,
     MAX_SPEED: 1.2,
     MIN_SPEED: 0.3,
     MAX_ACCUMULATED: 12,
@@ -246,6 +275,8 @@ export const APP_CONFIG = {
   PERFORMANCE: {
     LOW_MEMORY_THRESHOLD: 4,
     LOW_CPU_THRESHOLD: 4,
+    LARGE_LIST_THRESHOLD: 120,
+    VERY_LARGE_LIST_THRESHOLD: 240,
     ENABLE_PERFORMANCE_MODE: false,
   },
 
@@ -263,7 +294,7 @@ export const APP_CONFIG = {
       'heatValue',
       'startTime',
     ],
-    LOG_CHANGES: true,
+    LOG_CHANGES: false,
   },
 
   // Audio
@@ -278,7 +309,7 @@ export const APP_CONFIG = {
     ENABLED: false,
     LOG_NETWORK: false,
     LOG_RENDER: false,
-    LOG_PERFORMANCE: true,
-    LOG_AUDIO: true,
+    LOG_PERFORMANCE: false,
+    LOG_AUDIO: false,
   },
 };

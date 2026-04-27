@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="LiveRadar command bar">
+  <rect width="1200" height="720" rx="34" fill="#f8fafc"/>
+  <rect x="96" y="158" width="1008" height="404" rx="34" fill="#0f172a" filter="drop-shadow(0 24px 35px rgba(15,23,42,.18))"/>
+  <rect x="150" y="220" width="900" height="88" rx="24" fill="#111827" stroke="#243244"/>
+  <g fill="#1f2937">
+    <rect x="184" y="244" width="142" height="40" rx="20"/>
+    <rect x="350" y="244" width="256" height="40" rx="20"/>
+    <rect x="630" y="244" width="118" height="40" rx="20"/>
+    <rect x="772" y="244" width="118" height="40" rx="20"/>
+    <rect x="914" y="244" width="86" height="40" rx="20"/>
+  </g>
+  <g fill="#94a3b8">
+    <rect x="218" y="260" width="70" height="8" rx="4"/>
+    <rect x="385" y="260" width="160" height="8" rx="4"/>
+    <rect x="662" y="260" width="54" height="8" rx="4"/>
+    <rect x="804" y="260" width="54" height="8" rx="4"/>
+    <rect x="940" y="260" width="34" height="8" rx="4"/>
+  </g>
+  <circle cx="200" cy="264" r="8" fill="#2563eb"/>
+  <circle cx="644" cy="264" r="8" fill="#22c55e"/>
+  <circle cx="786" cy="264" r="8" fill="#f97316"/>
+  <text x="150" y="390" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="44" font-weight="800">One Command Surface</text>
+  <text x="152" y="436" fill="#94a3b8" font-family="Inter, Arial, sans-serif" font-size="24">Platform, room input, refresh, import and export stay within one predictable toolbar.</text>
+  <path d="M185 500 H1015" stroke="#243244" stroke-width="2"/>
+  <g font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">
+    <text x="190" y="535" fill="#93c5fd">SELECT</text>
+    <text x="370" y="535" fill="#bfdbfe">INPUT</text>
+    <text x="626" y="535" fill="#86efac">ADD</text>
+    <text x="764" y="535" fill="#fdba74">REFRESH</text>
+    <text x="910" y="535" fill="#c4b5fd">BACKUP</text>
+  </g>
+</svg>

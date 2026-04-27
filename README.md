@@ -1,267 +1,207 @@
-# LiveRadar 直播监控室
+# LiveRadar 直播雷达
 
 <div align="center">
 
 ![LiveRadar](https://img.shields.io/badge/LiveRadar-v3.1.1-f26a21?style=for-the-badge)
-![Stack](https://img.shields.io/badge/Vite%20%2B%20Vanilla%20JS-Frontend-646cff?style=for-the-badge)
-![License](https://img.shields.io/badge/Use-Educational%20Only-00a67d?style=for-the-badge)
+![Stack](https://img.shields.io/badge/Vite%20%2B%20Tailwind%20%2B%20Vanilla%20JS-Frontend-646cff?style=for-the-badge)
+![Runtime](https://img.shields.io/badge/Runtime-Browser%20%2B%20Serverless-00a67d?style=for-the-badge)
+![Use](https://img.shields.io/badge/Use-Educational%20Only-222222?style=for-the-badge)
 
-**多平台直播状态监控面板。一个页面集中查看斗鱼、B站、Twitch、Kick 主播的直播、离线和轮播录像状态。**
+**一个用于集中查看多平台主播直播状态的轻量监控面板。**
 
-[在线体验](https://liveradar.pages.dev/) · [快速开始](#快速开始) · [功能特性](#功能特性) · [项目结构](#项目结构) · [开发与验证](#开发与验证)
+[在线体验](https://liveradar.pages.dev/) · [快速开始](#快速开始) · [平台支持](#平台支持) · [验证命令](#验证命令)
 
 </div>
 
-![LiveRadar hero preview](public/readme-hero.png)
+![LiveRadar modern dashboard hero](public/readme-modern-hero.png)
 
-> README 中的宣传图为项目辅助展示图，真实运行界面以当前代码和浏览器渲染为准。
+> README 配图采用简洁现代的产品宣传风格，用来解释功能结构和视觉方向。真实界面以当前代码在浏览器中的渲染结果为准。
 
 ## 项目定位
 
-LiveRadar 是一个 Vite / Tailwind / Vanilla JavaScript 构建的直播监控 Web App。它面向需要同时关注多个平台主播状态的使用场景：直播中、离线、轮播录像、收藏主播、手动或自动刷新、导入导出备份。
+LiveRadar 是一个用 Vite、Tailwind 和原生 JavaScript 构建的直播监控 Web App。它把不同平台的主播状态收进同一个页面，方便快速判断谁正在直播、谁离线、谁处于轮播/录像状态，以及哪些房间需要重点关注。
 
-当前版本的视觉方向是 Half-Life: Alyx 风格的工业橙色控制台：暗色底、橙色主光、紧凑信息密度、卡片 hover 放大、平台品牌色反馈，以及轻量纯代码动态背景。
+这个项目的重点是“轻量、直观、可备份、可部署”。它不要求额外账号系统，主播列表保存在本地，支持导入导出，并可在静态部署环境中搭配服务端状态接口使用。
 
-## 功能特性
+## 当前版本重点
 
-### 监控能力
+- 新增 Picarto、SOOP/AfreecaTV 支持，和原有斗鱼、B 站、Twitch、Kick 一起进入统一刷新状态。
+- SOOP/AfreecaTV 默认走 `/api/status` 服务端路径，避免浏览器直连 CORS 限制。
+- 本地 Vite 开发环境内置 `/api/status` 与 `/api/status/batch`，方便在 `localhost` 直接测试服务端状态路径。
+- 刷新状态、临时通知区域和移动端布局做过收敛，减少刷新时的边缘闪烁和信息挤压。
+- 大量主播卡片场景下减少不必要的 DOM 查询、图片重载和高成本 hover 动效。
+- 头像与封面加载更稳：支持无 referrer 加载、协议相对 URL 修正、多级 fallback、失败后重试和封面兜底头像位。
+- 雪花特效保持独立按需加载，不阻塞核心状态监控。
 
-- 支持平台：斗鱼、B站、Twitch、Kick。
-- 分区展示：正在直播、离线、轮播录像。
-- 指标信息栏：Live、Offline、最爱直播中。
-- 支持主播封面、头像、标题、房间号、观看人数、直播时长等关键信息。
-- 收藏主播使用金色边框标识，不受在线/离线状态影响。
+## 功能画廊
 
-### 操作体验
+<table>
+  <tr>
+    <td width="50%">
+      <img src="public/readme-modern-refresh.png" alt="Refresh status promo" />
+      <br />
+      <strong>刷新状态</strong><br />
+      手动刷新、自动刷新、批量状态更新和临时通知区域统一收敛。
+    </td>
+    <td width="50%">
+      <img src="public/readme-modern-platforms.png" alt="Platform support promo" />
+      <br />
+      <strong>多平台集中</strong><br />
+      斗鱼、B 站、Twitch、Kick、Picarto、SOOP/AfreecaTV 放在同一个卡片网格里管理。
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="public/readme-modern-mobile.png" alt="Mobile layout promo" />
+      <br />
+      <strong>移动端适配</strong><br />
+      iPhone 宽度下保留安全边距，压缩命令区域，维持卡片可扫读性。
+    </td>
+    <td width="50%">
+      <img src="public/readme-modern-signal-map.svg" alt="Signal map diagram" />
+      <br />
+      <strong>状态链路</strong><br />
+      平台数据经过状态获取、缓存、标准化和渲染后进入卡片。
+    </td>
+  </tr>
+</table>
 
-- 顶部命令栏：平台选择、搜索/房间号输入、添加主播、自动刷新、导入、导出、手动刷新。
-- 搜索历史支持键盘操作与删除。
-- 卡片 hover 放大，信息区可根据平台品牌色反馈。
-- 删除按钮 hover 时转为红色反馈，降低误操作感知成本。
-- iPhone 视图保留左右安全边距，并使用双列卡片提升信息量。
+<table>
+  <tr>
+    <td width="33%">
+      <img src="public/readme-modern-card-states.svg" alt="Card states" />
+      <br />
+      <strong>卡片状态</strong><br />
+      Live、Offline、Replay、Favorite 独立表达。
+    </td>
+    <td width="33%">
+      <img src="public/readme-modern-command-bar.svg" alt="Command bar" />
+      <br />
+      <strong>命令栏</strong><br />
+      平台选择、房间输入、导入导出和刷新入口集中放置。
+    </td>
+    <td width="33%">
+      <img src="public/readme-modern-refresh-loop.svg" alt="Refresh loop" />
+      <br />
+      <strong>刷新闭环</strong><br />
+      队列、状态拉取、增量更新、通知反馈保持清晰边界。
+    </td>
+  </tr>
+  <tr>
+    <td width="33%">
+      <img src="public/readme-modern-data-safety.svg" alt="Data safety" />
+      <br />
+      <strong>本地数据</strong><br />
+      主播列表、收藏状态和备份文件由用户掌握。
+    </td>
+    <td width="33%">
+      <img src="public/readme-modern-mobile-layout.svg" alt="Mobile layout diagram" />
+      <br />
+      <strong>响应式布局</strong><br />
+      针对窄屏、平板和桌面宽度保持稳定布局。
+    </td>
+    <td width="33%">
+      <img src="public/readme-modern-deploy.svg" alt="Deploy diagram" />
+      <br />
+      <strong>静态部署</strong><br />
+      前端可静态部署，状态接口可由 Pages Functions 接管。
+    </td>
+  </tr>
+</table>
 
-### 数据与本地能力
+![Architecture diagram](public/readme-modern-architecture.svg)
 
-- 主播列表本地持久化。
-- 支持 JSON / LiveRadar 备份导入导出。
-- 自动刷新倒计时。
-- 批量状态获取、增量渲染和图片加载恢复。
-- 页面可在静态部署环境运行。
+## 平台支持
 
-### 氛围与增强功能
+| 平台 | 输入方式 | 当前能力 | 备注 |
+| --- | --- | --- | --- |
+| 斗鱼 | 房间号 | 直播、离线、轮播/录像、标题、封面、头像、热度类指标 | 国内平台接口字段可能随站点调整变化。 |
+| B 站直播 | 房间号 | 直播、离线、轮播/录像、标题、封面、头像、热度类指标 | 人气值不等同于精确观看人数。 |
+| Twitch | Channel ID | 直播状态、标题、封面、头像、观看人数相关信息 | 无 OAuth 时使用开放状态路径，语义弱于官方凭证路径。 |
+| Kick | Channel ID | 直播状态、标题、封面、头像、观看人数相关信息 | 依赖公开接口可用性。 |
+| Picarto | Channel name / ID | 直播状态、标题、封面、头像、观看人数相关信息 | 适合创作类直播补充监控。 |
+| SOOP / AfreecaTV | BJ ID | 直播状态、标题、封面、头像、观看人数相关信息 | 浏览器直连容易受 CORS 限制，默认走 `/api/status`。 |
 
-- Alyx 工业橙色 UI 主题。
-- 纯代码动态背景：慢速字符层、橙色环境光、鼠标划过的柔和反馈。
-- 下雪特效模块，按需加载。
-- 浮动音乐播放器，支持播放/暂停、上一曲/下一曲、进度、音量、圆形播放进度和专辑背景。
-- 移动端降低或关闭高成本动态效果，尊重 `prefers-reduced-motion`。
+## 核心能力
 
-## 移动端预览
-
-<p align="center">
-  <img src="public/readme-mobile.png" alt="LiveRadar mobile preview" width="360">
-</p>
-
-## 技术栈
-
-| 分类 | 技术 |
-| --- | --- |
-| 前端 | Vanilla JavaScript ES Modules |
-| 构建 | Vite 7 |
-| 样式 | TailwindCSS + 原生 CSS 主题层 |
-| 测试 | Vitest + jsdom / happy-dom |
-| 质量 | ESLint + Prettier + Husky + lint-staged |
-| 部署 | 静态站点，支持 Cloudflare Pages / Netlify / Vercel / Nginx |
+- 添加、删除、收藏主播卡片。
+- 按直播中、离线、轮播/录像等状态分区展示。
+- 手动刷新与自动刷新并存，刷新提示集中在临时通知区域。
+- 支持 JSON / LiveRadar 备份导入导出，方便迁移或恢复主播列表。
+- 图片加载失败时自动降级，头像失败时可尝试使用封面兜底。
+- 卡片渲染支持增量更新，减少大量主播同时刷新时的 UI 抖动。
+- 尊重 `prefers-reduced-motion`，移动端降低高成本动效。
+- 雪花、音乐播放器等增强效果按需加载，不阻塞核心监控能力。
 
 ## 架构概览
 
-```mermaid
-flowchart LR
-    UI["UI / index.html"] --> Router["core/event-router.js"]
-    Router --> Rooms["features/core/room-management.js"]
-    Router --> Refresh["core/refresh-manager.js"]
-    Refresh --> Fetcher["core/status-fetcher.js"]
-    Fetcher --> API["api/platform-sniffers.js"]
-    API --> Platforms["Douyu / Bilibili / Twitch / Kick"]
-    Fetcher --> State["core/state.js"]
-    State --> Renderer["core/renderer.js"]
-    Renderer --> Cards["core/renderer/card-renderer.js"]
-    Cards --> UI
-    State --> Storage["utils/safe-storage.js"]
-    Enhancements["enhancements: music / snow / ambient bg"] --> UI
+![Development loop](public/readme-modern-dev-loop.svg)
+
+```text
+Browser UI
+  -> src/core/status-fetcher.js
+  -> src/api/platform-adapter.js
+  -> direct public endpoints or /api/status
+  -> functions/_shared/platform-status.js
+  -> card renderer and local persistence
 ```
 
-核心思路：
+主要边界：
 
-- `core/` 管启动、状态、事件路由、刷新调度、状态获取、渲染入口。
-- `features/` 管业务功能，例如房间管理、导入导出、自动刷新、音频与增强效果。
-- `api/` 管平台状态获取和代理策略。
-- `styles/` 管基础样式、响应式、移动端和 Alyx 主题。
-- `utils/` 管安全存储、DOM 缓存、资源释放、设备检测、错误处理等基础工具。
+- `src/core/` 负责刷新、状态调度和渲染协调。
+- `src/core/renderer/` 负责卡片 DOM、图片恢复和网格更新。
+- `src/api/` 负责平台适配、直连探测和服务端状态路径选择。
+- `functions/_shared/` 复用到 Cloudflare Pages Functions 与本地 Vite dev API。
+- `src/features/` 放置导入导出、通知、雪花、音乐播放器等功能模块。
+- `src/styles/alyx-theme.css` 是主要视觉样式入口。
 
 ## 快速开始
 
-### 环境要求
-
-- Node.js `>= 20.19.0`
-- npm
-- 现代浏览器：Chrome / Edge / Firefox / Safari
-
-### 安装与启动
+要求 Node.js `>=20.19.0`。
 
 ```bash
-git clone https://github.com/Feeengyuuu/LiveRadar.git
-cd LiveRadar
 npm install
 npm run dev
 ```
 
-开发服务器默认运行在：
+默认开发地址：
 
 ```text
-http://localhost:3000
+http://localhost:3000/
 ```
 
-### 构建生产版本
+如果 3000 端口已被占用，可以指定端口：
 
 ```bash
-npm run build
-npm run preview
+npm run dev -- --host 127.0.0.1 --port 3002 --strictPort --open false
 ```
 
-构建产物输出到 `dist/`。
-
-## 使用说明
-
-### 添加主播
-
-1. 在顶部选择平台。
-2. 输入房间号、UID 或平台支持的主播标识。
-3. 点击“添加主播”。
-
-### 管理主播
-
-- 点击卡片：打开对应直播页面。
-- 点击星标：切换收藏状态。
-- 点击垃圾桶：删除主播。
-- 点击刷新：手动刷新全部主播状态。
-- 开启自动刷新：按倒计时周期更新状态。
-
-### 导入导出
-
-- 导出会保存当前主播列表备份。
-- 导入可恢复之前的备份文件。
-- 建议在大量调整主播列表前先导出一份备份。
-
-## 开发与验证
+## 验证命令
 
 ```bash
-# 启动开发服务器
-npm run dev
-
-# 运行单元测试
-npm run test:run
-
-# ESLint 检查
 npm run lint
-
-# 生产构建
+npm run test:run
 npm run build
-
-# 预览构建结果
-npm run preview
 ```
 
-当前常规验证标准：
-
-- `npm run lint`
-- `npm run test:run`
-- `npm run build`
-- 本地页面 `http://127.0.0.1:3000/` 可访问
-
-## 项目结构
-
-```text
-LR_online/
-├─ index.html
-├─ package.json
-├─ vite.config.js
-├─ vitest.config.js
-├─ public/
-│  ├─ covers/
-│  ├─ music/
-│  ├─ readme-hero.png
-│  └─ readme-mobile.png
-├─ src/
-│  ├─ api/                 # 平台状态获取、代理与签名
-│  ├─ config/              # 常量、代理、UI 文案
-│  ├─ core/                # 启动、状态、刷新、事件、渲染
-│  ├─ features/
-│  │  ├─ audio/            # 音频解锁与音效
-│  │  ├─ core/             # 自动刷新、导入导出、房间管理
-│  │  └─ enhancements/     # 音乐播放器、下雪、动态背景
-│  ├─ styles/              # CSS 入口、组件、响应式和主题
-│  ├─ types/               # JSDoc 类型定义
-│  └─ utils/               # 存储、DOM、资源、设备、错误处理
-├─ functions/              # 平台状态相关服务端/边缘函数
-├─ docs/                   # 架构、安全、迁移、部署等文档
-└─ tests/                  # 测试辅助
-```
-
-## 设计原则
-
-- 监控面板优先：信息密度、扫描效率和稳定性优先于装饰。
-- 轻量动态：背景和特效使用 CSS 与少量 JS 控制，不使用视频背景或重型粒子。
-- 渐进增强：移动端、省电偏好和低性能设备自动降级。
-- 可恢复：导入导出和本地存储优先保证用户列表安全。
-- 可维护：事件委托、状态集中管理、模块边界清晰。
+当前交付基线已覆盖 lint、全量 Vitest 和生产构建。界面相关改动建议再扫查 `390`、`640`、`900`、`1100`、`1280`、`1440`、`1920` 宽度，重点看命令栏、通知区域、卡片头像、卡片边缘和横向溢出。
 
 ## 部署
 
-### Cloudflare Pages / Netlify / Vercel
+LiveRadar 可以作为静态站点部署，也可以搭配 Cloudflare Pages Functions 提供 `/api/status` 与 `/api/status/batch`：
 
 ```text
-Build command: npm run build
-Output directory: dist
-Node version: 20.x
+Frontend static assets
+  -> Cloudflare Pages
+  -> /api/status for server-required platforms
 ```
 
-### Nginx 静态部署
+SOOP/AfreecaTV 这类浏览器直连不稳定的平台，建议始终通过服务端状态 API 获取数据。
 
-```dockerfile
-FROM node:20-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
+## 数据与合规说明
 
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
-```
-
-## 注意事项
-
-- 本项目需要访问第三方直播平台信息，平台接口、跨域策略和频率限制可能随时变化。
-- 请合理设置刷新频率，避免对平台产生过高请求压力。
-- 用户数据主要保存在浏览器本地，清理浏览器数据会导致列表丢失。
-- 建议定期导出备份。
-
-## 合规声明
-
-本项目仅供学习、研究和个人效率工具用途。使用者需要自行遵守各平台服务条款、当地法律法规、版权与隐私要求。请勿将本项目用于未经授权的数据采集、商业化监控或高频请求。
-
-## 致谢
-
-- Idea by Fengyu Xu
-- Built with Gemini, Claude and Codex
-- Powered by Vite, TailwindCSS and the open-source ecosystem
-
----
-
-<div align="center">
-
-**FOR LEARNING & RESEARCH ONLY. PLEASE COMPLY WITH LOCAL LAWS AND PLATFORM RULES.**
-
-</div>
+- 本项目面向学习、个人监控面板和前端工程实践。
+- 平台公开接口可能随时变化，状态字段不能保证永久稳定。
+- 不建议高频刷新；应尊重第三方平台的访问限制。
+- 主播列表、收藏和导入导出数据由浏览器本地保存，请定期备份。
+- README 中的宣传图不是 UI 截图，真实效果以运行中的应用为准。

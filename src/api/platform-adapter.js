@@ -18,7 +18,7 @@
 import { Logger } from '../utils/logger.js';
 import { ErrorHandler, isRetryableError } from '../utils/error-handler.js';
 import { fetchWithProxy } from './proxy-manager.js';
-import { getDouyuStatus, getBilibiliStatus, getTwitchStatus, getKickStatus } from './platform-sniffers.js';
+import { getDouyuStatus, getBilibiliStatus, getTwitchStatus, getKickStatus, getPicartoStatus, getSoopStatus } from './platform-sniffers.js';
 
 const log = Logger.create('PlatformAdapter');
 
@@ -203,6 +203,22 @@ class KickAdapter extends BasePlatformAdapter {
     }
 }
 
+class PicartoAdapter extends BasePlatformAdapter {
+    constructor() { super('picarto'); }
+    async getStatus(id, options = {}, prevData = null) {
+        const fetchAvatar = options.fetchAvatar !== false;
+        return getPicartoStatus(id, fetchAvatar, prevData);
+    }
+}
+
+class SoopAdapter extends BasePlatformAdapter {
+    constructor() { super('soop'); }
+    async getStatus(id, options = {}, prevData = null) {
+        const fetchAvatar = options.fetchAvatar !== false;
+        return getSoopStatus(id, fetchAvatar, prevData);
+    }
+}
+
 /**
  * Register default platform adapters (once)
  */
@@ -211,6 +227,8 @@ export function registerDefaultAdapters() {
     if (!getAdapter('bilibili')) registerAdapter('bilibili', new BilibiliAdapter());
     if (!getAdapter('twitch')) registerAdapter('twitch', new TwitchAdapter());
     if (!getAdapter('kick')) registerAdapter('kick', new KickAdapter());
+    if (!getAdapter('picarto')) registerAdapter('picarto', new PicartoAdapter());
+    if (!getAdapter('soop')) registerAdapter('soop', new SoopAdapter());
 }
 
 // ====================================================================
@@ -220,16 +238,23 @@ export function registerDefaultAdapters() {
 const SERVER_STATUS_TIMEOUT_MS = 5000;
 const SERVER_BATCH_STATUS_TIMEOUT_MS = 20000;
 const SERVER_BATCH_CHUNK_SIZE = 10;
+const SERVER_REQUIRED_PLATFORMS = new Set(['soop']);
 
-function shouldUseServerStatusApi() {
+function shouldUseServerStatusApi(platform = '') {
     if (typeof window === 'undefined') return false;
     if (!['http:', 'https:'].includes(window.location.protocol)) return false;
 
     const explicit = import.meta.env.VITE_STATUS_API_ENABLED;
     if (explicit === 'false') return false;
+    if (SERVER_REQUIRED_PLATFORMS.has(platform)) return true;
     if (explicit === 'true') return true;
 
     return import.meta.env.PROD === true;
+}
+
+function shouldUseServerStatusApiForBatch(requests) {
+    if (shouldUseServerStatusApi()) return true;
+    return Array.isArray(requests) && requests.some(request => shouldUseServerStatusApi(request.platform));
 }
 
 function normalizeServerStatus(status, id, prevData = null) {
@@ -255,7 +280,7 @@ function normalizeServerStatus(status, id, prevData = null) {
 }
 
 async function fetchServerPlatformStatus(platform, id, options = {}, prevData = null) {
-    if (!shouldUseServerStatusApi()) return null;
+    if (!shouldUseServerStatusApi(platform)) return null;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), options.timeout ?? SERVER_STATUS_TIMEOUT_MS);
@@ -284,8 +309,8 @@ async function fetchServerPlatformStatus(platform, id, options = {}, prevData = 
 }
 
 async function fetchServerPlatformStatusesBatch(requests) {
-    if (!shouldUseServerStatusApi()) return null;
     if (!Array.isArray(requests) || requests.length === 0) return [];
+    if (!shouldUseServerStatusApiForBatch(requests)) return null;
 
     const results = new Array(requests.length).fill(null);
 

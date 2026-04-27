@@ -285,6 +285,51 @@ async function fetchTextWithTimeout(url, timeout) {
     }
 }
 
+async function fetchJsonWithTimeout(url, timeout, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        const res = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                Accept: 'application/json, text/plain, */*',
+                ...(options.headers || {})
+            }
+        });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (e) {
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+async function postFormJsonWithTimeout(url, body, timeout, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            body,
+            signal: controller.signal,
+            headers: {
+                Accept: 'application/json, text/plain, */*',
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                ...(options.headers || {})
+            }
+        });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (e) {
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
 /**
  * Parse Twitch uptime string to milliseconds
  * Format: "2 hours, 30 minutes, 15 seconds" or "30 minutes, 15 seconds"
@@ -544,6 +589,242 @@ export async function getKickStatus(id, fetchAvatar, prevData) {
 }
 
 // ====================================================================
+// Picarto Sniffer
+// ====================================================================
+
+function firstString(...values) {
+    for (const value of values) {
+        if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return '';
+}
+
+function coerceBoolean(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value > 0;
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        return normalized === 'true' || normalized === '1' || normalized === 'online' || normalized === 'live';
+    }
+    return false;
+}
+
+function selectPicartoThumbnail(data, isLive) {
+    const thumbnails = data.thumbnails ?? data.thumbnail ?? {};
+    const channel = data.channel ?? {};
+    const liveThumb = firstString(
+        typeof data.thumbnail === 'string' ? data.thumbnail : '',
+        thumbnails.web_large,
+        thumbnails.web,
+        thumbnails.tablet,
+        thumbnails.mobile,
+        data.thumbnail_url,
+        data.preview,
+        data.preview_url,
+        data.image
+    );
+    const offlineThumb = firstString(
+        data.offline_image,
+        data.offline_image_url,
+        channel.offline_image,
+        channel.offline_image_url,
+        data.avatar,
+        data.avatar_url,
+        channel.avatar
+    );
+
+    return isLive ? (liveThumb || offlineThumb) : (offlineThumb || liveThumb);
+}
+
+export async function getPicartoStatus(id, fetchAvatar, prevData) {
+    const res = {
+        isLive: false,
+        isReplay: false,
+        title: prevData?.title || "",
+        owner: prevData?.owner || id,
+        cover: prevData?.cover || "",
+        avatar: prevData?.avatar || "",
+        heatValue: 0,
+        isError: false,
+        startTime: null
+    };
+
+    try {
+        const apiUrl = `https://api.picarto.tv/api/v1/channel/name/${encodeURIComponent(id)}`;
+        const data = await fetchJsonWithTimeout(apiUrl, APP_CONFIG.NETWORK.PROXY_TIMEOUT) ||
+            await fetchWithProxy(apiUrl, false, APP_CONFIG.NETWORK.PROXY_TIMEOUT);
+        if (!data || data.error) return null;
+
+        const channel = data.channel ?? {};
+        res.isLive = coerceBoolean(
+            data.online ??
+            data.is_online ??
+            data.live ??
+            data.is_live ??
+            channel.online ??
+            channel.is_online
+        );
+        res.isReplay = false;
+        res.title = firstString(data.title, data.channel_title, data.stream_title, channel.title, channel.stream_name, res.title);
+        res.owner = firstString(data.name, data.channel, data.channel_name, channel.name, channel.channel_name, res.owner);
+        res.heatValue = parseHeatValue(data.viewers ?? data.channel_viewers ?? data.viewers_total ?? data.viewer_count ?? 0);
+        res.cover = selectPicartoThumbnail(data, res.isLive) || res.cover;
+
+        if (fetchAvatar !== false) {
+            res.avatar = firstString(data.avatar, data.avatar_url, channel.avatar, channel.avatar_url, res.avatar);
+            res._profileFetched = !!res.avatar;
+        }
+
+        return res;
+    } catch(e) {
+        console.error(`[Picarto] Error fetching ${id}:`, e.message);
+        return null;
+    }
+}
+
+// ====================================================================
+// SOOP / AfreecaTV Sniffer
+// ====================================================================
+
+const SOOP_PLAYER_ENDPOINTS = [
+    'https://live.sooplive.co.kr/afreeca/player_live_api.php',
+    'https://live.sooplive.com/afreeca/player_live_api.php'
+];
+
+const SOOP_HEADERS = {
+    Referer: 'https://play.sooplive.co.kr/',
+    Origin: 'https://play.sooplive.co.kr'
+};
+
+function buildSoopLiveBody(id) {
+    const params = new URLSearchParams();
+    params.set('bid', id);
+    params.set('bno', 'null');
+    params.set('type', 'live');
+    params.set('pwd', '');
+    params.set('player_type', 'html5');
+    params.set('stream_type', 'common');
+    params.set('quality', 'HD');
+    params.set('mode', 'landing');
+    params.set('from_api', '0');
+    params.set('is_revive', 'false');
+    return params;
+}
+
+function normalizeExternalUrl(url) {
+    const value = firstString(url);
+    if (!value) return '';
+    if (value.startsWith('//')) return `https:${value}`;
+    if (/^https?:\/\//i.test(value)) return value;
+    return '';
+}
+
+function selectSoopCover(channel, isLive) {
+    const explicit = normalizeExternalUrl(
+        channel.broad_thumb ||
+        channel.BROAD_THUMB ||
+        channel.thumb ||
+        channel.THUMB ||
+        channel.thumbnail ||
+        channel.THUMBNAIL
+    );
+    if (explicit) return explicit;
+
+    const bno = firstString(channel.BNO, channel.bno, channel.broad_no, channel.BROAD_NO);
+    if (isLive && bno) return `https://liveimg.sooplive.com/m/${encodeURIComponent(bno)}`;
+    return '';
+}
+
+async function fetchSoopLiveData(id) {
+    for (const endpoint of SOOP_PLAYER_ENDPOINTS) {
+        const data = await postFormJsonWithTimeout(
+            endpoint,
+            buildSoopLiveBody(id),
+            APP_CONFIG.NETWORK.PROXY_TIMEOUT,
+            { headers: SOOP_HEADERS }
+        );
+        if (data) return data;
+    }
+    return null;
+}
+
+async function fetchSoopStationData(id) {
+    const stationUrl = `https://st.sooplive.co.kr/api/get_station_status.php?szBjid=${encodeURIComponent(id)}`;
+    return await fetchJsonWithTimeout(stationUrl, APP_CONFIG.NETWORK.PROXY_TIMEOUT_QUICK) ||
+        await fetchWithProxy(stationUrl, false, APP_CONFIG.NETWORK.PROXY_TIMEOUT);
+}
+
+function applySoopStatus(res, data) {
+    const channel = data.CHANNEL ?? data.channel ?? data;
+    const resultCode = Number.parseInt(channel.RESULT ?? channel.result ?? '0', 10);
+    const bno = firstString(channel.BNO, channel.bno);
+    const btime = Number.parseInt(channel.BTIME ?? channel.btime ?? '0', 10);
+    const isLive = resultCode === 1 || resultCode === -6 || parseHeatValue(bno) > 0;
+
+    res.isLive = isLive;
+    res.isReplay = false;
+    res.title = firstString(channel.TITLE, channel.title, res.title);
+    res.owner = firstString(channel.BJNICK, channel.bjnick, channel.BJID, channel.bjid, res.owner);
+    res.heatValue = parseHeatValue(
+        channel.VIEW_CNT ??
+        channel.view_cnt ??
+        channel.TOTAL_VIEW_CNT ??
+        channel.total_view_cnt ??
+        channel.total_view_count ??
+        0
+    );
+    res.cover = selectSoopCover(channel, isLive) || res.cover;
+
+    if (isLive && Number.isFinite(btime) && btime > 0) {
+        res.startTime = Date.now() - (btime * 1000);
+    }
+}
+
+function applySoopStationProfile(res, data) {
+    const profile = data.DATA ?? data.data ?? {};
+    res.owner = firstString(profile.user_nick, profile.USER_NICK, profile.nickname, res.owner);
+    res.title = res.title || firstString(profile.station_name, profile.station_title, profile.STATION_NAME, profile.STATION_TITLE);
+    res.avatar = normalizeExternalUrl(
+        profile.profile_img ||
+        profile.profile_image ||
+        profile.user_profile_img ||
+        profile.USER_PROFILE_IMG
+    ) || res.avatar;
+    if (res.avatar) res._profileFetched = true;
+}
+
+export async function getSoopStatus(id, _fetchAvatar, prevData) {
+    const res = {
+        isLive: false,
+        isReplay: false,
+        title: prevData?.title || "",
+        owner: prevData?.owner || id,
+        cover: prevData?.cover || "",
+        avatar: prevData?.avatar || "",
+        heatValue: 0,
+        isError: false,
+        startTime: null
+    };
+
+    try {
+        const data = await fetchSoopLiveData(id);
+        if (!data || data.error) return null;
+
+        applySoopStatus(res, data);
+
+        if (!res.isLive || !res.owner || res.owner === String(id) || !res.title) {
+            const stationData = await fetchSoopStationData(id);
+            if (stationData) applySoopStationProfile(res, stationData);
+        }
+
+        return res;
+    } catch(e) {
+        console.error(`[SOOP] Error fetching ${id}:`, e.message);
+        return null;
+    }
+}
+
+// ====================================================================
 // Exports
 // ====================================================================
 
@@ -553,9 +834,13 @@ export {
     getBilibiliStatus as sniffBilibili,
     getTwitchStatus as sniffTwitch,
     getKickStatus as sniffKick,
+    getPicartoStatus as sniffPicarto,
+    getSoopStatus as sniffSoop,
     // Aliases for main.js compatibility
     getDouyuStatus as sniffDouyuRoom,
     getBilibiliStatus as sniffBilibiliRoom,
     getTwitchStatus as sniffTwitchStream,
-    getKickStatus as sniffKickChannel
+    getKickStatus as sniffKickChannel,
+    getPicartoStatus as sniffPicartoChannel,
+    getSoopStatus as sniffSoopChannel
 };

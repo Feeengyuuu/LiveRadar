@@ -15,6 +15,8 @@
 import { setImageSource, getSmartImageUrl } from './image-handler.js';
 import { PLATFORM_CONFIG } from '../../config/constants.js';
 
+const EXTERNAL_VIEWER_PLATFORMS = new Set(['twitch', 'kick', 'picarto', 'soop']);
+
 // ====================================================================
 // Helper Functions
 // ====================================================================
@@ -27,7 +29,7 @@ import { PLATFORM_CONFIG } from '../../config/constants.js';
  * @returns {string} Display title
  */
 function getDisplayTitle(data, roomInfo, cardState) {
-    const isInternational = roomInfo.platform === 'twitch' || roomInfo.platform === 'kick';
+    const isInternational = EXTERNAL_VIEWER_PLATFORMS.has(roomInfo.platform);
     const hasConnectionIssue = data.isError || data._stale;
 
     // Connection error for international platforms
@@ -81,9 +83,6 @@ function getPlatformMeta(platform) {
     };
 }
 
-const CARD_UPDATE_ANIMATION_MS = 820;
-const CARD_STATUS_ANIMATION_MS = 640;
-
 function toCssImageUrl(url) {
     return `url("${String(url).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`;
 }
@@ -97,24 +96,6 @@ function syncSpatialThumbnail(card, src) {
 
     card.classList.add('has-spatial-thumb');
     card.style.setProperty('--thumb-image', toCssImageUrl(src));
-}
-
-function restartTransientClass(element, className, timeoutMs) {
-    if (!element?.isConnected) return;
-
-    const timerKey = `_${className.replace(/-/g, '')}Timer`;
-    if (element[timerKey]) {
-        window.clearTimeout(element[timerKey]);
-    }
-
-    element.classList.remove(className);
-    void element.offsetWidth;
-    element.classList.add(className);
-
-    element[timerKey] = window.setTimeout(() => {
-        element.classList.remove(className);
-        element[timerKey] = null;
-    }, timeoutMs);
 }
 
 // ====================================================================
@@ -176,7 +157,7 @@ export function updateCard(card, roomInfo, data, cardState) {
         platformChip.dataset.platform = roomInfo.platform || '';
         platformChip.style.setProperty('--platform-color', platformMeta.color);
     }
-    viewerIcon.textContent = (roomInfo.platform === 'twitch' || roomInfo.platform === 'kick') ? '👤' : '🔥';
+    viewerIcon.textContent = EXTERNAL_VIEWER_PLATFORMS.has(roomInfo.platform) ? '👤' : '🔥';
 
     // Favorite status: Always sync to ensure consistency
     const isFav = !!roomInfo.isFav;  // Ensure boolean
@@ -198,7 +179,6 @@ export function updateCard(card, roomInfo, data, cardState) {
             : '<svg viewBox="0 0 24 24"><path d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.01 4.38.38-3.32 2.88 1 4.28L12 15.4z" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
     }
 
-    const previousCardState = card.dataset.state || '';
     card.dataset.state = cardState;
 
     // 🔥 Performance: Use toggle instead of remove+add to reduce classList operations
@@ -208,16 +188,6 @@ export function updateCard(card, roomInfo, data, cardState) {
     card.classList.toggle('is-error-card', cardState === 'error');
     card.classList.toggle('is-loading-card', cardState === 'loading' || cardState === 'retrying');
     refs.viewerPill?.classList.toggle('hidden', cardState !== 'live');
-
-    const isLoadingState = cardState === 'loading' || cardState === 'retrying';
-
-    if (!isLoadingState && previousCardState && previousCardState !== cardState) {
-        restartTransientClass(card, 'is-status-shift', CARD_STATUS_ANIMATION_MS);
-    }
-
-    if (!isLoadingState && data._hasChanges === true) {
-        restartTransientClass(card, 'is-card-updated', CARD_UPDATE_ANIMATION_MS);
-    }
 
     let newThumbSrc = '';
     const newAvatarSrc = data.avatar || '';
@@ -329,6 +299,9 @@ export function updateCard(card, roomInfo, data, cardState) {
         imgElement: avt,
         newSrc: newAvatarSrc,
         skeletonElement: avatarSkeleton,
+        fallbacks: {
+            standard: data.cover && data.cover !== newAvatarSrc ? data.cover : ''
+        },
         hideOnError: true
     });
 }

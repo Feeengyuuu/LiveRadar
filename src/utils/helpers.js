@@ -314,7 +314,7 @@ export function getRandomItem(arr) {
  * Generate cache key for room data
  * Eliminates duplicate string concatenation throughout codebase
  *
- * @param {string} platform - Platform name (douyu/bilibili/twitch/kick)
+ * @param {string} platform - Platform name (douyu/bilibili/twitch/kick/picarto/soop)
  * @param {string|number} id - Room ID
  * @returns {string} Cache key in format "platform-id"
  *
@@ -329,7 +329,7 @@ export function getRoomCacheKey(platform, id) {
  * Normalize room ID for platforms with case-insensitive channel names
  * Handles full URLs and @ prefixes.
  *
- * @param {string} platform - Platform name (twitch/kick)
+ * @param {string} platform - Platform name (twitch/kick/picarto/soop)
  * @param {string|number} rawId - Raw room ID or URL
  * @returns {string} Normalized room ID
  */
@@ -352,6 +352,21 @@ export function normalizeRoomId(platform, rawId) {
     return id.toLowerCase();
   }
 
+  if (platform === 'picarto') {
+    id = id.replace(/^@/, '');
+    id = id.replace(/^.*picarto\.tv\/?/i, '');
+    id = id.split(/[/?#]/)[0];
+    return id;
+  }
+
+  if (platform === 'soop') {
+    id = id.replace(/^@/, '');
+    id = id.replace(/^.*(?:sooplive|afreecatv)\.(?:co\.kr|com)\/?/i, '');
+    id = id.replace(/^(?:play|ch|afreeca)\//i, '');
+    id = id.split(/[/?#]/)[0];
+    return id.toLowerCase();
+  }
+
   return id;
 }
 
@@ -359,7 +374,7 @@ export function normalizeRoomId(platform, rawId) {
  * Generate DOM element ID for room card
  * Eliminates duplicate string concatenation throughout codebase
  *
- * @param {string} platform - Platform name (douyu/bilibili/twitch/kick)
+ * @param {string} platform - Platform name (douyu/bilibili/twitch/kick/picarto/soop)
  * @param {string|number} id - Room ID
  * @returns {string} Card ID in format "card-platform-id"
  *
@@ -414,6 +429,10 @@ export function showToast(message, typeOrDuration = 3000, durationOverride) {
   toast.className = 'toast';
   toast.classList.add(`toast--${toastType}`);
   toast.textContent = message;
+  toast.setAttribute('role', toastType === 'error' ? 'alert' : 'status');
+  toast.setAttribute('aria-live', toastType === 'error' ? 'assertive' : 'polite');
+  toast.setAttribute('aria-atomic', 'true');
+  toast.title = message;
   container.appendChild(toast);
 
   setTimeout(() => {

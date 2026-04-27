@@ -37,6 +37,11 @@ function stripTimestampParam(url) {
         .replace(/[?&]$/, '');
 }
 
+function getTimestampParam(url) {
+    const match = String(url || '').match(/[?&]t=(\d+)/);
+    return match ? match[1] : '';
+}
+
 function applyTimestampParam(url, timestamp) {
     if (!url) return '';
     if (/([?&])t=\d+/.test(url)) {
@@ -46,10 +51,23 @@ function applyTimestampParam(url, timestamp) {
     return `${url}${separator}t=${timestamp}`;
 }
 
+function getLiveCoverRefreshInterval(platform) {
+    const intervals = APP_CONFIG.CACHE.LIVE_IMAGE_REFRESH_INTERVALS;
+    return FAST_LIVE_COVER_PLATFORMS.has(platform)
+        ? intervals.INTERNATIONAL
+        : intervals.DOMESTIC;
+}
+
+function getLiveCoverTimestampBucket(platform, timestamp) {
+    return Math.floor(timestamp / getLiveCoverRefreshInterval(platform));
+}
+
 // In-flight fetch dedup: multiple callers requesting the same cacheKey share a single promise
 const inFlightFetches = new Map();
 // Pending Douyu avatar fallbacks keyed by cacheKey, so cancelPendingFetches can drop them
 const pendingAvatarFetches = new Map();
+const FAST_LIVE_COVER_PLATFORMS = new Set(['twitch', 'kick', 'picarto', 'soop']);
+const VIEWER_COUNT_PLATFORMS = new Set(['twitch', 'kick', 'picarto']);
 
 function isRoomStillTracked(room) {
     const rooms = getRooms();
@@ -303,10 +321,10 @@ function applyRoomStatusResult(room, cacheKey, result, context) {
 
         let viewers = "离线";
         if (finalIsLive) {
-            // Priority: Display heat value, add "人" suffix for Twitch
+            // Priority: display viewer/popularity value. Real viewer-count platforms get "人".
             if (heatValue > 0) {
                 viewers = "在线 " + (formatHeat ? formatHeat(heatValue) : heatValue);
-                if (room.platform === 'twitch' || room.platform === 'kick') viewers += "人";
+                if (VIEWER_COUNT_PLATFORMS.has(room.platform)) viewers += "人";
             } else {
                 // Display online status when no heat data
                 viewers = "在线";
@@ -328,18 +346,19 @@ function applyRoomStatusResult(room, cacheKey, result, context) {
         const prevCover = prevData?.cover || '';
         const prevCoverBase = stripTimestampParam(prevCover);
         const nextCoverBase = stripTimestampParam(result.cover || '');
-        const lastCoverUpdate = prevData?.lastCoverUpdate || 0;
-        const coverRefreshDue = now - lastCoverUpdate > APP_CONFIG.CACHE.IMAGE_TIMESTAMP_INTERVAL;
-        const coverBaseChanged = !!nextCoverBase && !!prevCoverBase && nextCoverBase !== prevCoverBase;
+        const nextCoverTimestamp = String(getLiveCoverTimestampBucket(room.platform, now));
+        const prevCoverTimestamp = getTimestampParam(prevCover);
+        const coverBaseChanged = !!nextCoverBase && nextCoverBase !== prevCoverBase;
+        const coverRefreshDue = !!nextCoverBase && prevCoverTimestamp !== nextCoverTimestamp;
 
         let finalCover = result.cover || '';
         if (finalIsLive) {
             if (!nextCoverBase) {
                 finalCover = prevCover;
-            } else if (!coverBaseChanged && !coverRefreshDue) {
-                finalCover = prevCover;
+            } else if (coverBaseChanged || coverRefreshDue) {
+                finalCover = applyTimestampParam(nextCoverBase, nextCoverTimestamp);
             } else {
-                finalCover = applyTimestampParam(nextCoverBase, now);
+                finalCover = prevCover;
             }
         } else if (!result.isReplay && prevCover) {
             finalCover = prevCover;
@@ -347,7 +366,7 @@ function applyRoomStatusResult(room, cacheKey, result, context) {
 
         const shouldUpdateCoverTimestamp = finalIsLive
             && nextCoverBase
-            && (coverBaseChanged || coverRefreshDue || !lastCoverUpdate);
+            && (coverBaseChanged || coverRefreshDue);
 
         const updateData = {
             ...result,

@@ -12,6 +12,10 @@
  * @module core/renderer/image-handler
  */
 
+import { APP_CONFIG } from '../../config/constants.js';
+
+const FAST_LIVE_COVER_PLATFORMS = new Set(['twitch', 'kick', 'picarto', 'soop']);
+
 // ====================================================================
 // Image Event Handler Management (Memory Leak Prevention)
 // ====================================================================
@@ -48,7 +52,7 @@ export function setImageHandlers(img, onLoad, onError) {
 
     // Add new listeners
     img.addEventListener('load', onLoad, { once: true });
-    img.addEventListener('error', onError, { once: true });
+    img.addEventListener('error', onError);
 }
 
 // ====================================================================
@@ -74,18 +78,22 @@ export function getSmartImageUrl(baseUrl, platform, isLive) {
         return baseUrl;
     }
 
-    const isInternational = platform === 'twitch' || platform === 'kick';
+    const isInternational = FAST_LIVE_COVER_PLATFORMS.has(platform);
+    const intervals = APP_CONFIG.CACHE.LIVE_IMAGE_REFRESH_INTERVALS;
+    const refreshInterval = isInternational
+        ? intervals.INTERNATIONAL
+        : intervals.DOMESTIC;
 
     // 🔥 Smart caching buckets
     if (isInternational) {
         // International platforms: Refresh every 5 minutes
         // Twitch/Kick update thumbnails more frequently
-        const cacheKey = Math.floor(Date.now() / (5 * 60 * 1000));
+        const cacheKey = Math.floor(Date.now() / refreshInterval);
         return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${cacheKey}`;
     } else {
         // Domestic platforms: Refresh every 10 minutes
         // Douyu/Bilibili update less frequently
-        const cacheKey = Math.floor(Date.now() / (10 * 60 * 1000));
+        const cacheKey = Math.floor(Date.now() / refreshInterval);
         return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${cacheKey}`;
     }
 }
@@ -99,6 +107,13 @@ export function getSmartImageUrl(baseUrl, platform, isLive) {
  * Maps image elements to their configuration for retry
  */
 const imageConfigs = new WeakMap();
+
+function normalizeImageSrc(src) {
+    const value = String(src || '').trim();
+    if (!value) return '';
+    if (value.startsWith('//')) return `https:${value}`;
+    return value;
+}
 
 /**
  * Unified image source setter with lazy loading and fallback support
@@ -128,10 +143,19 @@ export function setImageSource(config) {
         forceTransition = false
     } = config;
 
+    const requestedSrc = normalizeImageSrc(newSrc);
+    const fallbackHD = normalizeImageSrc(fallbacks.hd);
+    const fallbackStandard = normalizeImageSrc(fallbacks.standard);
+
+    imgElement.referrerPolicy = 'no-referrer';
+    imgElement.decoding = 'async';
+    imgElement.loading = 'lazy';
+
     // Clear image if no new source
-    if (!newSrc) {
+    if (!requestedSrc) {
         if (imgElement.src) {
-            imgElement.src = '';
+            imgElement.removeAttribute('src');
+            delete imgElement.dataset.lrSrc;
             if (loadedClass) imgElement.classList.remove(loadedClass);
             if (hideOnError) imgElement.classList.add('hidden');
             if (skeletonElement) skeletonElement.classList.remove('hidden');
@@ -141,11 +165,15 @@ export function setImageSource(config) {
 
     // Only update if URL actually changed AND image is successfully loaded
     // This prevents unnecessary reloads while ensuring failed loads are retried
-    if (imgElement.src === newSrc) {
+    if (imgElement.dataset.lrSrc === requestedSrc || imgElement.src === requestedSrc) {
         // Check if image actually loaded successfully
         // complete === true means load/error event fired
         // naturalHeight > 0 means image data is valid
         if (imgElement.complete && imgElement.naturalHeight > 0) {
+            if (loadedClass) imgElement.classList.add(loadedClass);
+            if (loaderElement) loaderElement.classList.add('hidden');
+            if (skeletonElement) skeletonElement.classList.add('hidden');
+            if (hideOnError) imgElement.classList.remove('hidden');
             // Image successfully loaded, skip reload to prevent flickering
             return;
         }
@@ -154,12 +182,19 @@ export function setImageSource(config) {
     }
 
     // Store config for potential recovery after visibility change
-    imageConfigs.set(imgElement, config);
+    imageConfigs.set(imgElement, {
+        ...config,
+        newSrc: requestedSrc,
+        fallbacks: {
+            hd: fallbackHD,
+            standard: fallbackStandard
+        }
+    });
 
     // Prepare for loading
     if (loadedClass) imgElement.classList.remove(loadedClass);
     if (loaderElement) loaderElement.classList.remove('hidden');
-    imgElement.src = newSrc;
+    imgElement.dataset.lrSrc = requestedSrc;
 
     const applyLoadedState = () => {
         if (loadedClass) imgElement.classList.add(loadedClass);
@@ -186,19 +221,17 @@ export function setImageSource(config) {
         },
         // onError - Try fallbacks or show skeleton
         () => {
-            const { hd, standard } = fallbacks;
-
             // Try HD fallback first
-            if (hd && imgElement.src !== hd && !imgElement.dataset.triedHD) {
+            if (fallbackHD && imgElement.src !== fallbackHD && !imgElement.dataset.triedHD) {
                 imgElement.dataset.triedHD = 'true';
-                imgElement.src = hd;
+                imgElement.src = fallbackHD;
                 return;
             }
 
             // Try standard fallback
-            if (standard && imgElement.src !== standard && !imgElement.dataset.triedStandard) {
+            if (fallbackStandard && imgElement.src !== fallbackStandard && !imgElement.dataset.triedStandard) {
                 imgElement.dataset.triedStandard = 'true';
-                imgElement.src = standard;
+                imgElement.src = fallbackStandard;
                 return;
             }
 
@@ -214,6 +247,12 @@ export function setImageSource(config) {
             delete imgElement.dataset.triedStandard;
         }
     );
+
+    if (imgElement.src === requestedSrc && imgElement.complete && imgElement.naturalHeight === 0) {
+        // Setting the same failed URL may not trigger a fresh load in every browser.
+        imgElement.removeAttribute('src');
+    }
+    imgElement.src = requestedSrc;
 }
 
 // ====================================================================

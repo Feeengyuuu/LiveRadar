@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getSmartImageUrl } from '../image-handler.js';
+import { getSmartImageUrl, setImageSource } from '../image-handler.js';
 
 describe('Image Handler - getSmartImageUrl', () => {
   beforeEach(() => {
@@ -49,6 +49,28 @@ describe('Image Handler - getSmartImageUrl', () => {
 
       const url = 'https://kick.com/cover.jpg';
       const result = getSmartImageUrl(url, 'kick', true);
+
+      const expected5MinBucket = Math.floor(now / (5 * 60 * 1000));
+      expect(result).toBe(`${url}?t=${expected5MinBucket}`);
+    });
+
+    it('should add 5-minute timestamp bucket for Picarto', () => {
+      const now = 1700000000000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+
+      const url = 'https://picarto.tv/cover.jpg';
+      const result = getSmartImageUrl(url, 'picarto', true);
+
+      const expected5MinBucket = Math.floor(now / (5 * 60 * 1000));
+      expect(result).toBe(`${url}?t=${expected5MinBucket}`);
+    });
+
+    it('should add 5-minute timestamp bucket for SOOP', () => {
+      const now = 1700000000000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+
+      const url = 'https://liveimg.sooplive.com/m/123456789';
+      const result = getSmartImageUrl(url, 'soop', true);
 
       const expected5MinBucket = Math.floor(now / (5 * 60 * 1000));
       expect(result).toBe(`${url}?t=${expected5MinBucket}`);
@@ -151,5 +173,75 @@ describe('Image Handler - getSmartImageUrl', () => {
       const result = getSmartImageUrl(urlWithTimestamp, 'douyu', true);
       expect(result).toBe(urlWithTimestamp);
     });
+  });
+});
+
+describe('Image Handler - setImageSource', () => {
+  function setImageState(img, { complete, naturalHeight }) {
+    Object.defineProperty(img, 'complete', {
+      configurable: true,
+      value: complete
+    });
+    Object.defineProperty(img, 'naturalHeight', {
+      configurable: true,
+      value: naturalHeight
+    });
+  }
+
+  it('reveals a hidden avatar when the same URL is already loaded', () => {
+    const img = document.createElement('img');
+    const skeleton = document.createElement('div');
+    const url = 'https://example.com/avatar.jpg';
+
+    img.classList.add('hidden');
+    img.dataset.lrSrc = url;
+    img.src = url;
+    setImageState(img, { complete: true, naturalHeight: 64 });
+
+    setImageSource({
+      imgElement: img,
+      newSrc: url,
+      skeletonElement: skeleton,
+      hideOnError: true
+    });
+
+    expect(img.classList.contains('hidden')).toBe(false);
+    expect(skeleton.classList.contains('hidden')).toBe(true);
+  });
+
+  it('keeps the error handler active through HD and standard fallbacks', () => {
+    const img = document.createElement('img');
+    const skeleton = document.createElement('div');
+
+    setImageSource({
+      imgElement: img,
+      newSrc: 'https://example.com/original.jpg',
+      skeletonElement: skeleton,
+      fallbacks: {
+        hd: 'https://example.com/hd.jpg',
+        standard: 'https://example.com/standard.jpg'
+      }
+    });
+
+    img.dispatchEvent(new Event('error'));
+    expect(img.src).toBe('https://example.com/hd.jpg');
+
+    img.dispatchEvent(new Event('error'));
+    expect(img.src).toBe('https://example.com/standard.jpg');
+
+    img.dispatchEvent(new Event('error'));
+    expect(skeleton.classList.contains('hidden')).toBe(false);
+  });
+
+  it('normalizes protocol-relative image URLs to HTTPS', () => {
+    const img = document.createElement('img');
+
+    setImageSource({
+      imgElement: img,
+      newSrc: '//cdn.example.com/avatar.jpg'
+    });
+
+    expect(img.src).toBe('https://cdn.example.com/avatar.jpg');
+    expect(img.dataset.lrSrc).toBe('https://cdn.example.com/avatar.jpg');
   });
 });

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="LiveRadar responsive layout">
+  <rect width="1200" height="720" rx="34" fill="#f8fafc"/>
+  <text x="84" y="96" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="800">Responsive Layout</text>
+  <g filter="drop-shadow(0 20px 28px rgba(15,23,42,.14))">
+    <rect x="120" y="185" width="235" height="420" rx="34" fill="#0f172a"/>
+    <rect x="430" y="185" width="650" height="420" rx="34" fill="#0f172a"/>
+  </g>
+  <g fill="#1f2937">
+    <rect x="150" y="235" width="175" height="42" rx="21"/>
+    <rect x="150" y="305" width="175" height="64" rx="18"/>
+    <rect x="150" y="385" width="175" height="64" rx="18"/>
+    <rect x="150" y="465" width="175" height="64" rx="18"/>
+    <rect x="480" y="235" width="550" height="42" rx="21"/>
+    <rect x="480" y="315" width="150" height="122" rx="20"/>
+    <rect x="660" y="315" width="150" height="122" rx="20"/>
+    <rect x="840" y="315" width="150" height="122" rx="20"/>
+    <rect x="480" y="465" width="150" height="82" rx="20"/>
+    <rect x="660" y="465" width="150" height="82" rx="20"/>
+    <rect x="840" y="465" width="150" height="82" rx="20"/>
+  </g>
+  <g fill="#60a5fa">
+    <circle cx="184" cy="337" r="13"/>
+    <circle cx="184" cy="417" r="13"/>
+    <circle cx="184" cy="497" r="13"/>
+    <circle cx="520" cy="350" r="15"/>
+    <circle cx="700" cy="350" r="15"/>
+    <circle cx="880" cy="350" r="15"/>
+  </g>
+  <g fill="#64748b">
+    <rect x="210" y="332" width="78" height="10" rx="5"/>
+    <rect x="210" y="412" width="78" height="10" rx="5"/>
+    <rect x="210" y="492" width="78" height="10" rx="5"/>
+    <rect x="545" y="392" width="60" height="10" rx="5"/>
+    <rect x="725" y="392" width="60" height="10" rx="5"/>
+    <rect x="905" y="392" width="60" height="10" rx="5"/>
+  </g>
+  <text x="155" y="650" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">390 PX</text>
+  <text x="700" y="650" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">DESKTOP GRID</text>
+</svg>

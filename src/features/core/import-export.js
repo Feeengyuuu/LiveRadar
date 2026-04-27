@@ -82,7 +82,7 @@ export function importRooms(event) {
                         isFav: !!room.isFav
                     };
                 })
-                .filter(room => room.id && ['douyu', 'bilibili', 'twitch', 'kick'].includes(room.platform));
+                .filter(room => room.id && ['douyu', 'bilibili', 'twitch', 'kick', 'picarto', 'soop'].includes(room.platform));
 
             const uniqueRooms = [];
             const seen = new Map();

@@ -26,40 +26,6 @@ import { on, emit, Events } from './event-bus.js';
 // External dependencies (only callbacks need injection)
 let detectStatusChanges = null;
 let disposeRefreshManager = null;
-const REFRESH_VISUAL_SETTLE_MS = 960;
-let refreshVisualSettleTimer = null;
-
-function clearRefreshVisualState() {
-    if (typeof document === 'undefined') return;
-
-    if (refreshVisualSettleTimer) {
-        ResourceManager.clearTimer(refreshVisualSettleTimer);
-        refreshVisualSettleTimer = null;
-    }
-
-    document.documentElement.classList.remove('is-refreshing');
-}
-
-function setRefreshVisualState(isRefreshing) {
-    if (typeof document === 'undefined') return;
-
-    if (refreshVisualSettleTimer) {
-        ResourceManager.clearTimer(refreshVisualSettleTimer);
-        refreshVisualSettleTimer = null;
-    }
-
-    if (isRefreshing) {
-        document.documentElement.classList.add('is-refreshing');
-        return;
-    }
-
-    refreshVisualSettleTimer = ResourceManager.addTimer(
-        setTimeout(() => {
-            document.documentElement.classList.remove('is-refreshing');
-            refreshVisualSettleTimer = null;
-        }, REFRESH_VISUAL_SETTLE_MS)
-    );
-}
 
 /**
  * Initialize refresh manager with external dependencies
@@ -76,7 +42,6 @@ export function initRefreshManager(deps = {}) {
 
     disposeRefreshManager = () => {
         unsubscribeRefreshRequest();
-        clearRefreshVisualState();
         disposeRefreshManager = null;
     };
 
@@ -146,6 +111,18 @@ function createRenderScheduler() {
  * Update refresh progress display
  */
 let hideStatsTimer = null;
+
+function formatRefreshStats(stats) {
+    const elapsed = ((Date.now() - stats.startTime) / 1000).toFixed(1);
+    const progress = `${stats.completed}/${stats.total}`;
+    const compact = window.matchMedia?.('(max-width: 380px)').matches;
+
+    return {
+        text: compact ? `${progress} ${elapsed}s` : `${progress} (${elapsed}s)`,
+        label: `刷新进度：${progress}，已用时 ${elapsed} 秒`
+    };
+}
+
 function updateRefreshStatsDisplay() {
     const cache = getDOMCache();
     const el = cache.refreshStats;
@@ -157,8 +134,10 @@ function updateRefreshStatsDisplay() {
             ResourceManager.clearTimer(hideStatsTimer);
             hideStatsTimer = null;
         }
-        const elapsed = ((Date.now() - state.refreshStats.startTime) / 1000).toFixed(1);
-        el.textContent = `${state.refreshStats.completed}/${state.refreshStats.total} (${elapsed}s)`;
+        const { text, label } = formatRefreshStats(state.refreshStats);
+        el.textContent = text;
+        el.title = label;
+        el.setAttribute('aria-label', label);
         el.classList.remove('hidden');
         el.classList.add('active');
     } else {
@@ -247,7 +226,6 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
         emit(Events.AUTO_REFRESH_RESET);
     }
 
-    setRefreshVisualState(true);
     updateRefreshStatus(true);
 
     const cache = getDOMCache();
@@ -370,7 +348,6 @@ export async function refreshAll(sl = false, isAutoRefresh = false, options = {}
     } finally {
         // Cleanup work - execute regardless of success or failure
         updateRefreshStatus(false);
-        setRefreshVisualState(false);
         updateRefreshStatsDisplay();
 
         if (cache.globalRefreshBtn) cache.globalRefreshBtn.classList.remove('animate-spin');
