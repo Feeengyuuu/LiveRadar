@@ -155,6 +155,12 @@ describe('music-player', () => {
 
         expect(audioInstances[0].currentTime).toBe(60);
         expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');
+
+        audioInstances[0].currentTime = 0;
+        vi.advanceTimersByTime(500);
+
+        expect(audioInstances[0].currentTime).toBe(60);
+        expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');
     });
 
     it('confirms a seekable progress click if playback snaps back shortly after', async () => {
@@ -164,6 +170,22 @@ describe('music-player', () => {
         dispatchSliderStart(document.getElementById('music-progress-bar'), 100);
         audioInstances[0].currentTime = 0;
         vi.advanceTimersByTime(500);
+
+        expect(audioInstances[0].currentTime).toBe(60);
+        expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');
+    });
+
+    it('supports direct progress click events without a pointerdown drag', async () => {
+        importedModule = await import('../music-player.js');
+        importedModule.initMusicPlayer();
+
+        document.getElementById('music-progress-bar').dispatchEvent(
+            new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                clientX: 100,
+            })
+        );
 
         expect(audioInstances[0].currentTime).toBe(60);
         expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');

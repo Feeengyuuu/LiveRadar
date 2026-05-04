@@ -65,7 +65,6 @@ class MusicPlayerController {
         this.animationCleanup = null;
         this.dragKind = null;
         this.pendingSeekRatio = null;
-        this.pendingSeekNeedsReady = false;
         this.seekConfirmationTimer = null;
         this.ready = false;
 
@@ -227,6 +226,11 @@ class MusicPlayerController {
         const start = (event) => {
             this.startDrag(kind, event);
         };
+        const click = (event) => {
+            if (event.cancelable) event.preventDefault();
+            event.stopPropagation();
+            this.applySliderValue(kind, event);
+        };
         const keydown = (event) => {
             if (kind === 'progress') {
                 this.handleProgressKeydown(event);
@@ -242,6 +246,7 @@ class MusicPlayerController {
             this.on(slider, 'touchstart', start, { passive: false });
         }
 
+        this.on(slider, 'click', click);
         this.on(slider, 'keydown', keydown);
     }
 
@@ -392,11 +397,21 @@ class MusicPlayerController {
 
     applyDragValue(event) {
         if (this.dragKind === 'progress') {
+            this.applySliderValue('progress', event);
+        }
+
+        if (this.dragKind === 'volume') {
+            this.applySliderValue('volume', event);
+        }
+    }
+
+    applySliderValue(kind, event) {
+        if (kind === 'progress') {
             this.seekToRatio(this.getPointerRatio(event, this.elements.progressBar));
             return;
         }
 
-        if (this.dragKind === 'volume') {
+        if (kind === 'volume') {
             this.setVolume(this.getPointerRatio(event, this.elements.volumeSlider));
         }
     }
@@ -528,30 +543,25 @@ class MusicPlayerController {
     }
 
     handleCanPlay() {
-        this.applyPendingSeek({ ready: true });
+        this.confirmPendingSeek();
         this.setPlayerStatus('ready');
     }
 
     handlePlaying() {
-        this.applyPendingSeek({ ready: true });
+        this.confirmPendingSeek();
         this.setPlayerStatus('ready');
     }
 
     queuePendingSeek(ratio) {
         this.pendingSeekRatio = ratio;
-        this.pendingSeekNeedsReady = true;
     }
 
-    applyPendingSeek(options = {}) {
+    applyPendingSeek() {
         if (this.pendingSeekRatio === null || !this.hasSeekableDuration()) return false;
 
         const ratio = this.pendingSeekRatio;
         this.applySeekRatio(ratio);
-        if (!this.pendingSeekNeedsReady || options.ready) {
-            this.clearPendingSeek();
-        } else {
-            this.scheduleSeekConfirmation();
-        }
+        this.scheduleSeekConfirmation();
         return true;
     }
 
@@ -579,13 +589,15 @@ class MusicPlayerController {
         if (this.audio.currentTime + CONFIG.SEEK_CONFIRM_TOLERANCE_SECONDS < targetTime) {
             this.audio.currentTime = targetTime;
             this.syncProgressUI();
+            return;
         }
+
+        this.clearPendingSeek();
     }
 
     clearPendingSeek() {
         this.clearSeekConfirmationTimer();
         this.pendingSeekRatio = null;
-        this.pendingSeekNeedsReady = false;
     }
 
     clearSeekConfirmationTimer() {
