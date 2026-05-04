@@ -149,6 +149,24 @@ describe('music-player', () => {
         expect(audioInstances[0].currentTime).toBe(60);
         expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');
         expect(document.getElementById('music-play-btn').getAttribute('aria-pressed')).toBe('true');
+
+        audioInstances[0].currentTime = 0;
+        audioInstances[0].dispatchEvent(new Event('canplay'));
+
+        expect(audioInstances[0].currentTime).toBe(60);
+        expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');
+    });
+
+    it('confirms a seekable progress click if playback snaps back shortly after', async () => {
+        importedModule = await import('../music-player.js');
+        importedModule.initMusicPlayer();
+
+        dispatchSliderStart(document.getElementById('music-progress-bar'), 100);
+        audioInstances[0].currentTime = 0;
+        vi.advanceTimersByTime(500);
+
+        expect(audioInstances[0].currentTime).toBe(60);
+        expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');
     });
 
     it('keeps progress click intent until metadata makes the track seekable', async () => {

@@ -27,6 +27,8 @@ const CONFIG = {
     SAVE_CURRENT_TRACK_KEY: 'music_player_current_track',
     ANIMATION_DURATION_MS: 220,
     TRACK_COMPLETE_HOLD_MS: 120,
+    SEEK_CONFIRM_MS: 500,
+    SEEK_CONFIRM_TOLERANCE_SECONDS: 0.75,
 };
 
 const LABELS = {
@@ -64,6 +66,7 @@ class MusicPlayerController {
         this.dragKind = null;
         this.pendingSeekRatio = null;
         this.pendingSeekNeedsReady = false;
+        this.seekConfirmationTimer = null;
         this.ready = false;
 
         this.state = {
@@ -315,8 +318,7 @@ class MusicPlayerController {
         }
 
         this.clearCompletionTimer();
-        this.pendingSeekRatio = null;
-        this.pendingSeekNeedsReady = false;
+        this.clearPendingSeek();
         const shouldPlay = Boolean(options.forcePlay || (options.keepPlaybackState && this.state.playing));
 
         if (this.audio) {
@@ -404,18 +406,15 @@ class MusicPlayerController {
 
         const safeRatio = clamp(ratio);
         this.clearCompletionTimer();
+        this.queuePendingSeek(safeRatio);
 
         if (!this.hasSeekableDuration()) {
-            this.pendingSeekRatio = safeRatio;
-            this.pendingSeekNeedsReady = true;
             this.syncProgressUI(safeRatio);
             return;
         }
 
-        this.pendingSeekRatio = null;
-        this.pendingSeekNeedsReady = false;
-        this.audio.currentTime = safeRatio * this.audio.duration;
-        this.syncProgressUI();
+        this.applySeekRatio(safeRatio);
+        this.scheduleSeekConfirmation();
     }
 
     handleProgressKeydown(event) {
@@ -442,8 +441,7 @@ class MusicPlayerController {
         }
 
         event.preventDefault();
-        this.audio.currentTime = clamp(nextTime / this.audio.duration) * this.audio.duration;
-        this.syncProgressUI();
+        this.seekToRatio(nextTime / this.audio.duration);
     }
 
     handleVolumeKeydown(event) {
@@ -539,17 +537,61 @@ class MusicPlayerController {
         this.setPlayerStatus('ready');
     }
 
+    queuePendingSeek(ratio) {
+        this.pendingSeekRatio = ratio;
+        this.pendingSeekNeedsReady = true;
+    }
+
     applyPendingSeek(options = {}) {
         if (this.pendingSeekRatio === null || !this.hasSeekableDuration()) return false;
 
         const ratio = this.pendingSeekRatio;
-        this.audio.currentTime = ratio * this.audio.duration;
-        this.syncProgressUI();
+        this.applySeekRatio(ratio);
         if (!this.pendingSeekNeedsReady || options.ready) {
-            this.pendingSeekRatio = null;
-            this.pendingSeekNeedsReady = false;
+            this.clearPendingSeek();
+        } else {
+            this.scheduleSeekConfirmation();
         }
         return true;
+    }
+
+    applySeekRatio(ratio) {
+        if (!this.hasSeekableDuration()) return;
+        this.audio.currentTime = clamp(ratio) * this.audio.duration;
+        this.syncProgressUI();
+    }
+
+    scheduleSeekConfirmation() {
+        this.clearSeekConfirmationTimer();
+        if (this.pendingSeekRatio === null) return;
+
+        this.seekConfirmationTimer = setTimeout(() => {
+            this.seekConfirmationTimer = null;
+            this.confirmPendingSeek();
+            this.clearPendingSeek();
+        }, CONFIG.SEEK_CONFIRM_MS);
+    }
+
+    confirmPendingSeek() {
+        if (this.pendingSeekRatio === null || !this.hasSeekableDuration()) return;
+
+        const targetTime = clamp(this.pendingSeekRatio) * this.audio.duration;
+        if (this.audio.currentTime + CONFIG.SEEK_CONFIRM_TOLERANCE_SECONDS < targetTime) {
+            this.audio.currentTime = targetTime;
+            this.syncProgressUI();
+        }
+    }
+
+    clearPendingSeek() {
+        this.clearSeekConfirmationTimer();
+        this.pendingSeekRatio = null;
+        this.pendingSeekNeedsReady = false;
+    }
+
+    clearSeekConfirmationTimer() {
+        if (!this.seekConfirmationTimer) return;
+        clearTimeout(this.seekConfirmationTimer);
+        this.seekConfirmationTimer = null;
     }
 
     setPlayerStatus(status) {
@@ -907,6 +949,7 @@ class MusicPlayerController {
         this.clearCompletionTimer();
         this.clearAnimationTimer();
         this.clearActiveDragListeners();
+        this.clearPendingSeek();
 
         if (this.audio) {
             this.audio.pause();
@@ -925,8 +968,6 @@ class MusicPlayerController {
         this.state.playing = false;
         this.state.animating = false;
         this.dragKind = null;
-        this.pendingSeekRatio = null;
-        this.pendingSeekNeedsReady = false;
     }
 }
 
