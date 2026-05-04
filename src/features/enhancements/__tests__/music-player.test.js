@@ -166,6 +166,37 @@ describe('music-player', () => {
 
         expect(audioInstances[0].currentTime).toBe(60);
         expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');
+
+        audioInstances[0].currentTime = 0;
+        audioInstances[0].dispatchEvent(new Event('canplay'));
+
+        expect(audioInstances[0].currentTime).toBe(60);
+        expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');
+    });
+
+    it('keeps a pending progress click stable after switching to the second track', async () => {
+        importedModule = await import('../music-player.js');
+        importedModule.initMusicPlayer();
+
+        document.querySelectorAll('.playlist-item')[1].click();
+
+        expect(document.getElementById('music-title').textContent).toBe('Outer Wilds');
+
+        audioInstances[0].duration = Number.NaN;
+        audioInstances[0].currentTime = 0;
+        dispatchSliderStart(document.getElementById('music-progress-bar'), 100);
+
+        expect(document.getElementById('music-progress-fill').style.width).toBe('50%');
+
+        audioInstances[0].duration = 146;
+        audioInstances[0].dispatchEvent(new Event('loadedmetadata'));
+        expect(audioInstances[0].currentTime).toBe(73);
+
+        audioInstances[0].currentTime = 0;
+        audioInstances[0].dispatchEvent(new Event('playing'));
+
+        expect(audioInstances[0].currentTime).toBe(73);
+        expect(document.getElementById('music-current-time').textContent).toBe('1:13');
     });
 
     it('expands and collapses through the new disclosure controller', async () => {

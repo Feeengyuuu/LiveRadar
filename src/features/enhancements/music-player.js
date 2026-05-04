@@ -63,6 +63,7 @@ class MusicPlayerController {
         this.animationCleanup = null;
         this.dragKind = null;
         this.pendingSeekRatio = null;
+        this.pendingSeekNeedsReady = false;
         this.ready = false;
 
         this.state = {
@@ -211,10 +212,10 @@ class MusicPlayerController {
         this.on(this.audio, 'durationchange', () => this.handleDurationChange());
         this.on(this.audio, 'ended', () => this.handleAudioEnded());
         this.on(this.audio, 'play', () => this.handlePlay());
-        this.on(this.audio, 'playing', () => this.setPlayerStatus('ready'));
+        this.on(this.audio, 'playing', () => this.handlePlaying());
         this.on(this.audio, 'pause', () => this.handlePause());
         this.on(this.audio, 'loadstart', () => this.setPlayerStatus('loading'));
-        this.on(this.audio, 'canplay', () => this.setPlayerStatus('ready'));
+        this.on(this.audio, 'canplay', () => this.handleCanPlay());
         this.on(this.audio, 'waiting', () => this.setPlayerStatus('loading'));
         this.on(this.audio, 'error', () => this.setPlayerStatus('error'));
     }
@@ -315,6 +316,7 @@ class MusicPlayerController {
 
         this.clearCompletionTimer();
         this.pendingSeekRatio = null;
+        this.pendingSeekNeedsReady = false;
         const shouldPlay = Boolean(options.forcePlay || (options.keepPlaybackState && this.state.playing));
 
         if (this.audio) {
@@ -405,11 +407,13 @@ class MusicPlayerController {
 
         if (!this.hasSeekableDuration()) {
             this.pendingSeekRatio = safeRatio;
+            this.pendingSeekNeedsReady = true;
             this.syncProgressUI(safeRatio);
             return;
         }
 
         this.pendingSeekRatio = null;
+        this.pendingSeekNeedsReady = false;
         this.audio.currentTime = safeRatio * this.audio.duration;
         this.syncProgressUI();
     }
@@ -525,13 +529,26 @@ class MusicPlayerController {
         if (!this.applyPendingSeek()) this.syncProgressUI();
     }
 
-    applyPendingSeek() {
+    handleCanPlay() {
+        this.applyPendingSeek({ ready: true });
+        this.setPlayerStatus('ready');
+    }
+
+    handlePlaying() {
+        this.applyPendingSeek({ ready: true });
+        this.setPlayerStatus('ready');
+    }
+
+    applyPendingSeek(options = {}) {
         if (this.pendingSeekRatio === null || !this.hasSeekableDuration()) return false;
 
         const ratio = this.pendingSeekRatio;
-        this.pendingSeekRatio = null;
         this.audio.currentTime = ratio * this.audio.duration;
         this.syncProgressUI();
+        if (!this.pendingSeekNeedsReady || options.ready) {
+            this.pendingSeekRatio = null;
+            this.pendingSeekNeedsReady = false;
+        }
         return true;
     }
 
@@ -909,6 +926,7 @@ class MusicPlayerController {
         this.state.animating = false;
         this.dragKind = null;
         this.pendingSeekRatio = null;
+        this.pendingSeekNeedsReady = false;
     }
 }
 
