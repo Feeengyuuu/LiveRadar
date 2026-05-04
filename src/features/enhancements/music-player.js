@@ -62,6 +62,7 @@ class MusicPlayerController {
         this.animationFinish = null;
         this.animationCleanup = null;
         this.dragKind = null;
+        this.pendingSeekRatio = null;
         this.ready = false;
 
         this.state = {
@@ -207,6 +208,7 @@ class MusicPlayerController {
             if (this.dragKind !== 'progress') this.syncProgressUI();
         });
         this.on(this.audio, 'loadedmetadata', () => this.handleMetadataLoaded());
+        this.on(this.audio, 'durationchange', () => this.handleDurationChange());
         this.on(this.audio, 'ended', () => this.handleAudioEnded());
         this.on(this.audio, 'play', () => this.handlePlay());
         this.on(this.audio, 'playing', () => this.setPlayerStatus('ready'));
@@ -312,6 +314,7 @@ class MusicPlayerController {
         }
 
         this.clearCompletionTimer();
+        this.pendingSeekRatio = null;
         const shouldPlay = Boolean(options.forcePlay || (options.keepPlaybackState && this.state.playing));
 
         if (this.audio) {
@@ -395,17 +398,24 @@ class MusicPlayerController {
     }
 
     seekToRatio(ratio) {
-        if (!this.audio || !Number.isFinite(this.audio.duration) || this.audio.duration <= 0) {
-            this.syncProgressUI(0);
+        if (!this.audio) return;
+
+        const safeRatio = clamp(ratio);
+        this.clearCompletionTimer();
+
+        if (!this.hasSeekableDuration()) {
+            this.pendingSeekRatio = safeRatio;
+            this.syncProgressUI(safeRatio);
             return;
         }
 
-        this.audio.currentTime = clamp(ratio) * this.audio.duration;
+        this.pendingSeekRatio = null;
+        this.audio.currentTime = safeRatio * this.audio.duration;
         this.syncProgressUI();
     }
 
     handleProgressKeydown(event) {
-        if (!this.audio || !Number.isFinite(this.audio.duration) || this.audio.duration <= 0) return;
+        if (!this.audio || !this.hasSeekableDuration()) return;
 
         const step = Math.max(5, this.audio.duration * 0.03);
         const pageStep = Math.max(15, this.audio.duration * 0.1);
@@ -491,8 +501,12 @@ class MusicPlayerController {
     }
 
     getPlaybackRatio() {
-        if (!this.audio || !Number.isFinite(this.audio.duration) || this.audio.duration <= 0) return 0;
+        if (!this.hasSeekableDuration()) return 0;
         return clamp(this.audio.currentTime / this.audio.duration);
+    }
+
+    hasSeekableDuration() {
+        return Boolean(this.audio && Number.isFinite(this.audio.duration) && this.audio.duration > 0);
     }
 
     setProgressRingVars(target, angle) {
@@ -504,7 +518,21 @@ class MusicPlayerController {
 
     handleMetadataLoaded() {
         this.setPlayerStatus('ready');
+        if (!this.applyPendingSeek()) this.syncProgressUI();
+    }
+
+    handleDurationChange() {
+        if (!this.applyPendingSeek()) this.syncProgressUI();
+    }
+
+    applyPendingSeek() {
+        if (this.pendingSeekRatio === null || !this.hasSeekableDuration()) return false;
+
+        const ratio = this.pendingSeekRatio;
+        this.pendingSeekRatio = null;
+        this.audio.currentTime = ratio * this.audio.duration;
         this.syncProgressUI();
+        return true;
     }
 
     setPlayerStatus(status) {
@@ -880,6 +908,7 @@ class MusicPlayerController {
         this.state.playing = false;
         this.state.animating = false;
         this.dragKind = null;
+        this.pendingSeekRatio = null;
     }
 }
 

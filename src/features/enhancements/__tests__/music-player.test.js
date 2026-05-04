@@ -136,6 +136,38 @@ describe('music-player', () => {
         expect(localStorage.getItem('music_player_volume')).toBe('0');
     });
 
+    it('seeks to the clicked progress position without restarting playback', async () => {
+        importedModule = await import('../music-player.js');
+        importedModule.initMusicPlayer();
+
+        document.getElementById('music-play-btn').click();
+        await Promise.resolve();
+
+        audioInstances[0].currentTime = 10;
+        dispatchSliderStart(document.getElementById('music-progress-bar'), 100);
+
+        expect(audioInstances[0].currentTime).toBe(60);
+        expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');
+        expect(document.getElementById('music-play-btn').getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('keeps progress click intent until metadata makes the track seekable', async () => {
+        importedModule = await import('../music-player.js');
+        importedModule.initMusicPlayer();
+
+        audioInstances[0].duration = Number.NaN;
+        dispatchSliderStart(document.getElementById('music-progress-bar'), 100);
+
+        expect(audioInstances[0].currentTime).toBe(0);
+        expect(document.getElementById('music-progress-fill').style.width).toBe('50%');
+
+        audioInstances[0].duration = 120;
+        audioInstances[0].dispatchEvent(new Event('loadedmetadata'));
+
+        expect(audioInstances[0].currentTime).toBe(60);
+        expect(document.getElementById('music-progress-bar').getAttribute('aria-valuenow')).toBe('50');
+    });
+
     it('expands and collapses through the new disclosure controller', async () => {
         importedModule = await import('../music-player.js');
         importedModule.initMusicPlayer();
@@ -262,4 +294,24 @@ function musicPlayerMarkup() {
             <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" /></symbol>
         </svg>
     `;
+}
+
+function dispatchSliderStart(element, clientX) {
+    const usesPointerEvents = 'PointerEvent' in window;
+    const startType = usesPointerEvents ? 'pointerdown' : 'mousedown';
+    const endType = usesPointerEvents ? 'pointerup' : 'mouseup';
+    const EventConstructor = usesPointerEvents && typeof window.PointerEvent === 'function'
+        ? window.PointerEvent
+        : window.MouseEvent;
+
+    element.dispatchEvent(new EventConstructor(startType, {
+        bubbles: true,
+        cancelable: true,
+        clientX,
+    }));
+    document.dispatchEvent(new EventConstructor(endType, {
+        bubbles: true,
+        cancelable: true,
+        clientX,
+    }));
 }
